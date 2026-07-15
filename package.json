@@ -13,6 +13,7 @@
         "format:check": "prettier --check .",
         "typecheck": "tsc --noEmit"
     },
+    "homepage": "https://file-converter-mu-seven.vercel.app",
     "repository": {
         "type": "git",
         "url": "https://github.com/PavelLazarchuk/file-converter.git"
