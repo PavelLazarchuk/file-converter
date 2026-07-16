@@ -157,6 +157,17 @@ export function ConvertForm() {
                         file.
                     </p>
                 )}
+                {target === 'gif' && (
+                    <p className="text-sm text-muted-foreground">
+                        Exports a single still frame — animation is not preserved.
+                    </p>
+                )}
+                {target === 'tiff' && (
+                    <p className="text-sm text-muted-foreground">
+                        A lossless format for print and archival. Files are large and most browsers
+                        can&apos;t preview them.
+                    </p>
+                )}
                 {errors.format && (
                     <p className="text-sm text-destructive">{errors.format.message}</p>
                 )}

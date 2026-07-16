@@ -6,7 +6,7 @@ import { CropForm } from './crop-form';
 export const metadata: Metadata = {
     title: 'Crop an image — Image Toolbox',
     description:
-        'Crop JPEG, PNG, WEBP or AVIF images to a preset aspect ratio like 1:1 or 16:9, with a draggable crop area.',
+        'Crop JPEG, PNG, WEBP or AVIF images to a preset aspect ratio like 1:1 or 16:9, or a circle with transparent corners, using a draggable crop area.',
 };
 
 export default function CropPage() {

@@ -14,6 +14,7 @@ import {
     MAX_INPUT_PIXELS,
     QUALITY_LIMITS,
     acceptedFormatsLabel,
+    circleOutputFormat,
     clampCropBox,
     formatFileSize,
     placeholderFontSize,
@@ -132,6 +133,7 @@ export async function cropImage(formData: FormData): Promise<ActionResult> {
         const { buffer, format, baseName } = await readImageFile(formData, FORMAT_KEYS);
         const parsed = cropSchema.safeParse({
             ratio: formData.get('ratio'),
+            shape: formData.get('shape') || 'rectangle',
             left: formData.get('left'),
             top: formData.get('top'),
             width: formData.get('width'),
@@ -152,15 +154,31 @@ export async function cropImage(formData: FormData): Promise<ActionResult> {
         }
 
         const box = clampCropBox(parsed.data, srcWidth, srcHeight);
-        let pipeline = decode(buffer).extract(box).toFormat(format);
+        const circle = parsed.data.shape === 'circle';
+        const outFormat = circle ? circleOutputFormat(format) : format;
+        let pipeline = decode(buffer).extract(box);
+
+        if (circle) {
+            const mask = Buffer.from(
+                `<svg xmlns="http://www.w3.org/2000/svg" width="${box.width}" height="${box.height}">` +
+                    `<ellipse cx="${box.width / 2}" cy="${box.height / 2}" ` +
+                    `rx="${box.width / 2}" ry="${box.height / 2}" fill="#fff"/>` +
+                    `</svg>`
+            );
+
+            pipeline = pipeline.ensureAlpha().composite([{ input: mask, blend: 'dest-in' }]);
+        }
+
+        pipeline = pipeline.toFormat(outFormat);
 
         if (keepMetadataRequested(formData)) pipeline = pipeline.keepMetadata();
 
         const data = await pipeline.toBuffer();
-        const { extension, mimeType } = IMAGE_FORMATS[format];
+        const { extension, mimeType } = IMAGE_FORMATS[outFormat];
         const ratioLabel = parsed.data.ratio.replace(':', 'x');
+        const shapeLabel = circle ? '-circle' : '';
 
-        return success(data, `${baseName}-${ratioLabel}.${extension}`, mimeType);
+        return success(data, `${baseName}-${ratioLabel}${shapeLabel}.${extension}`, mimeType);
     });
 }
 

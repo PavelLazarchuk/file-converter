@@ -11,11 +11,11 @@ export const FORMAT_KEYS = ['jpeg', 'png', 'webp', 'avif'] as const;
 
 export type ImageFormat = (typeof FORMAT_KEYS)[number];
 
-export const CONVERT_SOURCE_KEYS = [...FORMAT_KEYS, 'svg'] as const;
+export const CONVERT_SOURCE_KEYS = [...FORMAT_KEYS, 'gif', 'svg'] as const;
 
 export type ConvertSource = (typeof CONVERT_SOURCE_KEYS)[number];
 
-export const CONVERT_TARGET_KEYS = [...FORMAT_KEYS, 'svg', 'ico', 'base64'] as const;
+export const CONVERT_TARGET_KEYS = [...FORMAT_KEYS, 'gif', 'tiff', 'svg', 'ico', 'base64'] as const;
 
 export type ConvertTarget = (typeof CONVERT_TARGET_KEYS)[number];
 
@@ -27,6 +27,8 @@ export const IMAGE_FORMATS: Record<
     png: { label: 'PNG', mimeType: 'image/png', extension: 'png' },
     webp: { label: 'WEBP', mimeType: 'image/webp', extension: 'webp' },
     avif: { label: 'AVIF', mimeType: 'image/avif', extension: 'avif' },
+    gif: { label: 'GIF', mimeType: 'image/gif', extension: 'gif' },
+    tiff: { label: 'TIFF', mimeType: 'image/tiff', extension: 'tiff' },
     svg: { label: 'SVG', mimeType: 'image/svg+xml', extension: 'svg' },
     ico: { label: 'ICO (favicon)', mimeType: 'image/x-icon', extension: 'ico' },
     base64: { label: 'Base64 data URI', mimeType: 'text/plain', extension: 'txt' },
@@ -79,6 +81,19 @@ export const ASPECT_RATIOS: Record<AspectRatio, { label: string; width: number; 
         '2:3': { label: 'Portrait (2:3)', width: 2, height: 3 },
         '9:16': { label: 'Vertical (9:16)', width: 9, height: 16 },
     };
+
+export const CROP_SHAPE_KEYS = ['rectangle', 'circle'] as const;
+
+export type CropShape = (typeof CROP_SHAPE_KEYS)[number];
+
+export const CROP_SHAPES: Record<CropShape, { label: string }> = {
+    rectangle: { label: 'Rectangle' },
+    circle: { label: 'Circle / ellipse (transparent corners)' },
+};
+
+export function circleOutputFormat(format: ImageFormat): ImageFormat {
+    return format === 'jpeg' ? 'png' : format;
+}
 
 export type CropBox = { left: number; top: number; width: number; height: number };
 

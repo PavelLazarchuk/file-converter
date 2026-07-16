@@ -4,6 +4,7 @@ import {
     ASPECT_RATIO_KEYS,
     COMPRESS_MODES,
     CONVERT_TARGET_KEYS,
+    CROP_SHAPE_KEYS,
     DIMENSION_LIMITS,
     FORMAT_KEYS,
     HEX_COLOR_PATTERN,
@@ -34,13 +35,14 @@ export const resizeSchema = z.object({
 
 export const cropSchema = z.object({
     ratio: z.enum(ASPECT_RATIO_KEYS, { error: 'Choose an aspect ratio' }),
+    shape: z.enum(CROP_SHAPE_KEYS, { error: 'Choose a crop shape' }),
     left: integerInRange(0, DIMENSION_LIMITS.max - 1, 'Left offset'),
     top: integerInRange(0, DIMENSION_LIMITS.max - 1, 'Top offset'),
     width: integerInRange(DIMENSION_LIMITS.min, DIMENSION_LIMITS.max, 'Crop width'),
     height: integerInRange(DIMENSION_LIMITS.min, DIMENSION_LIMITS.max, 'Crop height'),
 });
 
-export const cropFormSchema = cropSchema.pick({ ratio: true });
+export const cropFormSchema = cropSchema.pick({ ratio: true, shape: true });
 
 export const compressSchema = z.object({
     mode: z.enum(COMPRESS_MODES, { error: 'Choose a compression mode' }),

@@ -6,7 +6,7 @@ import { ConvertForm } from './convert-form';
 export const metadata: Metadata = {
     title: 'Convert an image — Image Toolbox',
     description:
-        'Convert images between JPEG, PNG, WEBP, AVIF and SVG, build an ICO favicon, or get a Base64 data URI.',
+        'Convert images between JPEG, PNG, WEBP, AVIF, GIF, TIFF and SVG, build an ICO favicon, or get a Base64 data URI.',
 };
 
 export default function ConvertPage() {

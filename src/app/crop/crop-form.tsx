@@ -18,9 +18,18 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { useImageAction } from '@/hooks/use-image-action';
 import { cropImage } from '@/lib/actions';
-import { ASPECT_RATIOS, ASPECT_RATIO_KEYS, centeredCrop, type CropBox } from '@/lib/image';
+import {
+    ASPECT_RATIOS,
+    ASPECT_RATIO_KEYS,
+    CROP_SHAPES,
+    CROP_SHAPE_KEYS,
+    centeredCrop,
+    type CropBox,
+} from '@/lib/image';
 import { cropFormSchema, type CropFormInput, type CropFormValues } from '@/lib/schemas';
 import { CropArea } from './crop-area';
+
+const defaultValues: CropFormInput = { ratio: '1:1', shape: 'rectangle' };
 
 export function CropForm() {
     const { image, setImage } = useLoadedImage();
@@ -37,10 +46,11 @@ export function CropForm() {
     } = useForm<CropFormInput, unknown, CropFormValues>({
         resolver: zodResolver(cropFormSchema),
         mode: 'onChange',
-        defaultValues: { ratio: '1:1' },
+        defaultValues,
     });
 
     const ratioKey = useWatch({ control, name: 'ratio' });
+    const shape = useWatch({ control, name: 'shape' }) ?? 'rectangle';
     const ratio = ratioKey ? ASPECT_RATIOS[ratioKey] : null;
     const boxKey = image && ratioKey ? `${image.previewUrl}|${ratioKey}` : null;
     const box =
@@ -55,6 +65,7 @@ export function CropForm() {
 
         run(image, {
             ratio: values.ratio,
+            shape: values.shape,
             left: String(box.left),
             top: String(box.top),
             width: String(box.width),
@@ -76,7 +87,7 @@ export function CropForm() {
                 onClear={() => {
                     setImage(null);
                     setManualBox(null);
-                    reset({ ratio: '1:1' });
+                    reset(defaultValues);
                 }}
             />
 
@@ -111,12 +122,50 @@ export function CropForm() {
                 {errors.ratio && <p className="text-sm text-destructive">{errors.ratio.message}</p>}
             </div>
 
+            <div className="space-y-2">
+                <Label htmlFor="shape">Shape</Label>
+                <Controller
+                    control={control}
+                    name="shape"
+                    render={({ field }) => (
+                        <Select
+                            value={field.value ?? ''}
+                            onValueChange={field.onChange}
+                            disabled={!image || isPending}
+                        >
+                            <SelectTrigger
+                                id="shape"
+                                className="w-full"
+                                aria-invalid={!!errors.shape}
+                            >
+                                <SelectValue placeholder="Choose a crop shape" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {CROP_SHAPE_KEYS.map(key => (
+                                    <SelectItem key={key} value={key}>
+                                        {CROP_SHAPES[key].label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    )}
+                />
+                {shape === 'circle' && (
+                    <p className="text-sm text-muted-foreground">
+                        Keeps only the area inside the ellipse; the corners become transparent. JPEG
+                        exports as PNG so the transparency is preserved.
+                    </p>
+                )}
+                {errors.shape && <p className="text-sm text-destructive">{errors.shape.message}</p>}
+            </div>
+
             {image && ratio && box && (
                 <div className="space-y-2">
                     <CropArea
                         image={image}
                         ratio={ratio}
                         box={box}
+                        shape={shape}
                         disabled={isPending}
                         onChange={next => {
                             if (boxKey) setManualBox({ key: boxKey, box: next });

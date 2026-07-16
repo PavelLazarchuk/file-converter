@@ -4,7 +4,7 @@ import { useRef } from 'react';
 import Image from 'next/image';
 
 import type { LoadedImage } from '@/components/image-dropzone';
-import { clampCropBox, type CropBox } from '@/lib/image';
+import { clampCropBox, type CropBox, type CropShape } from '@/lib/image';
 import { cn } from '@/lib/utils';
 
 type Corner = 'nw' | 'ne' | 'sw' | 'se';
@@ -31,11 +31,12 @@ type CropAreaProps = {
     image: LoadedImage;
     ratio: { width: number; height: number };
     box: CropBox;
+    shape: CropShape;
     onChange: (box: CropBox) => void;
     disabled?: boolean;
 };
 
-export function CropArea({ image, ratio, box, onChange, disabled }: CropAreaProps) {
+export function CropArea({ image, ratio, box, shape, onChange, disabled }: CropAreaProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const dragRef = useRef<DragState | null>(null);
 
@@ -129,6 +130,7 @@ export function CropArea({ image, ratio, box, onChange, disabled }: CropAreaProp
                 role="presentation"
                 className={cn(
                     'absolute border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]',
+                    shape === 'circle' && 'rounded-[50%]',
                     !disabled && 'cursor-move'
                 )}
                 style={{
@@ -143,12 +145,14 @@ export function CropArea({ image, ratio, box, onChange, disabled }: CropAreaProp
                 onPointerUp={endDrag}
                 onPointerCancel={endDrag}
             >
-                <div aria-hidden className="pointer-events-none absolute inset-0">
-                    <div className="absolute inset-y-0 left-1/3 w-px bg-white/40" />
-                    <div className="absolute inset-y-0 left-2/3 w-px bg-white/40" />
-                    <div className="absolute inset-x-0 top-1/3 h-px bg-white/40" />
-                    <div className="absolute inset-x-0 top-2/3 h-px bg-white/40" />
-                </div>
+                {shape === 'rectangle' && (
+                    <div aria-hidden className="pointer-events-none absolute inset-0">
+                        <div className="absolute inset-y-0 left-1/3 w-px bg-white/40" />
+                        <div className="absolute inset-y-0 left-2/3 w-px bg-white/40" />
+                        <div className="absolute inset-x-0 top-1/3 h-px bg-white/40" />
+                        <div className="absolute inset-x-0 top-2/3 h-px bg-white/40" />
+                    </div>
+                )}
                 {!disabled &&
                     (Object.keys(CORNERS) as Corner[]).map(corner => (
                         <div

@@ -14,7 +14,7 @@ const tools = [
         href: '/crop',
         title: 'Crop',
         description:
-            'Trim to a preset aspect ratio — square, 16:9, 4:3 and more — and drag to frame it.',
+            'Trim to a preset aspect ratio — square, 16:9, 4:3 and more — or a circle, and drag to frame it.',
         icon: Crop,
         gradient: 'from-amber-500 to-orange-600',
     },
@@ -29,7 +29,7 @@ const tools = [
         href: '/convert',
         title: 'Convert',
         description:
-            'Switch between JPEG, PNG, WEBP, AVIF and SVG, build an ICO favicon, or get a Base64 data URI.',
+            'Switch between JPEG, PNG, WEBP, AVIF, GIF, TIFF and SVG, build an ICO favicon, or get a Base64 data URI.',
         icon: RefreshCw,
         gradient: 'from-emerald-500 to-teal-600',
     },
