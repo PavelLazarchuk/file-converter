@@ -50,7 +50,7 @@ export function CropForm() {
     });
 
     const ratioKey = useWatch({ control, name: 'ratio' });
-    const shape = useWatch({ control, name: 'shape' }) ?? 'rectangle';
+    const shape = useWatch({ control, name: 'shape' });
     const ratio = ratioKey ? ASPECT_RATIOS[ratioKey] : null;
     const boxKey = image && ratioKey ? `${image.previewUrl}|${ratioKey}` : null;
     const box =

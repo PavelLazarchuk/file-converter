@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
     title: 'Image Toolbox — Resize, Crop, Compress & Convert',
     description:
-        'Free browser tools for images: resize with locked aspect ratio, crop to preset ratios, compress by quality or target size, and convert between JPEG, PNG, WEBP, AVIF, SVG and ICO favicons.',
+        'Free browser tools for images: resize with locked aspect ratio, crop to preset ratios or a circle, compress by quality or target size, and convert between JPEG, PNG, WEBP, AVIF, GIF, TIFF, SVG and ICO favicons.',
 };
 
 export default function RootLayout({

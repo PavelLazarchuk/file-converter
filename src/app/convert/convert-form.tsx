@@ -162,6 +162,11 @@ export function ConvertForm() {
                         Exports a single still frame — animation is not preserved.
                     </p>
                 )}
+                {sourceFormat === 'gif' && target !== 'gif' && (
+                    <p className="text-sm text-muted-foreground">
+                        If this GIF is animated, only its first frame is converted.
+                    </p>
+                )}
                 {target === 'tiff' && (
                     <p className="text-sm text-muted-foreground">
                         A lossless format for print and archival. Files are large and most browsers

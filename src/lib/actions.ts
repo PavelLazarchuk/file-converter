@@ -133,7 +133,7 @@ export async function cropImage(formData: FormData): Promise<ActionResult> {
         const { buffer, format, baseName } = await readImageFile(formData, FORMAT_KEYS);
         const parsed = cropSchema.safeParse({
             ratio: formData.get('ratio'),
-            shape: formData.get('shape') || 'rectangle',
+            shape: formData.get('shape'),
             left: formData.get('left'),
             top: formData.get('top'),
             width: formData.get('width'),
@@ -160,10 +160,9 @@ export async function cropImage(formData: FormData): Promise<ActionResult> {
 
         if (circle) {
             const mask = Buffer.from(
-                `<svg xmlns="http://www.w3.org/2000/svg" width="${box.width}" height="${box.height}">` +
-                    `<ellipse cx="${box.width / 2}" cy="${box.height / 2}" ` +
-                    `rx="${box.width / 2}" ry="${box.height / 2}" fill="#fff"/>` +
-                    `</svg>`
+                `<svg xmlns="http://www.w3.org/2000/svg" width="${box.width}" height="${box.height}">
+                    <ellipse cx="${box.width / 2}" cy="${box.height / 2}" rx="${box.width / 2}" ry="${box.height / 2}" fill="#fff"/>
+                </svg>`
             );
 
             pipeline = pipeline.ensureAlpha().composite([{ input: mask, blend: 'dest-in' }]);

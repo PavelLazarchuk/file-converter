@@ -130,7 +130,7 @@ export function CropArea({ image, ratio, box, shape, onChange, disabled }: CropA
                 role="presentation"
                 className={cn(
                     'absolute border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]',
-                    shape === 'circle' && 'rounded-[50%]',
+                    shape === 'circle' && 'rounded-full',
                     !disabled && 'cursor-move'
                 )}
                 style={{
