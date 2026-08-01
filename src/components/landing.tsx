@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, Crop, Gauge, ImagePlus, RefreshCw, Scaling } from 'lucide-react';
+import { ArrowRight, Crop, FileText, Gauge, ImagePlus, RefreshCw, Scaling } from 'lucide-react';
 
 const tools = [
     {
@@ -40,6 +40,14 @@ const tools = [
         icon: ImagePlus,
         gradient: 'from-pink-500 to-rose-600',
     },
+    {
+        href: '/pdf',
+        title: 'Image to PDF',
+        description:
+            'Wrap a JPEG, PNG, WEBP, AVIF, GIF or SVG into a single-page PDF, fit to the image or a standard A4/Letter page.',
+        icon: FileText,
+        gradient: 'from-red-500 to-rose-600',
+    },
 ] as const;
 
 const enter =
@@ -61,8 +69,8 @@ export function Landing() {
                         Your images, exactly how you need them
                     </h1>
                     <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground text-balance">
-                        Five focused tools for everyday image work. Upload, tweak, download — done
-                        in seconds.
+                        Six focused tools for everyday image work. Upload, tweak, download — done in
+                        seconds.
                     </p>
                 </div>
 

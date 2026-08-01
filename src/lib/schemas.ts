@@ -8,6 +8,7 @@ import {
     DIMENSION_LIMITS,
     FORMAT_KEYS,
     HEX_COLOR_PATTERN,
+    PDF_PAGE_SIZE_KEYS,
     PLACEHOLDER_TEXT_MAX_LENGTH,
     QUALITY_LIMITS,
     ROTATION_KEYS,
@@ -76,6 +77,10 @@ export const placeholderSchema = z.object({
     format: z.enum(FORMAT_KEYS, { error: 'Choose an output format' }),
 });
 
+export const imageToPdfSchema = z.object({
+    pageSize: z.enum(PDF_PAGE_SIZE_KEYS, { error: 'Choose a page size' }),
+});
+
 export type ResizeInput = z.input<typeof resizeSchema>;
 export type ResizeValues = z.output<typeof resizeSchema>;
 export type CropFormInput = z.input<typeof cropFormSchema>;
@@ -86,3 +91,5 @@ export type ConvertInput = z.input<typeof convertSchema>;
 export type ConvertValues = z.output<typeof convertSchema>;
 export type PlaceholderInput = z.input<typeof placeholderSchema>;
 export type PlaceholderValues = z.output<typeof placeholderSchema>;
+export type ImageToPdfInput = z.input<typeof imageToPdfSchema>;
+export type ImageToPdfValues = z.output<typeof imageToPdfSchema>;

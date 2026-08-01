@@ -180,6 +180,33 @@ export function placeholderFontSize(width: number, height: number, label: string
     return Math.max(4, Math.round(Math.min(height * 0.25, fitWidth)));
 }
 
+export const PDF_PAGE_SIZE_KEYS = ['fit', 'a4', 'letter'] as const;
+
+export type PdfPageSize = (typeof PDF_PAGE_SIZE_KEYS)[number];
+
+export const PDF_PAGE_SIZES: Record<PdfPageSize, { label: string; description: string }> = {
+    fit: {
+        label: 'Fit to image',
+        description: 'One page sized exactly to the image, no margins.',
+    },
+    a4: {
+        label: 'A4',
+        description: 'Standard A4 page, image centered and scaled to fit with a margin.',
+    },
+    letter: {
+        label: 'US Letter',
+        description: 'Standard Letter page, image centered and scaled to fit with a margin.',
+    },
+};
+
+// Points (1/72in), portrait orientation.
+export const PDF_PAGE_DIMENSIONS: Record<Exclude<PdfPageSize, 'fit'>, [number, number]> = {
+    a4: [595.28, 841.89],
+    letter: [612, 792],
+};
+
+export const PDF_PAGE_MARGIN = 36;
+
 export function formatFileSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;

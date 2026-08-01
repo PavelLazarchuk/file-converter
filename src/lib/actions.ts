@@ -1,6 +1,7 @@
 'use server';
 
 import sharp, { type Sharp } from 'sharp';
+import { PDFDocument } from 'pdf-lib';
 
 import {
     CONVERT_SOURCE_KEYS,
@@ -12,6 +13,8 @@ import {
     MAX_FILE_SIZE,
     MAX_FILE_SIZE_LABEL,
     MAX_INPUT_PIXELS,
+    PDF_PAGE_DIMENSIONS,
+    PDF_PAGE_MARGIN,
     QUALITY_LIMITS,
     acceptedFormatsLabel,
     circleOutputFormat,
@@ -27,6 +30,7 @@ import {
     compressSchema,
     convertSchema,
     cropSchema,
+    imageToPdfSchema,
     placeholderSchema,
     resizeSchema,
 } from './schemas';
@@ -331,6 +335,62 @@ export async function convertImage(formData: FormData): Promise<ActionResult> {
         const { extension, mimeType } = IMAGE_FORMATS[target];
 
         return success(data, `${baseName}.${extension}`, mimeType);
+    });
+}
+
+export async function imageToPdf(formData: FormData): Promise<ActionResult> {
+    return run(async () => {
+        const {
+            buffer,
+            format: source,
+            baseName,
+        } = await readImageFile(formData, CONVERT_SOURCE_KEYS);
+        const parsed = imageToPdfSchema.safeParse({ pageSize: formData.get('pageSize') });
+
+        if (!parsed.success) {
+            throw new ProcessingError(parsed.error.issues[0]?.message ?? 'Invalid page size.');
+        }
+
+        const { pageSize } = parsed.data;
+        const isJpeg = source === 'jpeg';
+        const imageBytes = await decode(buffer)
+            .toFormat(isJpeg ? 'jpeg' : 'png', isJpeg ? { quality: 90 } : undefined)
+            .toBuffer();
+
+        const pdfDoc = await PDFDocument.create();
+        const embedded = isJpeg
+            ? await pdfDoc.embedJpg(imageBytes)
+            : await pdfDoc.embedPng(imageBytes);
+        const { width: imgWidth, height: imgHeight } = embedded;
+
+        if (pageSize === 'fit') {
+            const page = pdfDoc.addPage([imgWidth, imgHeight]);
+
+            page.drawImage(embedded, { x: 0, y: 0, width: imgWidth, height: imgHeight });
+        } else {
+            const [portraitWidth, portraitHeight] = PDF_PAGE_DIMENSIONS[pageSize];
+            const landscape = imgWidth > imgHeight;
+            const pageWidth = landscape ? portraitHeight : portraitWidth;
+            const pageHeight = landscape ? portraitWidth : portraitHeight;
+            const scale = Math.min(
+                (pageWidth - PDF_PAGE_MARGIN * 2) / imgWidth,
+                (pageHeight - PDF_PAGE_MARGIN * 2) / imgHeight
+            );
+            const drawWidth = imgWidth * scale;
+            const drawHeight = imgHeight * scale;
+            const page = pdfDoc.addPage([pageWidth, pageHeight]);
+
+            page.drawImage(embedded, {
+                x: (pageWidth - drawWidth) / 2,
+                y: (pageHeight - drawHeight) / 2,
+                width: drawWidth,
+                height: drawHeight,
+            });
+        }
+
+        const data = await pdfDoc.save();
+
+        return success(Buffer.from(data), `${baseName}.pdf`, 'application/pdf');
     });
 }
 
