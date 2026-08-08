@@ -34,7 +34,52 @@ export const IMAGE_FORMATS: Record<
     base64: { label: 'Base64 data URI', mimeType: 'text/plain', extension: 'txt' },
 };
 
-export const ICO_SIZES = [16, 32, 48] as const;
+const SHARP_FORMAT_ALIASES: Record<string, ConvertSource> = {
+    jpeg: 'jpeg',
+    jpg: 'jpeg',
+    png: 'png',
+    webp: 'webp',
+    avif: 'avif',
+    heif: 'avif',
+    gif: 'gif',
+    svg: 'svg',
+};
+
+export function convertSourceFromSharpFormat(format: string | undefined): ConvertSource | null {
+    return SHARP_FORMAT_ALIASES[format ?? ''] ?? null;
+}
+
+export const ICO_SIZE_OPTIONS = [16, 32, 48, 64, 128, 256] as const;
+
+export const DEFAULT_ICO_SIZES = [16, 32, 48] as const;
+
+export const ZIP_MIME_TYPE = 'application/zip';
+
+export const FAVICON_PACK = {
+    appleTouch: 180,
+    manifestSizes: [192, 512],
+} as const;
+
+export const BASE64_OUTPUT_KEYS = ['uri', 'img', 'css'] as const;
+
+export type Base64Output = (typeof BASE64_OUTPUT_KEYS)[number];
+
+export const BASE64_OUTPUTS: Record<Base64Output, { label: string; extension: string }> = {
+    uri: { label: 'Plain data URI', extension: 'txt' },
+    img: { label: 'HTML <img> tag', extension: 'html' },
+    css: { label: 'CSS background-image', extension: 'css' },
+};
+
+export function formatBase64Output(kind: Base64Output, dataUri: string, alt: string): string {
+    switch (kind) {
+        case 'uri':
+            return dataUri;
+        case 'img':
+            return `<img src="${dataUri}" alt="${alt}" />`;
+        case 'css':
+            return `.image {\n    background-image: url('${dataUri}');\n}`;
+    }
+}
 
 export const ROTATION_KEYS = ['0', '90', '180', '270'] as const;
 
@@ -51,6 +96,36 @@ export function rotationSwapsDimensions(rotation: Rotation): boolean {
     return rotation === '90' || rotation === '270';
 }
 
+export const RESIZE_FIT_KEYS = ['contain', 'cover', 'fill', 'inside'] as const;
+
+export type ResizeFit = (typeof RESIZE_FIT_KEYS)[number];
+
+export const RESIZE_FITS: Record<ResizeFit, { label: string; description: string }> = {
+    contain: {
+        label: 'Contain — fit inside, pad the rest',
+        description:
+            'The whole image fits inside the box; leftover space is padded (transparent, or white for JPEG).',
+    },
+    cover: {
+        label: 'Cover — fill the box, crop the overflow',
+        description:
+            'The box is filled edge to edge and whatever sticks out is cropped away, centered.',
+    },
+    fill: {
+        label: 'Fill — stretch to the exact size',
+        description: 'Both dimensions are forced to match, so the image is stretched or squashed.',
+    },
+    inside: {
+        label: 'Inside — shrink to fit, keep the ratio',
+        description:
+            'Scales down until both sides fit inside the box. The output can be smaller than the numbers above.',
+    },
+};
+
+export function fitPads(fit: ResizeFit): boolean {
+    return fit === 'contain';
+}
+
 export const COMPRESS_MODES = ['quality', 'size'] as const;
 
 export type CompressMode = (typeof COMPRESS_MODES)[number];
@@ -63,7 +138,7 @@ export const TARGET_SIZE_PRESETS = [
     { label: '250 KB', kb: 250 },
     { label: '500 KB', kb: 500 },
     { label: '1 MB', kb: 1024 },
-    { label: '1.5 MB', kb: 1526 },
+    { label: '1.5 MB', kb: 1536 },
     { label: '2 MB', kb: 2048 },
 ] as const;
 
@@ -132,6 +207,10 @@ export function centeredCrop(
         width,
         height,
     };
+}
+
+export function stripExtension(filename: string): string {
+    return filename.replace(/\.[^.]+$/, '');
 }
 
 export function formatFromMimeType(mimeType: string): ImageFormat | null {

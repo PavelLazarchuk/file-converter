@@ -6,7 +6,7 @@ import { StatusPage } from '@/components/status-page';
 import { Button } from '@/components/ui/button';
 
 export const metadata: Metadata = {
-    title: 'Page not found — Image Toolbox',
+    title: 'Page not found',
 };
 
 export default function NotFound() {

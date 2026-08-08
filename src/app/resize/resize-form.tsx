@@ -20,8 +20,17 @@ import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { useImageAction } from '@/hooks/use-image-action';
 import { resizeImage } from '@/lib/actions';
-import { DIMENSION_LIMITS, ROTATIONS, ROTATION_KEYS, rotationSwapsDimensions } from '@/lib/image';
+import {
+    DIMENSION_LIMITS,
+    RESIZE_FITS,
+    RESIZE_FIT_KEYS,
+    ROTATIONS,
+    ROTATION_KEYS,
+    rotationSwapsDimensions,
+} from '@/lib/image';
 import { resizeSchema, type ResizeInput, type ResizeValues } from '@/lib/schemas';
+
+const defaultValues: ResizeInput = { width: '', height: '', rotate: '0', fit: 'contain' };
 
 function clampDimension(value: number): number {
     return Math.min(DIMENSION_LIMITS.max, Math.max(DIMENSION_LIMITS.min, Math.round(value)));
@@ -31,6 +40,7 @@ export function ResizeForm() {
     const { image, setImage } = useLoadedImage();
     const [lockAspect, setLockAspect] = useState(true);
     const [removeMetadata, setRemoveMetadata] = useState(true);
+    const [noEnlarge, setNoEnlarge] = useState(false);
     const { isPending, run } = useImageAction(resizeImage);
 
     const {
@@ -45,10 +55,11 @@ export function ResizeForm() {
     } = useForm<ResizeInput, unknown, ResizeValues>({
         resolver: zodResolver(resizeSchema),
         mode: 'onChange',
-        defaultValues: { width: '', height: '', rotate: '0' },
+        defaultValues,
     });
 
     const rotate = useWatch({ control, name: 'rotate' });
+    const fit = useWatch({ control, name: 'fit' });
     const sourceRatio = image ? image.width / image.height : null;
     const ratio = sourceRatio && rotationSwapsDimensions(rotate) ? 1 / sourceRatio : sourceRatio;
 
@@ -77,6 +88,8 @@ export function ResizeForm() {
             width: String(values.width),
             height: String(values.height),
             rotate: values.rotate,
+            fit: values.fit,
+            noEnlarge: String(noEnlarge),
             keepMetadata: String(!removeMetadata),
         });
     });
@@ -89,15 +102,15 @@ export function ResizeForm() {
                 onImage={loaded => {
                     setImage(loaded);
                     reset({
+                        ...defaultValues,
                         width: String(loaded.width),
                         height: String(loaded.height),
-                        rotate: '0',
                     });
                     void trigger();
                 }}
                 onClear={() => {
                     setImage(null);
-                    reset({ width: '', height: '', rotate: '0' });
+                    reset(defaultValues);
                 }}
             />
 
@@ -183,6 +196,36 @@ export function ResizeForm() {
                 </div>
             </div>
 
+            <div className="space-y-2">
+                <Label htmlFor="fit">Fit</Label>
+                <Controller
+                    control={control}
+                    name="fit"
+                    render={({ field }) => (
+                        <Select
+                            value={field.value ?? 'contain'}
+                            onValueChange={field.onChange}
+                            disabled={!image || isPending}
+                        >
+                            <SelectTrigger id="fit" className="w-full" aria-invalid={!!errors.fit}>
+                                <SelectValue placeholder="Choose how the image should fit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {RESIZE_FIT_KEYS.map(key => (
+                                    <SelectItem key={key} value={key}>
+                                        {RESIZE_FITS[key].label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    )}
+                />
+                <p className="text-sm text-muted-foreground">
+                    {RESIZE_FITS[fit ?? 'contain'].description}
+                </p>
+                {errors.fit && <p className="text-sm text-destructive">{errors.fit.message}</p>}
+            </div>
+
             <div className="flex items-center gap-3">
                 <Switch
                     id="lock-aspect"
@@ -194,6 +237,22 @@ export function ResizeForm() {
                     }}
                 />
                 <Label htmlFor="lock-aspect">Lock aspect ratio</Label>
+            </div>
+
+            <div className="space-y-1.5">
+                <div className="flex items-center gap-3">
+                    <Switch
+                        id="no-enlarge"
+                        checked={noEnlarge}
+                        disabled={!image || isPending}
+                        onCheckedChange={setNoEnlarge}
+                    />
+                    <Label htmlFor="no-enlarge">Don&apos;t enlarge smaller images</Label>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                    Leaves the image at its original size when it is already smaller than the target
+                    — upscaling only adds blur.
+                </p>
             </div>
 
             <MetadataSwitch

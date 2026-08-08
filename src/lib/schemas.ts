@@ -8,9 +8,11 @@ import {
     DIMENSION_LIMITS,
     FORMAT_KEYS,
     HEX_COLOR_PATTERN,
+    ICO_SIZE_OPTIONS,
     PDF_PAGE_SIZE_KEYS,
     PLACEHOLDER_TEXT_MAX_LENGTH,
     QUALITY_LIMITS,
+    RESIZE_FIT_KEYS,
     ROTATION_KEYS,
     TARGET_SIZE_LIMITS,
 } from './image';
@@ -32,6 +34,7 @@ export const resizeSchema = z.object({
     width: integerInRange(DIMENSION_LIMITS.min, DIMENSION_LIMITS.max, 'Width'),
     height: integerInRange(DIMENSION_LIMITS.min, DIMENSION_LIMITS.max, 'Height'),
     rotate: z.enum(ROTATION_KEYS, { error: 'Choose a rotation' }),
+    fit: z.enum(RESIZE_FIT_KEYS, { error: 'Choose how the image should fit' }),
 });
 
 export const cropSchema = z.object({
@@ -53,6 +56,27 @@ export const compressSchema = z.object({
 
 export const convertSchema = z.object({
     format: z.enum(CONVERT_TARGET_KEYS, { error: 'Choose a target format' }),
+});
+
+const icoSizes = new Set<number>(ICO_SIZE_OPTIONS);
+
+const ICO_SIZES_MAX_LENGTH = 64;
+
+export const icoOptionsSchema = z.object({
+    sizes: z
+        .string({ error: 'Choose at least one icon size' })
+        .trim()
+        .min(1, 'Choose at least one icon size')
+        .max(ICO_SIZES_MAX_LENGTH, 'Too many icon sizes')
+        .transform(value => [...new Set(value.split(',').map(Number))].sort((a, b) => a - b))
+        .refine(
+            sizes =>
+                sizes.length > 0 &&
+                sizes.length <= ICO_SIZE_OPTIONS.length &&
+                sizes.every(size => icoSizes.has(size)),
+            `Icon sizes must be any of ${ICO_SIZE_OPTIONS.join(', ')} px`
+        ),
+    pack: z.enum(['true', 'false'], { error: 'Invalid favicon pack option' }),
 });
 
 function hexColor(label: string) {

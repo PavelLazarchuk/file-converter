@@ -4,9 +4,10 @@ import { ToolPage } from '@/components/tool-page';
 import { PlaceholderForm } from './placeholder-form';
 
 export const metadata: Metadata = {
-    title: 'Generate a placeholder image — Image Toolbox',
+    title: 'Generate a placeholder image',
     description:
         'Generate solid-color placeholder images with custom dimensions, colors and text as JPEG, PNG, WEBP or AVIF.',
+    alternates: { canonical: '/placeholder' },
 };
 
 export default function PlaceholderPage() {

@@ -4,9 +4,10 @@ import { ToolPage } from '@/components/tool-page';
 import { CompressForm } from './compress-form';
 
 export const metadata: Metadata = {
-    title: 'Compress an image — Image Toolbox',
+    title: 'Compress an image',
     description:
         'Reduce image file size with adjustable quality or a target size. Metadata is always stripped.',
+    alternates: { canonical: '/compress' },
 };
 
 export default function CompressPage() {

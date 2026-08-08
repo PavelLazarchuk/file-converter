@@ -4,9 +4,10 @@ import { ToolPage } from '@/components/tool-page';
 import { ResizeForm } from './resize-form';
 
 export const metadata: Metadata = {
-    title: 'Resize an image — Image Toolbox',
+    title: 'Resize an image',
     description:
         'Resize JPEG, PNG, WEBP or AVIF images to exact pixel dimensions, with optional rotation.',
+    alternates: { canonical: '/resize' },
 };
 
 export default function ResizePage() {

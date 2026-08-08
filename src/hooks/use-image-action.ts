@@ -9,6 +9,11 @@ import { downloadFile } from '@/lib/download';
 
 export type ActionSuccess = Extract<ActionResult, { success: true }>;
 
+export function downloadResult(result: ActionSuccess): void {
+    downloadFile(result.data, result.filename, result.mimeType);
+    toast.success(`Downloading ${result.filename}`);
+}
+
 export function useImageAction(action: (formData: FormData) => Promise<ActionResult>) {
     const [isPending, startTransition] = useTransition();
 
@@ -30,8 +35,7 @@ export function useImageAction(action: (formData: FormData) => Promise<ActionRes
             } else if (onSuccess) {
                 onSuccess(result);
             } else {
-                downloadFile(result.data, result.filename, result.mimeType);
-                toast.success(`Downloading ${result.filename}`);
+                downloadResult(result);
             }
         });
     }

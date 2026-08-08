@@ -1,0 +1,74 @@
+import {
+    Crop,
+    FileText,
+    Gauge,
+    ImagePlus,
+    RefreshCw,
+    Scaling,
+    type LucideIcon,
+} from 'lucide-react';
+
+export const SITE = {
+    name: 'Image Toolbox',
+    tagline: 'Resize, Crop, Compress & Convert',
+    description:
+        'Free browser tools for images: resize with locked aspect ratio, crop to preset ratios or a circle, compress by quality or target size, convert between JPEG, PNG, WEBP, AVIF, GIF, TIFF, SVG and ICO favicons, and wrap images into a PDF.',
+    url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://file-converter-mu-seven.vercel.app',
+} as const;
+
+export type Tool = {
+    href: string;
+    title: string;
+    description: string;
+    icon: LucideIcon;
+    gradient: string;
+};
+
+export const TOOLS: readonly Tool[] = [
+    {
+        href: '/resize',
+        title: 'Resize',
+        description:
+            'Set exact pixel dimensions with a locked aspect ratio, up to 10,000px — with optional rotation.',
+        icon: Scaling,
+        gradient: 'from-sky-500 to-blue-600',
+    },
+    {
+        href: '/crop',
+        title: 'Crop',
+        description:
+            'Trim to a preset aspect ratio — square, 16:9, 4:3 and more — or a circle, and drag to frame it.',
+        icon: Crop,
+        gradient: 'from-amber-500 to-orange-600',
+    },
+    {
+        href: '/compress',
+        title: 'Compress',
+        description: 'Shrink file size by quality or down to a target size like 500 KB.',
+        icon: Gauge,
+        gradient: 'from-violet-500 to-purple-600',
+    },
+    {
+        href: '/convert',
+        title: 'Convert',
+        description:
+            'Switch between JPEG, PNG, WEBP, AVIF, GIF, TIFF and SVG, build an ICO favicon, or get a Base64 data URI.',
+        icon: RefreshCw,
+        gradient: 'from-emerald-500 to-teal-600',
+    },
+    {
+        href: '/placeholder',
+        title: 'Placeholder',
+        description: 'Generate a placeholder image with custom dimensions, colors and text.',
+        icon: ImagePlus,
+        gradient: 'from-pink-500 to-rose-600',
+    },
+    {
+        href: '/pdf',
+        title: 'Image to PDF',
+        description:
+            'Wrap a JPEG, PNG, WEBP, AVIF, GIF or SVG into a single-page PDF, fit to the image or a standard A4/Letter page.',
+        icon: FileText,
+        gradient: 'from-red-500 to-rose-600',
+    },
+] as const;

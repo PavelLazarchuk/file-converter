@@ -1,54 +1,7 @@
 import Link from 'next/link';
-import { ArrowRight, Crop, FileText, Gauge, ImagePlus, RefreshCw, Scaling } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
-const tools = [
-    {
-        href: '/resize',
-        title: 'Resize',
-        description:
-            'Set exact pixel dimensions with a locked aspect ratio, up to 10,000px — with optional rotation.',
-        icon: Scaling,
-        gradient: 'from-sky-500 to-blue-600',
-    },
-    {
-        href: '/crop',
-        title: 'Crop',
-        description:
-            'Trim to a preset aspect ratio — square, 16:9, 4:3 and more — or a circle, and drag to frame it.',
-        icon: Crop,
-        gradient: 'from-amber-500 to-orange-600',
-    },
-    {
-        href: '/compress',
-        title: 'Compress',
-        description: 'Shrink file size by quality or down to a target size like 500 KB.',
-        icon: Gauge,
-        gradient: 'from-violet-500 to-purple-600',
-    },
-    {
-        href: '/convert',
-        title: 'Convert',
-        description:
-            'Switch between JPEG, PNG, WEBP, AVIF, GIF, TIFF and SVG, build an ICO favicon, or get a Base64 data URI.',
-        icon: RefreshCw,
-        gradient: 'from-emerald-500 to-teal-600',
-    },
-    {
-        href: '/placeholder',
-        title: 'Placeholder',
-        description: 'Generate a placeholder image with custom dimensions, colors and text.',
-        icon: ImagePlus,
-        gradient: 'from-pink-500 to-rose-600',
-    },
-    {
-        href: '/pdf',
-        title: 'Image to PDF',
-        description:
-            'Wrap a JPEG, PNG, WEBP, AVIF, GIF or SVG into a single-page PDF, fit to the image or a standard A4/Letter page.',
-        icon: FileText,
-        gradient: 'from-red-500 to-rose-600',
-    },
-] as const;
+import { TOOLS } from '@/lib/site';
 
 const enter =
     'animate-in fade-in fill-mode-backwards duration-500 ease-out motion-reduce:animate-none';
@@ -63,7 +16,7 @@ export function Landing() {
             <div className="mx-auto w-full max-w-5xl px-4 py-20 sm:py-28">
                 <div className={`${enter} slide-in-from-bottom-4 text-center`}>
                     <span className="inline-flex items-center rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
-                        Fast · Private · No sign-up
+                        Fast · No sign-up · Files never stored
                     </span>
                     <h1 className="mx-auto mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
                         Your images, exactly how you need them
@@ -72,10 +25,20 @@ export function Landing() {
                         Six focused tools for everyday image work. Upload, tweak, download — done in
                         seconds.
                     </p>
+                    <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
+                        Images are processed on the server, in memory, and never stored.{' '}
+                        <Link
+                            href="/privacy"
+                            className="underline underline-offset-4 hover:text-foreground"
+                        >
+                            How it works
+                        </Link>
+                        .
+                    </p>
                 </div>
 
                 <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                    {tools.map((tool, index) => (
+                    {TOOLS.map((tool, index) => (
                         <div
                             key={tool.href}
                             className={`${enter} slide-in-from-bottom-6`}

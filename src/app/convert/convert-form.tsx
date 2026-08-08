@@ -17,27 +17,43 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { Switch } from '@/components/ui/switch';
 import { useImageAction } from '@/hooks/use-image-action';
 import { convertImage } from '@/lib/actions';
 import { downloadFile } from '@/lib/download';
 import {
+    BASE64_OUTPUTS,
+    BASE64_OUTPUT_KEYS,
     CONVERT_SOURCE_KEYS,
-    ICO_SIZES,
+    DEFAULT_ICO_SIZES,
+    FAVICON_PACK,
+    ICO_SIZE_OPTIONS,
     IMAGE_FORMATS,
     conversionTargets,
     convertSourceFromMimeType,
+    formatBase64Output,
     formatFileSize,
+    stripExtension,
+    type Base64Output,
 } from '@/lib/image';
 import { convertSchema, type ConvertInput, type ConvertValues } from '@/lib/schemas';
+import { cn } from '@/lib/utils';
 
 const DATA_URI_PREVIEW_LIMIT = 2000;
 
-type DataUriResult = { value: string; filename: string };
+type DataUriResult = { value: string; filename: string; alt: string };
+
+function withExtension(filename: string, extension: string): string {
+    return `${stripExtension(filename)}.${extension}`;
+}
 
 export function ConvertForm() {
     const { image, setImage } = useLoadedImage();
     const [removeMetadata, setRemoveMetadata] = useState(true);
     const [dataUri, setDataUri] = useState<DataUriResult | null>(null);
+    const [base64Output, setBase64Output] = useState<Base64Output>('uri');
+    const [icoSizes, setIcoSizes] = useState<number[]>([...DEFAULT_ICO_SIZES]);
+    const [icoPack, setIcoPack] = useState(false);
     const { isPending, run } = useImageAction(convertImage);
 
     const {
@@ -55,13 +71,28 @@ export function ConvertForm() {
     const targets = image ? conversionTargets(image.file.type) : [];
     const target = useWatch({ control, name: 'format' });
 
+    function toggleIcoSize(size: number) {
+        setIcoSizes(current =>
+            current.includes(size)
+                ? // An .ico with no images in it is not a file anyone wants.
+                  current.length > 1
+                    ? current.filter(value => value !== size)
+                    : current
+                : [...current, size].sort((a, b) => a - b)
+        );
+    }
+
     const onSubmit = handleSubmit(values => {
         if (!image) return;
+
+        const keepMetadata = String(!removeMetadata);
+
         if (values.format === 'base64') {
-            run(image, { format: values.format }, result => {
+            run(image, { format: values.format, keepMetadata }, result => {
                 setDataUri({
                     value: new TextDecoder().decode(result.data),
                     filename: result.filename,
+                    alt: image.file.name.replaceAll('"', ''),
                 });
                 toast.success('Base64 data URI ready');
             });
@@ -69,10 +100,20 @@ export function ConvertForm() {
             return;
         }
 
-        run(image, { format: values.format, keepMetadata: String(!removeMetadata) });
+        if (values.format === 'ico') {
+            run(image, {
+                format: values.format,
+                icoSizes: icoSizes.join(','),
+                icoPack: String(icoPack),
+            });
+
+            return;
+        }
+
+        run(image, { format: values.format, keepMetadata });
     });
 
-    async function copyDataUri(value: string) {
+    async function copyText(value: string) {
         try {
             await navigator.clipboard.writeText(value);
             toast.success('Copied to clipboard');
@@ -80,6 +121,8 @@ export function ConvertForm() {
             toast.error('Could not access the clipboard.');
         }
     }
+
+    const snippet = dataUri && formatBase64Output(base64Output, dataUri.value, dataUri.alt);
 
     return (
         <form onSubmit={onSubmit} className="space-y-6" noValidate>
@@ -144,17 +187,10 @@ export function ConvertForm() {
                         resolution.
                     </p>
                 )}
-                {target === 'ico' && (
-                    <p className="text-sm text-muted-foreground">
-                        Builds a favicon containing {ICO_SIZES.join(', ')} px versions of the image,
-                        fitted on a transparent background.
-                    </p>
-                )}
                 {target === 'base64' && (
                     <p className="text-sm text-muted-foreground">
-                        Encodes the uploaded file byte-for-byte as a data: URI for embedding in CSS
-                        or HTML. Best for small images — the text is about a third larger than the
-                        file.
+                        Encodes the image as a data: URI for embedding in CSS or HTML. Best for
+                        small images — the text is about a third larger than the file.
                     </p>
                 )}
                 {target === 'gif' && (
@@ -178,37 +214,117 @@ export function ConvertForm() {
                 )}
             </div>
 
-            {target !== 'ico' && target !== 'base64' && (
-                <MetadataSwitch
-                    checked={removeMetadata}
-                    onCheckedChange={setRemoveMetadata}
-                    disabled={!image || isPending}
-                />
+            {target === 'ico' && (
+                <div className="space-y-4 rounded-xl border bg-card p-4">
+                    <div className="space-y-2">
+                        <Label>Icon sizes</Label>
+                        <div className="flex flex-wrap gap-2">
+                            {ICO_SIZE_OPTIONS.map(size => {
+                                const selected = icoSizes.includes(size);
+
+                                return (
+                                    <Button
+                                        key={size}
+                                        type="button"
+                                        size="sm"
+                                        variant={selected ? 'default' : 'outline'}
+                                        aria-pressed={selected}
+                                        disabled={isPending}
+                                        onClick={() => toggleIcoSize(size)}
+                                        className={cn(!selected && 'text-muted-foreground')}
+                                    >
+                                        {size}px
+                                    </Button>
+                                );
+                            })}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                            The .ico holds every selected size as a PNG, fitted on a transparent
+                            background; browsers pick the one they need. 16, 32 and 48px cover tabs,
+                            bookmarks and the Windows desktop.
+                        </p>
+                    </div>
+
+                    <div className="space-y-1.5 border-t pt-4">
+                        <div className="flex items-center gap-3">
+                            <Switch
+                                id="ico-pack"
+                                checked={icoPack}
+                                disabled={isPending}
+                                onCheckedChange={setIcoPack}
+                            />
+                            <Label htmlFor="ico-pack">Download the full favicon pack (.zip)</Label>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                            {icoPack
+                                ? `Bundles favicon.ico with apple-touch-icon.png (${FAVICON_PACK.appleTouch}px, flattened on white), icon-192.png, icon-512.png, a site.webmanifest and the <link> tags to paste into <head>.`
+                                : 'Just the .ico file on its own.'}
+                        </p>
+                    </div>
+                </div>
             )}
 
-            {target === 'base64' && dataUri && (
+            {target !== 'ico' && (
+                <div className="space-y-1.5">
+                    <MetadataSwitch
+                        checked={removeMetadata}
+                        onCheckedChange={checked => {
+                            setRemoveMetadata(checked);
+                            // The snippet below was produced under the old setting, so drop it
+                            // rather than leave output on screen that no longer matches the form.
+                            setDataUri(null);
+                        }}
+                        disabled={!image || isPending}
+                    />
+                    {target === 'base64' &&
+                        sourceFormat !== 'gif' &&
+                        sourceFormat !== 'svg' &&
+                        removeMetadata && (
+                            <p className="text-sm text-muted-foreground">
+                                If the image carries metadata, removing it re-encodes the pixels, so
+                                the embedded bytes differ from the original file. Turn it off to
+                                always embed the upload byte-for-byte.
+                            </p>
+                        )}
+                </div>
+            )}
+
+            {target === 'base64' && snippet && dataUri && (
                 <div className="space-y-2">
-                    <Label htmlFor="data-uri">
-                        Data URI ({formatFileSize(dataUri.value.length)})
-                    </Label>
+                    <Label htmlFor="base64-output">Output</Label>
+                    <Select
+                        value={base64Output}
+                        onValueChange={value => setBase64Output(value as Base64Output)}
+                    >
+                        <SelectTrigger id="base64-output" className="w-full">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {BASE64_OUTPUT_KEYS.map(key => (
+                                <SelectItem key={key} value={key}>
+                                    {BASE64_OUTPUTS[key].label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                     <textarea
-                        id="data-uri"
+                        aria-label="Generated snippet"
                         readOnly
                         rows={6}
                         className="w-full resize-none rounded-md border bg-muted/30 p-3 font-mono text-xs break-all"
                         value={
-                            dataUri.value.length > DATA_URI_PREVIEW_LIMIT
-                                ? `${dataUri.value.slice(0, DATA_URI_PREVIEW_LIMIT)}…`
-                                : dataUri.value
+                            snippet.length > DATA_URI_PREVIEW_LIMIT
+                                ? `${snippet.slice(0, DATA_URI_PREVIEW_LIMIT)}…`
+                                : snippet
                         }
                     />
-                    {dataUri.value.length > DATA_URI_PREVIEW_LIMIT && (
-                        <p className="text-sm text-muted-foreground">
-                            Preview truncated — Copy and Download include the full string.
-                        </p>
-                    )}
-                    <div className="flex gap-2">
-                        <Button type="button" onClick={() => copyDataUri(dataUri.value)}>
+                    <p className="text-sm text-muted-foreground">
+                        {formatFileSize(snippet.length)}
+                        {snippet.length > DATA_URI_PREVIEW_LIMIT &&
+                            ' — preview truncated, Copy and Download include the full string.'}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        <Button type="button" onClick={() => copyText(snippet)}>
                             Copy
                         </Button>
                         <Button
@@ -216,13 +332,16 @@ export function ConvertForm() {
                             variant="outline"
                             onClick={() =>
                                 downloadFile(
-                                    new TextEncoder().encode(dataUri.value),
-                                    dataUri.filename,
+                                    new TextEncoder().encode(snippet),
+                                    withExtension(
+                                        dataUri.filename,
+                                        BASE64_OUTPUTS[base64Output].extension
+                                    ),
                                     IMAGE_FORMATS.base64.mimeType
                                 )
                             }
                         >
-                            Download .txt
+                            Download .{BASE64_OUTPUTS[base64Output].extension}
                         </Button>
                     </div>
                 </div>
@@ -235,6 +354,8 @@ export function ConvertForm() {
                     </>
                 ) : target === 'base64' ? (
                     'Generate data URI'
+                ) : target === 'ico' && icoPack ? (
+                    'Build favicon pack & download'
                 ) : (
                     'Convert & download'
                 )}

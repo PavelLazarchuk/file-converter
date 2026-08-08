@@ -1,8 +1,14 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter, Geist_Mono } from 'next/font/google';
-import { Toaster } from 'sonner';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+
+import { AppToaster } from '@/components/app-toaster';
+import { SiteFooter } from '@/components/site-footer';
+import { SiteHeader } from '@/components/site-header';
+import { ThemeProvider } from '@/components/theme-provider';
+import { SITE } from '@/lib/site';
+import { THEME_INIT_SCRIPT } from '@/lib/theme';
 
 import './globals.css';
 
@@ -16,10 +22,36 @@ const geistMono = Geist_Mono({
     subsets: ['latin'],
 });
 
+const title = `${SITE.name} — ${SITE.tagline}`;
+
 export const metadata: Metadata = {
-    title: 'Image Toolbox — Resize, Crop, Compress & Convert',
-    description:
-        'Free browser tools for images: resize with locked aspect ratio, crop to preset ratios or a circle, compress by quality or target size, convert between JPEG, PNG, WEBP, AVIF, GIF, TIFF, SVG and ICO favicons, and wrap images into a PDF.',
+    metadataBase: new URL(SITE.url),
+    title: {
+        default: title,
+        template: `%s — ${SITE.name}`,
+    },
+    description: SITE.description,
+    applicationName: SITE.name,
+    alternates: { canonical: '/' },
+    openGraph: {
+        type: 'website',
+        siteName: SITE.name,
+        title,
+        description: SITE.description,
+        url: SITE.url,
+    },
+    twitter: {
+        card: 'summary_large_image',
+        title,
+        description: SITE.description,
+    },
+};
+
+export const viewport: Viewport = {
+    themeColor: [
+        { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+        { media: '(prefers-color-scheme: dark)', color: '#1b1830' },
+    ],
 };
 
 export default function RootLayout({
@@ -33,11 +65,18 @@ export default function RootLayout({
             suppressHydrationWarning
             className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
         >
+            <head>
+                <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+            </head>
             <body className="min-h-full flex flex-col">
-                {children}
-                <Analytics />
-                <SpeedInsights />
-                <Toaster position="top-right" richColors />
+                <ThemeProvider>
+                    <SiteHeader />
+                    {children}
+                    <SiteFooter />
+                    <Analytics />
+                    <SpeedInsights />
+                    <AppToaster />
+                </ThemeProvider>
             </body>
         </html>
     );

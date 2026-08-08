@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ShieldCheck } from 'lucide-react';
+import { Palette, ShieldCheck, TriangleAlert } from 'lucide-react';
 
 import { ImageDropzone, useLoadedImage } from '@/components/image-dropzone';
 import { IntegerInput } from '@/components/integer-input';
@@ -16,7 +17,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { useImageAction } from '@/hooks/use-image-action';
+import { downloadResult, useImageAction, type ActionSuccess } from '@/hooks/use-image-action';
 import { compressImage } from '@/lib/actions';
 import {
     DEFAULT_QUALITY,
@@ -24,6 +25,7 @@ import {
     QUALITY_LIMITS,
     TARGET_SIZE_LIMITS,
     TARGET_SIZE_PRESETS,
+    formatFromMimeType,
 } from '@/lib/image';
 import { compressSchema, type CompressInput, type CompressValues } from '@/lib/schemas';
 
@@ -35,6 +37,7 @@ const defaultValues: CompressInput = {
 
 export function CompressForm() {
     const { image, setImage } = useLoadedImage();
+    const [unreachable, setUnreachable] = useState<ActionSuccess | null>(null);
     const { isPending, run } = useImageAction(compressImage);
 
     const {
@@ -52,15 +55,26 @@ export function CompressForm() {
     });
 
     const mode = useWatch({ control, name: 'mode' });
+    const isPng = image ? formatFromMimeType(image.file.type) === 'png' : false;
 
     const onSubmit = handleSubmit(values => {
         if (!image) return;
 
-        run(image, {
-            mode: values.mode,
-            quality: String(values.quality),
-            targetKb: String(values.targetKb),
-        });
+        setUnreachable(null);
+        run(
+            image,
+            {
+                mode: values.mode,
+                quality: String(values.quality),
+                targetKb: String(values.targetKb),
+            },
+            result => {
+                // The target size was out of reach — offer the smallest version instead
+                // of throwing away work the server already did.
+                if (result.warning) setUnreachable(result);
+                else downloadResult(result);
+            }
+        );
     });
 
     return (
@@ -70,10 +84,12 @@ export function CompressForm() {
                 disabled={isPending}
                 onImage={loaded => {
                     setImage(loaded);
+                    setUnreachable(null);
                     void trigger();
                 }}
                 onClear={() => {
                     setImage(null);
+                    setUnreachable(null);
                     reset(defaultValues);
                 }}
             />
@@ -171,6 +187,47 @@ export function CompressForm() {
                     {errors.targetKb && (
                         <p className="text-sm text-destructive">{errors.targetKb.message}</p>
                     )}
+                </div>
+            )}
+
+            {unreachable && (
+                <div className="space-y-3 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
+                    <div className="flex items-start gap-2.5">
+                        <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <p>{unreachable.warning}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => {
+                                downloadResult(unreachable);
+                                setUnreachable(null);
+                            }}
+                        >
+                            Download it anyway
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setUnreachable(null)}
+                        >
+                            Cancel
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {isPng && (
+                <div className="flex items-start gap-2.5 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+                    <Palette className="mt-0.5 size-4 shrink-0" />
+                    <p>
+                        PNG output is written as an 8-bit palette image — that&apos;s where most of
+                        the saving comes from. Ideal for screenshots, logos and flat graphics; on
+                        photos it can show visible banding, so convert those to JPEG or WEBP
+                        instead.
+                    </p>
                 </div>
             )}
 

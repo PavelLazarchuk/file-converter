@@ -4,9 +4,10 @@ import { ToolPage } from '@/components/tool-page';
 import { ConvertForm } from './convert-form';
 
 export const metadata: Metadata = {
-    title: 'Convert an image — Image Toolbox',
+    title: 'Convert an image',
     description:
         'Convert images between JPEG, PNG, WEBP, AVIF, GIF, TIFF and SVG, build an ICO favicon, or get a Base64 data URI.',
+    alternates: { canonical: '/convert' },
 };
 
 export default function ConvertPage() {
