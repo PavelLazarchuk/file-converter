@@ -74,7 +74,7 @@ export function ConvertForm() {
     function toggleIcoSize(size: number) {
         setIcoSizes(current =>
             current.includes(size)
-                ? // An .ico with no images in it is not a file anyone wants.
+                ?
                   current.length > 1
                     ? current.filter(value => value !== size)
                     : current
@@ -270,8 +270,6 @@ export function ConvertForm() {
                         checked={removeMetadata}
                         onCheckedChange={checked => {
                             setRemoveMetadata(checked);
-                            // The snippet below was produced under the old setting, so drop it
-                            // rather than leave output on screen that no longer matches the form.
                             setDataUri(null);
                         }}
                         disabled={!image || isPending}

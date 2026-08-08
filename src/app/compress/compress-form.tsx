@@ -69,8 +69,6 @@ export function CompressForm() {
                 targetKb: String(values.targetKb),
             },
             result => {
-                // The target size was out of reach — offer the smallest version instead
-                // of throwing away work the server already did.
                 if (result.warning) setUnreachable(result);
                 else downloadResult(result);
             }
