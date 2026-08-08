@@ -74,8 +74,7 @@ export function ConvertForm() {
     function toggleIcoSize(size: number) {
         setIcoSizes(current =>
             current.includes(size)
-                ?
-                  current.length > 1
+                ? current.length > 1
                     ? current.filter(value => value !== size)
                     : current
                 : [...current, size].sort((a, b) => a - b)
