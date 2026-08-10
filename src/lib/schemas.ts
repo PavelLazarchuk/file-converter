@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 import {
-    ASPECT_RATIO_KEYS,
     COMPRESS_MODES,
     CONVERT_TARGET_KEYS,
+    CROP_RATIO_KEYS,
     CROP_SHAPE_KEYS,
     DIMENSION_LIMITS,
     FORMAT_KEYS,
@@ -38,7 +38,7 @@ export const resizeSchema = z.object({
 });
 
 export const cropSchema = z.object({
-    ratio: z.enum(ASPECT_RATIO_KEYS, { error: 'Choose an aspect ratio' }),
+    ratio: z.enum(CROP_RATIO_KEYS, { error: 'Choose an aspect ratio' }),
     shape: z.enum(CROP_SHAPE_KEYS, { error: 'Choose a crop shape' }),
     left: integerInRange(0, DIMENSION_LIMITS.max - 1, 'Left offset'),
     top: integerInRange(0, DIMENSION_LIMITS.max - 1, 'Top offset'),

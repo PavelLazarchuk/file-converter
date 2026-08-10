@@ -17,6 +17,12 @@ import {
 } from '@/lib/image';
 import { cn } from '@/lib/utils';
 
+const EDITABLE_TAGS = ['INPUT', 'TEXTAREA', 'SELECT'];
+
+function isField(element: HTMLElement): boolean {
+    return EDITABLE_TAGS.includes(element.tagName);
+}
+
 export type LoadedImage = {
     file: File;
     previewUrl: string;
@@ -99,6 +105,35 @@ export function ImageDropzone({
         };
         probe.src = previewUrl;
     }
+
+    const loadFileRef = useRef(loadFile);
+
+    useEffect(() => {
+        loadFileRef.current = loadFile;
+    });
+
+    useEffect(() => {
+        if (disabled) return;
+
+        function handlePaste(event: ClipboardEvent) {
+            const target = event.target;
+
+            if (target instanceof HTMLElement && (target.isContentEditable || isField(target))) {
+                return;
+            }
+
+            const file = event.clipboardData?.files?.[0];
+
+            if (!file || !file.type.startsWith('image/')) return;
+
+            event.preventDefault();
+            loadFileRef.current(file);
+        }
+
+        window.addEventListener('paste', handlePaste);
+
+        return () => window.removeEventListener('paste', handlePaste);
+    }, [disabled]);
 
     function handleDrop(event: React.DragEvent) {
         event.preventDefault();
@@ -200,7 +235,7 @@ export function ImageDropzone({
                 <p className="text-sm font-medium">
                     {isDragging
                         ? 'Drop the image here'
-                        : 'Drag & drop an image, or click to browse'}
+                        : 'Drag & drop an image, click to browse, or paste with Ctrl/⌘ + V'}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                     {acceptedFormatsLabel(formats)} · up to {MAX_FILE_SIZE_LABEL}

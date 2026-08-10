@@ -4,6 +4,7 @@ import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import { IntegerInput } from '@/components/integer-input';
+import { ResultCard } from '@/components/result-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,7 +33,8 @@ const PREVIEW_MAX_WIDTH = 288;
 const PREVIEW_MAX_HEIGHT = 176;
 
 export function PlaceholderForm() {
-    const { isPending, run } = useImageAction(generatePlaceholder);
+    const { isPending, outcome, run, clearResult, autoDownload } =
+        useImageAction(generatePlaceholder);
 
     const {
         register,
@@ -219,13 +221,17 @@ export function PlaceholderForm() {
                 </div>
             )}
 
+            {outcome && <ResultCard outcome={outcome} onDismiss={clearResult} />}
+
             <Button type="submit" className="w-full" disabled={!isValid || isPending}>
                 {isPending ? (
                     <>
                         <Spinner /> Generating…
                     </>
-                ) : (
+                ) : autoDownload ? (
                     'Generate & download'
+                ) : (
+                    'Generate'
                 )}
             </Button>
         </form>

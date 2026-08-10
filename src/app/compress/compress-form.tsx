@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Palette, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { Palette, ShieldCheck } from 'lucide-react';
 
 import { ImageDropzone, useLoadedImage } from '@/components/image-dropzone';
 import { IntegerInput } from '@/components/integer-input';
+import { ResultCard } from '@/components/result-card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -17,7 +17,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { downloadResult, useImageAction, type ActionSuccess } from '@/hooks/use-image-action';
+import { useImageAction } from '@/hooks/use-image-action';
 import { compressImage } from '@/lib/actions';
 import {
     DEFAULT_QUALITY,
@@ -37,8 +37,7 @@ const defaultValues: CompressInput = {
 
 export function CompressForm() {
     const { image, setImage } = useLoadedImage();
-    const [unreachable, setUnreachable] = useState<ActionSuccess | null>(null);
-    const { isPending, run } = useImageAction(compressImage);
+    const { isPending, outcome, run, clearResult, autoDownload } = useImageAction(compressImage);
 
     const {
         control,
@@ -60,19 +59,11 @@ export function CompressForm() {
     const onSubmit = handleSubmit(values => {
         if (!image) return;
 
-        setUnreachable(null);
-        run(
-            image,
-            {
-                mode: values.mode,
-                quality: String(values.quality),
-                targetKb: String(values.targetKb),
-            },
-            result => {
-                if (result.warning) setUnreachable(result);
-                else downloadResult(result);
-            }
-        );
+        run(image, {
+            mode: values.mode,
+            quality: String(values.quality),
+            targetKb: String(values.targetKb),
+        });
     });
 
     return (
@@ -82,12 +73,12 @@ export function CompressForm() {
                 disabled={isPending}
                 onImage={loaded => {
                     setImage(loaded);
-                    setUnreachable(null);
+                    clearResult();
                     void trigger();
                 }}
                 onClear={() => {
                     setImage(null);
-                    setUnreachable(null);
+                    clearResult();
                     reset(defaultValues);
                 }}
             />
@@ -188,35 +179,6 @@ export function CompressForm() {
                 </div>
             )}
 
-            {unreachable && (
-                <div className="space-y-3 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
-                    <div className="flex items-start gap-2.5">
-                        <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                        <p>{unreachable.warning}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => {
-                                downloadResult(unreachable);
-                                setUnreachable(null);
-                            }}
-                        >
-                            Download it anyway
-                        </Button>
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setUnreachable(null)}
-                        >
-                            Cancel
-                        </Button>
-                    </div>
-                </div>
-            )}
-
             {isPng && (
                 <div className="flex items-start gap-2.5 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
                     <Palette className="mt-0.5 size-4 shrink-0" />
@@ -236,13 +198,23 @@ export function CompressForm() {
                 </p>
             </div>
 
+            {outcome && (
+                <ResultCard
+                    outcome={outcome}
+                    original={image && { size: image.file.size }}
+                    onDismiss={clearResult}
+                />
+            )}
+
             <Button type="submit" className="w-full" disabled={!image || !isValid || isPending}>
                 {isPending ? (
                     <>
                         <Spinner /> Compressing…
                     </>
-                ) : (
+                ) : autoDownload ? (
                     'Compress & download'
+                ) : (
+                    'Compress'
                 )}
             </Button>
         </form>

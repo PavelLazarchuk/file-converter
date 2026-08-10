@@ -157,6 +157,18 @@ export const ASPECT_RATIOS: Record<AspectRatio, { label: string; width: number; 
         '9:16': { label: 'Vertical (9:16)', width: 9, height: 16 },
     };
 
+export const CROP_RATIO_KEYS = ['free', ...ASPECT_RATIO_KEYS] as const;
+
+export type CropRatio = (typeof CROP_RATIO_KEYS)[number];
+
+export function cropRatioLabel(ratio: CropRatio): string {
+    return ratio === 'free' ? 'Free — any size' : ASPECT_RATIOS[ratio].label;
+}
+
+export function cropRatioSize(ratio: CropRatio): { width: number; height: number } | null {
+    return ratio === 'free' ? null : ASPECT_RATIOS[ratio];
+}
+
 export const CROP_SHAPE_KEYS = ['rectangle', 'circle'] as const;
 
 export type CropShape = (typeof CROP_SHAPE_KEYS)[number];
@@ -207,6 +219,24 @@ export function centeredCrop(
         width,
         height,
     };
+}
+
+const FREE_CROP_SCALE = 0.8;
+
+export function defaultFreeCrop(srcWidth: number, srcHeight: number): CropBox {
+    const width = Math.max(1, Math.round(srcWidth * FREE_CROP_SCALE));
+    const height = Math.max(1, Math.round(srcHeight * FREE_CROP_SCALE));
+
+    return clampCropBox(
+        {
+            left: Math.floor((srcWidth - width) / 2),
+            top: Math.floor((srcHeight - height) / 2),
+            width,
+            height,
+        },
+        srcWidth,
+        srcHeight
+    );
 }
 
 export function stripExtension(filename: string): string {
@@ -291,4 +321,19 @@ export function formatFileSize(bytes: number): string {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
 
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export type SizeChange = { direction: 'smaller' | 'larger' | 'same'; label: string };
+
+export function sizeChange(before: number, after: number): SizeChange {
+    if (before <= 0 || before === after) return { direction: 'same', label: 'no change' };
+
+    const percent = (Math.abs(after - before) / before) * 100;
+    const rounded = percent < 1 ? Math.round(percent * 10) / 10 : Math.round(percent);
+
+    if (rounded === 0) return { direction: 'same', label: 'no change' };
+
+    return after < before
+        ? { direction: 'smaller', label: `−${rounded}%` }
+        : { direction: 'larger', label: `+${rounded}%` };
 }

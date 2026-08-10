@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { ImageDropzone, useLoadedImage } from '@/components/image-dropzone';
 import { IntegerInput } from '@/components/integer-input';
 import { MetadataSwitch } from '@/components/metadata-switch';
+import { ResultCard } from '@/components/result-card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -41,7 +42,7 @@ export function ResizeForm() {
     const [lockAspect, setLockAspect] = useState(true);
     const [removeMetadata, setRemoveMetadata] = useState(true);
     const [noEnlarge, setNoEnlarge] = useState(false);
-    const { isPending, run } = useImageAction(resizeImage);
+    const { isPending, outcome, run, clearResult, autoDownload } = useImageAction(resizeImage);
 
     const {
         register,
@@ -101,6 +102,7 @@ export function ResizeForm() {
                 disabled={isPending}
                 onImage={loaded => {
                     setImage(loaded);
+                    clearResult();
                     reset({
                         ...defaultValues,
                         width: String(loaded.width),
@@ -110,6 +112,7 @@ export function ResizeForm() {
                 }}
                 onClear={() => {
                     setImage(null);
+                    clearResult();
                     reset(defaultValues);
                 }}
             />
@@ -261,13 +264,23 @@ export function ResizeForm() {
                 disabled={!image || isPending}
             />
 
+            {outcome && (
+                <ResultCard
+                    outcome={outcome}
+                    original={image && { size: image.file.size }}
+                    onDismiss={clearResult}
+                />
+            )}
+
             <Button type="submit" className="w-full" disabled={!image || !isValid || isPending}>
                 {isPending ? (
                     <>
                         <Spinner /> Resizing…
                     </>
-                ) : (
+                ) : autoDownload ? (
                     'Resize & download'
+                ) : (
+                    'Resize'
                 )}
             </Button>
         </form>

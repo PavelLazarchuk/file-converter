@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 import { ImageDropzone, useLoadedImage } from '@/components/image-dropzone';
 import { MetadataSwitch } from '@/components/metadata-switch';
+import { ResultCard } from '@/components/result-card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -54,7 +55,7 @@ export function ConvertForm() {
     const [base64Output, setBase64Output] = useState<Base64Output>('uri');
     const [icoSizes, setIcoSizes] = useState<number[]>([...DEFAULT_ICO_SIZES]);
     const [icoPack, setIcoPack] = useState(false);
-    const { isPending, run } = useImageAction(convertImage);
+    const { isPending, outcome, run, clearResult, autoDownload } = useImageAction(convertImage);
 
     const {
         control,
@@ -87,14 +88,22 @@ export function ConvertForm() {
         const keepMetadata = String(!removeMetadata);
 
         if (values.format === 'base64') {
-            run(image, { format: values.format, keepMetadata }, result => {
-                setDataUri({
-                    value: new TextDecoder().decode(result.data),
-                    filename: result.filename,
-                    alt: image.file.name.replaceAll('"', ''),
-                });
-                toast.success('Base64 data URI ready');
-            });
+            run(
+                image,
+                { format: values.format, keepMetadata },
+                {
+                    onResult: result => {
+                        setDataUri({
+                            value: new TextDecoder().decode(result.data),
+                            filename: result.filename,
+                            alt: image.file.name.replaceAll('"', ''),
+                        });
+                        toast.success('Base64 data URI ready');
+
+                        return 'handled';
+                    },
+                }
+            );
 
             return;
         }
@@ -132,12 +141,14 @@ export function ConvertForm() {
                 onImage={loaded => {
                     setImage(loaded);
                     setDataUri(null);
+                    clearResult();
                     reset({ format: conversionTargets(loaded.file.type)[0] });
                     void trigger();
                 }}
                 onClear={() => {
                     setImage(null);
                     setDataUri(null);
+                    clearResult();
                     reset({ format: undefined });
                 }}
             />
@@ -152,6 +163,7 @@ export function ConvertForm() {
                             value={field.value ?? ''}
                             onValueChange={value => {
                                 setDataUri(null);
+                                clearResult();
                                 field.onChange(value);
                             }}
                             disabled={!image || isPending}
@@ -344,6 +356,14 @@ export function ConvertForm() {
                 </div>
             )}
 
+            {outcome && (
+                <ResultCard
+                    outcome={outcome}
+                    original={image && { size: image.file.size }}
+                    onDismiss={clearResult}
+                />
+            )}
+
             <Button type="submit" className="w-full" disabled={!image || !isValid || isPending}>
                 {isPending ? (
                     <>
@@ -352,9 +372,15 @@ export function ConvertForm() {
                 ) : target === 'base64' ? (
                     'Generate data URI'
                 ) : target === 'ico' && icoPack ? (
-                    'Build favicon pack & download'
-                ) : (
+                    autoDownload ? (
+                        'Build favicon pack & download'
+                    ) : (
+                        'Build favicon pack'
+                    )
+                ) : autoDownload ? (
                     'Convert & download'
+                ) : (
+                    'Convert'
                 )}
             </Button>
         </form>

@@ -31,6 +31,7 @@ import {
     type ImageFormat,
 } from './image';
 import { encodeIco } from './ico';
+import { RATE_LIMIT, checkRateLimit } from './rate-limit';
 import { createZip, type ZipEntry } from './zip';
 import {
     compressSchema,
@@ -126,6 +127,15 @@ function success(data: Buffer, filename: string, mimeType: string, warning?: str
 }
 
 async function run(process: () => Promise<ActionResult>): Promise<ActionResult> {
+    const limit = await checkRateLimit();
+
+    if (!limit.allowed) {
+        return {
+            success: false,
+            error: `Too many requests — this tool allows ${RATE_LIMIT.requests} per minute. Try again in ${limit.retryAfterSeconds}s.`,
+        };
+    }
+
     try {
         return await process();
     } catch (error) {
@@ -225,7 +235,10 @@ export async function cropImage(formData: FormData): Promise<ActionResult> {
 
         const data = await pipeline.toBuffer();
         const { extension, mimeType } = IMAGE_FORMATS[outFormat];
-        const ratioLabel = parsed.data.ratio.replace(':', 'x');
+        const ratioLabel =
+            parsed.data.ratio === 'free'
+                ? `${box.width}x${box.height}`
+                : parsed.data.ratio.replace(':', 'x');
         const shapeLabel = circle ? '-circle' : '';
 
         return success(data, `${baseName}-${ratioLabel}${shapeLabel}.${extension}`, mimeType);

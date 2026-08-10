@@ -4,6 +4,7 @@ import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import { ImageDropzone, useLoadedImage } from '@/components/image-dropzone';
+import { ResultCard } from '@/components/result-card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -21,7 +22,7 @@ import { imageToPdfSchema, type ImageToPdfInput, type ImageToPdfValues } from '@
 
 export function PdfForm() {
     const { image, setImage } = useLoadedImage();
-    const { isPending, run } = useImageAction(imageToPdf);
+    const { isPending, outcome, run, clearResult, autoDownload } = useImageAction(imageToPdf);
 
     const {
         control,
@@ -50,9 +51,13 @@ export function PdfForm() {
                 disabled={isPending}
                 onImage={loaded => {
                     setImage(loaded);
+                    clearResult();
                     void trigger();
                 }}
-                onClear={() => setImage(null)}
+                onClear={() => {
+                    setImage(null);
+                    clearResult();
+                }}
             />
 
             <div className="space-y-2">
@@ -91,13 +96,23 @@ export function PdfForm() {
                 )}
             </div>
 
+            {outcome && (
+                <ResultCard
+                    outcome={outcome}
+                    original={image && { size: image.file.size }}
+                    onDismiss={clearResult}
+                />
+            )}
+
             <Button type="submit" className="w-full" disabled={!image || !isValid || isPending}>
                 {isPending ? (
                     <>
                         <Spinner /> Building PDF…
                     </>
-                ) : (
+                ) : autoDownload ? (
                     'Convert & download'
+                ) : (
+                    'Convert to PDF'
                 )}
             </Button>
         </form>

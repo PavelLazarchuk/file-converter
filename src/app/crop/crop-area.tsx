@@ -7,8 +7,8 @@ import type { LoadedImage } from '@/components/image-dropzone';
 import { clampCropBox, type CropBox, type CropShape } from '@/lib/image';
 import { cn } from '@/lib/utils';
 
-type Corner = 'nw' | 'ne' | 'sw' | 'se';
-type DragMode = 'move' | Corner;
+type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+type DragMode = 'move' | Handle;
 
 type DragState = {
     mode: DragMode;
@@ -18,18 +18,27 @@ type DragState = {
     startBox: CropBox;
 };
 
-const CORNERS: Record<Corner, { className: string; x: -1 | 1; y: -1 | 1 }> = {
+type Axis = -1 | 0 | 1;
+
+const HANDLES: Record<Handle, { className: string; x: Axis; y: Axis }> = {
     nw: { className: '-top-1.5 -left-1.5 cursor-nwse-resize', x: -1, y: -1 },
+    n: { className: '-top-1.5 left-1/2 -translate-x-1/2 cursor-ns-resize', x: 0, y: -1 },
     ne: { className: '-top-1.5 -right-1.5 cursor-nesw-resize', x: 1, y: -1 },
-    sw: { className: '-bottom-1.5 -left-1.5 cursor-nesw-resize', x: -1, y: 1 },
+    e: { className: 'top-1/2 -right-1.5 -translate-y-1/2 cursor-ew-resize', x: 1, y: 0 },
     se: { className: '-bottom-1.5 -right-1.5 cursor-nwse-resize', x: 1, y: 1 },
+    s: { className: '-bottom-1.5 left-1/2 -translate-x-1/2 cursor-ns-resize', x: 0, y: 1 },
+    sw: { className: '-bottom-1.5 -left-1.5 cursor-nesw-resize', x: -1, y: 1 },
+    w: { className: 'top-1/2 -left-1.5 -translate-y-1/2 cursor-ew-resize', x: -1, y: 0 },
 };
+
+const CORNER_HANDLES: Handle[] = ['nw', 'ne', 'sw', 'se'];
+const ALL_HANDLES = Object.keys(HANDLES) as Handle[];
 
 const MIN_CROP_PX = 16;
 
 type CropAreaProps = {
     image: LoadedImage;
-    ratio: { width: number; height: number };
+    ratio: { width: number; height: number } | null;
     box: CropBox;
     shape: CropShape;
     onChange: (box: CropBox) => void;
@@ -64,10 +73,16 @@ export function CropArea({ image, ratio, box, shape, onChange, disabled }: CropA
         const dx = ((event.clientX - drag.startX) * image.width) / rect.width;
         const dy = ((event.clientY - drag.startY) * image.height) / rect.height;
 
+        if (drag.mode === 'move') {
+            onChange(moveBox(drag.startBox, dx, dy));
+
+            return;
+        }
+
         onChange(
-            drag.mode === 'move'
-                ? moveBox(drag.startBox, dx, dy)
-                : resizeBox(drag.startBox, drag.mode, dx, dy)
+            ratio
+                ? resizeLockedBox(drag.startBox, drag.mode, dx, dy, ratio)
+                : resizeFreeBox(drag.startBox, drag.mode, dx, dy)
         );
     }
 
@@ -83,20 +98,26 @@ export function CropArea({ image, ratio, box, shape, onChange, disabled }: CropA
         );
     }
 
-    function resizeBox(start: CropBox, corner: Corner, dx: number, dy: number): CropBox {
-        const { x, y } = CORNERS[corner];
+    function resizeLockedBox(
+        start: CropBox,
+        handle: Handle,
+        dx: number,
+        dy: number,
+        lock: { width: number; height: number }
+    ): CropBox {
+        const { x, y } = HANDLES[handle];
         const growX = x * dx;
-        const growY = (y * dy * ratio.width) / ratio.height;
+        const growY = (y * dy * lock.width) / lock.height;
         const grow = Math.abs(growX) >= Math.abs(growY) ? growX : growY;
         const right = start.left + start.width;
         const bottom = start.top + start.height;
         const maxWidth = Math.min(
             x < 0 ? right : image.width - start.left,
-            ((y < 0 ? bottom : image.height - start.top) * ratio.width) / ratio.height
+            ((y < 0 ? bottom : image.height - start.top) * lock.width) / lock.height
         );
-        const minWidth = Math.min(maxWidth, Math.max(MIN_CROP_PX, ratio.width / ratio.height));
+        const minWidth = Math.min(maxWidth, Math.max(MIN_CROP_PX, lock.width / lock.height));
         const width = Math.min(maxWidth, Math.max(minWidth, start.width + grow));
-        const height = (width * ratio.height) / ratio.width;
+        const height = (width * lock.height) / lock.width;
 
         return clampCropBox(
             {
@@ -110,7 +131,33 @@ export function CropArea({ image, ratio, box, shape, onChange, disabled }: CropA
         );
     }
 
+    function resizeFreeBox(start: CropBox, handle: Handle, dx: number, dy: number): CropBox {
+        const { x, y } = HANDLES[handle];
+        const right = start.left + start.width;
+        const bottom = start.top + start.height;
+        const next = { ...start };
+
+        if (x !== 0) {
+            next.width =
+                x < 0
+                    ? Math.min(right, Math.max(MIN_CROP_PX, start.width - dx))
+                    : Math.min(image.width - start.left, Math.max(MIN_CROP_PX, start.width + dx));
+            next.left = x < 0 ? right - next.width : start.left;
+        }
+
+        if (y !== 0) {
+            next.height =
+                y < 0
+                    ? Math.min(bottom, Math.max(MIN_CROP_PX, start.height - dy))
+                    : Math.min(image.height - start.top, Math.max(MIN_CROP_PX, start.height + dy));
+            next.top = y < 0 ? bottom - next.height : start.top;
+        }
+
+        return clampCropBox(next, image.width, image.height);
+    }
+
     const toPercent = (value: number, total: number) => `${(value / total) * 100}%`;
+    const handles = ratio ? CORNER_HANDLES : ALL_HANDLES;
 
     return (
         <div
@@ -154,15 +201,15 @@ export function CropArea({ image, ratio, box, shape, onChange, disabled }: CropA
                     </div>
                 )}
                 {!disabled &&
-                    (Object.keys(CORNERS) as Corner[]).map(corner => (
+                    handles.map(handle => (
                         <div
-                            key={corner}
+                            key={handle}
                             role="presentation"
                             className={cn(
                                 'absolute size-3 rounded-full border border-primary bg-white shadow-sm',
-                                CORNERS[corner].className
+                                HANDLES[handle].className
                             )}
-                            data-drag-mode={corner}
+                            data-drag-mode={handle}
                             onPointerDown={startDrag}
                             onPointerMove={handleDrag}
                             onPointerUp={endDrag}
