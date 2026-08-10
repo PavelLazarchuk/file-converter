@@ -1,8 +1,8 @@
 import { headers } from 'next/headers';
 
-export const RATE_LIMIT = { requests: 30, windowMs: 60_000 } as const;
+export const RATE_LIMIT = { requests: 20, windowMs: 60_000 } as const;
 
-const MAX_TRACKED_CLIENTS = 5000;
+const MAX_TRACKED_CLIENTS = 2000;
 
 const buckets = new Map<string, number[]>();
 
