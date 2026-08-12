@@ -4,7 +4,7 @@ import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Palette, ShieldCheck } from 'lucide-react';
 
-import { ImageDropzone, useLoadedImage } from '@/components/image-dropzone';
+import { ImageDropzone, useLoadedImages } from '@/components/image-dropzone';
 import { IntegerInput } from '@/components/integer-input';
 import { ResultCard } from '@/components/result-card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import { compressImage } from '@/lib/actions';
 import {
     DEFAULT_QUALITY,
     DEFAULT_TARGET_KB,
+    MAX_BATCH_FILES,
     QUALITY_LIMITS,
     TARGET_SIZE_LIMITS,
     TARGET_SIZE_PRESETS,
@@ -36,8 +37,11 @@ const defaultValues: CompressInput = {
 };
 
 export function CompressForm() {
-    const { image, setImage } = useLoadedImage();
-    const { isPending, outcome, run, clearResult, autoDownload } = useImageAction(compressImage);
+    const { images, addImages, removeImage, clearImages } = useLoadedImages(MAX_BATCH_FILES);
+    const { isPending, outcome, run, clearResult, downloadAll, autoDownload } = useImageAction(
+        compressImage,
+        'compressed-images.zip'
+    );
 
     const {
         control,
@@ -54,12 +58,13 @@ export function CompressForm() {
     });
 
     const mode = useWatch({ control, name: 'mode' });
-    const isPng = image ? formatFromMimeType(image.file.type) === 'png' : false;
+    const hasImages = images.length > 0;
+    const hasPng = images.some(image => formatFromMimeType(image.file.type) === 'png');
 
     const onSubmit = handleSubmit(values => {
-        if (!image) return;
+        if (!hasImages) return;
 
-        run(image, {
+        run(images, {
             mode: values.mode,
             quality: String(values.quality),
             targetKb: String(values.targetKb),
@@ -69,15 +74,20 @@ export function CompressForm() {
     return (
         <form onSubmit={onSubmit} className="space-y-6" noValidate>
             <ImageDropzone
-                image={image}
+                images={images}
+                max={MAX_BATCH_FILES}
                 disabled={isPending}
-                onImage={loaded => {
-                    setImage(loaded);
+                onAdd={loaded => {
+                    addImages(loaded);
                     clearResult();
                     void trigger();
                 }}
+                onRemove={index => {
+                    removeImage(index);
+                    clearResult();
+                }}
                 onClear={() => {
-                    setImage(null);
+                    clearImages();
                     clearResult();
                     reset(defaultValues);
                 }}
@@ -104,7 +114,7 @@ export function CompressForm() {
                                     });
                                 }
                             }}
-                            disabled={!image || isPending}
+                            disabled={!hasImages || isPending}
                         >
                             <SelectTrigger id="mode" className="w-full">
                                 <SelectValue />
@@ -128,7 +138,7 @@ export function CompressForm() {
                         min={QUALITY_LIMITS.min}
                         max={QUALITY_LIMITS.max}
                         placeholder={String(DEFAULT_QUALITY)}
-                        disabled={!image || isPending}
+                        disabled={!hasImages || isPending}
                         aria-invalid={!!errors.quality}
                         {...register('quality')}
                     />
@@ -147,7 +157,7 @@ export function CompressForm() {
                         min={TARGET_SIZE_LIMITS.min}
                         max={TARGET_SIZE_LIMITS.max}
                         placeholder={String(DEFAULT_TARGET_KB)}
-                        disabled={!image || isPending}
+                        disabled={!hasImages || isPending}
                         aria-invalid={!!errors.targetKb}
                         {...register('targetKb')}
                     />
@@ -158,7 +168,7 @@ export function CompressForm() {
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                disabled={!image || isPending}
+                                disabled={!hasImages || isPending}
                                 onClick={() =>
                                     setValue('targetKb', String(preset.kb), {
                                         shouldValidate: true,
@@ -179,7 +189,7 @@ export function CompressForm() {
                 </div>
             )}
 
-            {isPng && (
+            {hasPng && (
                 <div className="flex items-start gap-2.5 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
                     <Palette className="mt-0.5 size-4 shrink-0" />
                     <p>
@@ -199,14 +209,10 @@ export function CompressForm() {
             </div>
 
             {outcome && (
-                <ResultCard
-                    outcome={outcome}
-                    original={image && { size: image.file.size }}
-                    onDismiss={clearResult}
-                />
+                <ResultCard outcome={outcome} onDismiss={clearResult} onDownloadAll={downloadAll} />
             )}
 
-            <Button type="submit" className="w-full" disabled={!image || !isValid || isPending}>
+            <Button type="submit" className="w-full" disabled={!hasImages || !isValid || isPending}>
                 {isPending ? (
                     <>
                         <Spinner /> Compressing…

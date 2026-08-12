@@ -47,7 +47,7 @@ export function SiteFooter() {
 
             <div className="mx-auto w-full max-w-5xl border-t px-4 py-6">
                 <p className="text-sm text-muted-foreground">
-                    © {new Date().getFullYear()} {SITE.name}. Built with Next.js and sharp.
+                    © {new Date().getFullYear()} {SITE.name}.
                 </p>
             </div>
         </footer>

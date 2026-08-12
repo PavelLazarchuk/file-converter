@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import { ImageDropzone, useLoadedImage } from '@/components/image-dropzone';
+import { ImageDropzone, useLoadedImages } from '@/components/image-dropzone';
 import { MetadataSwitch } from '@/components/metadata-switch';
 import { ResultCard } from '@/components/result-card';
 import { Button } from '@/components/ui/button';
@@ -36,10 +36,12 @@ import { CropFields } from './crop-fields';
 const defaultValues: CropFormInput = { ratio: '1:1', shape: 'rectangle' };
 
 export function CropForm() {
-    const { image, setImage } = useLoadedImage();
+    const { images, addImages, clearImages } = useLoadedImages();
     const [removeMetadata, setRemoveMetadata] = useState(true);
     const [manualBox, setManualBox] = useState<{ key: string; box: CropBox } | null>(null);
-    const { isPending, outcome, run, clearResult, autoDownload } = useImageAction(cropImage);
+    const { isPending, outcome, run, clearResult, downloadAll, autoDownload } =
+        useImageAction(cropImage);
+    const image = images[0] ?? null;
 
     const {
         control,
@@ -65,10 +67,17 @@ export function CropForm() {
             : null;
     const box = manualBox && manualBox.key === boxKey ? manualBox.box : defaultBox;
 
+    function resetForm() {
+        clearImages();
+        setManualBox(null);
+        clearResult();
+        reset(defaultValues);
+    }
+
     const onSubmit = handleSubmit(values => {
         if (!image || !box) return;
 
-        run(image, {
+        run(images, {
             ratio: values.ratio,
             shape: values.shape,
             left: String(box.left),
@@ -82,20 +91,16 @@ export function CropForm() {
     return (
         <form onSubmit={onSubmit} className="space-y-6" noValidate>
             <ImageDropzone
-                image={image}
+                images={images}
                 disabled={isPending}
-                onImage={loaded => {
-                    setImage(loaded);
+                onAdd={loaded => {
+                    addImages(loaded);
                     setManualBox(null);
                     clearResult();
                     void trigger();
                 }}
-                onClear={() => {
-                    setImage(null);
-                    setManualBox(null);
-                    clearResult();
-                    reset(defaultValues);
-                }}
+                onRemove={resetForm}
+                onClear={resetForm}
             />
 
             <div className="space-y-2">
@@ -203,11 +208,7 @@ export function CropForm() {
             />
 
             {outcome && (
-                <ResultCard
-                    outcome={outcome}
-                    original={image && { size: image.file.size }}
-                    onDismiss={clearResult}
-                />
+                <ResultCard outcome={outcome} onDismiss={clearResult} onDownloadAll={downloadAll} />
             )}
 
             <Button type="submit" className="w-full" disabled={!image || !isValid || isPending}>

@@ -1,6 +1,10 @@
 export const MAX_FILE_SIZE = 20 * 1024 * 1024;
 export const MAX_FILE_SIZE_LABEL = '20MB';
 
+export const MAX_BATCH_FILES = 20;
+export const MAX_BATCH_BYTES = MAX_FILE_SIZE;
+export const MAX_BATCH_SIZE_LABEL = MAX_FILE_SIZE_LABEL;
+
 export const DIMENSION_LIMITS = { min: 1, max: 10000 } as const;
 export const QUALITY_LIMITS = { min: 1, max: 100 } as const;
 export const DEFAULT_QUALITY = 80;
@@ -243,6 +247,42 @@ export function stripExtension(filename: string): string {
     return filename.replace(/\.[^.]+$/, '');
 }
 
+export function fileExtension(filename: string): string {
+    const match = /\.([^.]+)$/.exec(filename);
+
+    return match ? match[1] : '';
+}
+
+export function uniqueFilenames(filenames: readonly string[]): string[] {
+    const taken = new Set<string>();
+
+    return filenames.map(filename => {
+        if (!taken.has(filename)) {
+            taken.add(filename);
+
+            return filename;
+        }
+
+        const base = stripExtension(filename);
+        const extension = fileExtension(filename);
+        const suffix = extension ? `.${extension}` : '';
+
+        for (let index = 2; ; index += 1) {
+            const candidate = `${base}-${index}${suffix}`;
+
+            if (!taken.has(candidate)) {
+                taken.add(candidate);
+
+                return candidate;
+            }
+        }
+    });
+}
+
+export function countLabel(count: number, noun: string): string {
+    return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
 export function formatFromMimeType(mimeType: string): ImageFormat | null {
     const key = FORMAT_KEYS.find(format => IMAGE_FORMATS[format].mimeType === mimeType);
 
@@ -255,10 +295,10 @@ export function convertSourceFromMimeType(mimeType: string): ConvertSource | nul
     return key ?? null;
 }
 
-export function conversionTargets(sourceMimeType: string): ConvertTarget[] {
-    const source = convertSourceFromMimeType(sourceMimeType);
+export function conversionTargets(sourceMimeTypes: readonly string[]): ConvertTarget[] {
+    const sources = sourceMimeTypes.map(convertSourceFromMimeType);
 
-    return CONVERT_TARGET_KEYS.filter(format => format !== source);
+    return CONVERT_TARGET_KEYS.filter(format => sources.some(source => format !== source));
 }
 
 export function acceptedFormatsLabel(formats: readonly ConvertSource[]): string {

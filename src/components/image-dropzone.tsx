@@ -2,16 +2,19 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { ImageIcon, UploadCloud, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ImageIcon, UploadCloud, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import {
     FORMAT_KEYS,
     IMAGE_FORMATS,
+    MAX_BATCH_BYTES,
+    MAX_BATCH_SIZE_LABEL,
     MAX_FILE_SIZE,
     MAX_FILE_SIZE_LABEL,
     acceptedFormatsLabel,
+    countLabel,
     formatFileSize,
     type ConvertSource,
 } from '@/lib/image';
@@ -30,86 +33,178 @@ export type LoadedImage = {
     height: number;
 };
 
-export function useLoadedImage() {
-    const [image, setImageState] = useState<LoadedImage | null>(null);
-    const currentRef = useRef<LoadedImage | null>(null);
+function totalBytes(images: readonly LoadedImage[]): number {
+    return images.reduce((sum, image) => sum + image.file.size, 0);
+}
 
-    const setImage = useCallback((next: LoadedImage | null) => {
-        const previous = currentRef.current;
+export function useLoadedImages(max = 1) {
+    const [images, setImagesState] = useState<LoadedImage[]>([]);
+    const currentRef = useRef<LoadedImage[]>([]);
 
-        if (previous && previous !== next) URL.revokeObjectURL(previous.previewUrl);
+    const commit = useCallback((next: LoadedImage[]) => {
+        for (const image of currentRef.current) {
+            if (!next.includes(image)) URL.revokeObjectURL(image.previewUrl);
+        }
 
         currentRef.current = next;
-        setImageState(next);
+        setImagesState(next);
     }, []);
+
+    const addImages = useCallback(
+        (added: LoadedImage[]) =>
+            commit(max === 1 ? added.slice(0, 1) : [...currentRef.current, ...added].slice(0, max)),
+        [commit, max]
+    );
+
+    const removeImage = useCallback(
+        (index: number) => commit(currentRef.current.filter((_, at) => at !== index)),
+        [commit]
+    );
+
+    const moveImage = useCallback(
+        (from: number, to: number) => {
+            const next = [...currentRef.current];
+
+            if (from < 0 || from >= next.length || to < 0 || to >= next.length) return;
+
+            const [moved] = next.splice(from, 1);
+
+            next.splice(to, 0, moved);
+            commit(next);
+        },
+        [commit]
+    );
+
+    const clearImages = useCallback(() => commit([]), [commit]);
 
     useEffect(
         () => () => {
-            if (currentRef.current) URL.revokeObjectURL(currentRef.current.previewUrl);
+            for (const image of currentRef.current) URL.revokeObjectURL(image.previewUrl);
         },
         []
     );
 
-    return { image, setImage };
+    return { images, addImages, removeImage, moveImage, clearImages };
+}
+
+function probeImage(file: File): Promise<LoadedImage | null> {
+    return new Promise(resolve => {
+        const previewUrl = URL.createObjectURL(file);
+        const probe = new window.Image();
+
+        probe.onload = () =>
+            resolve({ file, previewUrl, width: probe.naturalWidth, height: probe.naturalHeight });
+        probe.onerror = () => {
+            URL.revokeObjectURL(previewUrl);
+            resolve(null);
+        };
+        probe.src = previewUrl;
+    });
 }
 
 type ImageDropzoneProps = {
-    image: LoadedImage | null;
-    onImage: (image: LoadedImage) => void;
+    images: LoadedImage[];
+    onAdd: (images: LoadedImage[]) => void;
+    onRemove: (index: number) => void;
     onClear: () => void;
+    onMove?: (from: number, to: number) => void;
     disabled?: boolean;
     formats?: readonly ConvertSource[];
+    max?: number;
 };
 
 export function ImageDropzone({
-    image,
-    onImage,
+    images,
+    onAdd,
+    onRemove,
     onClear,
+    onMove,
     disabled,
     formats = FORMAT_KEYS,
+    max = 1,
 }: ImageDropzoneProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const loadTokenRef = useRef(0);
     const [isDragging, setIsDragging] = useState(false);
+    const single = max === 1;
 
-    function loadFile(file: File) {
-        if (!formats.some(format => IMAGE_FORMATS[format].mimeType === file.type)) {
-            toast.error(`Unsupported file type. Use ${acceptedFormatsLabel(formats)}.`);
+    async function loadFiles(incoming: File[]) {
+        if (disabled || !incoming.length) return;
+
+        const room = single ? 1 : max - images.length;
+
+        if (room <= 0) {
+            toast.error(`You can process up to ${countLabel(max, 'image')} at a time.`);
 
             return;
         }
-        if (file.size > MAX_FILE_SIZE) {
-            toast.error(`File is too large. The maximum size is ${MAX_FILE_SIZE_LABEL}.`);
 
-            return;
+        const accepted: File[] = [];
+        const problems: string[] = [];
+        let budget = (single ? MAX_FILE_SIZE : MAX_BATCH_BYTES) - (single ? 0 : totalBytes(images));
+
+        for (const file of incoming) {
+            if (accepted.length >= room) {
+                problems.push(
+                    `There is room for ${countLabel(room, 'more image')} — skipped the rest.`
+                );
+
+                break;
+            }
+            if (!formats.some(format => IMAGE_FORMATS[format].mimeType === file.type)) {
+                problems.push(`${file.name}: unsupported file type.`);
+
+                continue;
+            }
+            if (file.size > MAX_FILE_SIZE) {
+                problems.push(`${file.name}: larger than ${MAX_FILE_SIZE_LABEL}.`);
+
+                continue;
+            }
+            if (file.size > budget) {
+                problems.push(
+                    single
+                        ? `${file.name}: larger than ${MAX_FILE_SIZE_LABEL}.`
+                        : `${file.name}: the batch has to stay under ${MAX_BATCH_SIZE_LABEL} in total.`
+                );
+
+                continue;
+            }
+
+            budget -= file.size;
+            accepted.push(file);
         }
+
+        if (problems.length) {
+            toast.error(
+                problems.length === 1
+                    ? problems[0]
+                    : `${problems[0]} (+${problems.length - 1} more)`
+            );
+        }
+        if (!accepted.length) return;
 
         const token = ++loadTokenRef.current;
-        const previewUrl = URL.createObjectURL(file);
-        const probe = new window.Image();
+        const loaded = await Promise.all(accepted.map(probeImage));
 
-        probe.onload = () => {
-            if (token !== loadTokenRef.current) {
-                URL.revokeObjectURL(previewUrl);
-                return;
-            }
+        if (token !== loadTokenRef.current) {
+            for (const image of loaded) if (image) URL.revokeObjectURL(image.previewUrl);
 
-            onImage({ file, previewUrl, width: probe.naturalWidth, height: probe.naturalHeight });
-        };
-        probe.onerror = () => {
-            URL.revokeObjectURL(previewUrl);
+            return;
+        }
 
-            if (token === loadTokenRef.current) {
-                toast.error('Could not read this image. The file may be corrupted.');
-            }
-        };
-        probe.src = previewUrl;
+        const usable = loaded.filter((image): image is LoadedImage => image !== null);
+
+        if (usable.length < accepted.length) {
+            toast.error('Could not read some images. The files may be corrupted.');
+        }
+        if (usable.length) onAdd(usable);
     }
 
-    const loadFileRef = useRef(loadFile);
+    const loadFilesRef = useRef(loadFiles);
 
     useEffect(() => {
-        loadFileRef.current = loadFile;
+        loadFilesRef.current = loadFiles;
     });
 
     useEffect(() => {
@@ -122,12 +217,14 @@ export function ImageDropzone({
                 return;
             }
 
-            const file = event.clipboardData?.files?.[0];
+            const files = [...(event.clipboardData?.files ?? [])].filter(file =>
+                file.type.startsWith('image/')
+            );
 
-            if (!file || !file.type.startsWith('image/')) return;
+            if (!files.length) return;
 
             event.preventDefault();
-            loadFileRef.current(file);
+            void loadFilesRef.current(files);
         }
 
         window.addEventListener('paste', handlePaste);
@@ -141,27 +238,27 @@ export function ImageDropzone({
 
         if (disabled) return;
 
-        const file = event.dataTransfer.files[0];
-
-        if (file) loadFile(file);
+        void loadFiles([...event.dataTransfer.files]);
     }
 
     const fileInput = (
         <input
             ref={inputRef}
             type="file"
+            multiple={!single}
             accept={formats.map(format => IMAGE_FORMATS[format].mimeType).join(',')}
             className="sr-only"
             disabled={disabled}
             onChange={event => {
-                const file = event.target.files?.[0];
-                if (file) loadFile(file);
+                void loadFiles([...(event.target.files ?? [])]);
                 event.target.value = '';
             }}
         />
     );
 
-    if (image) {
+    if (single && images.length) {
+        const image = images[0];
+
         return (
             <div className="flex items-center gap-4 rounded-xl border bg-card p-4">
                 <div className="relative size-20 shrink-0 overflow-hidden rounded-lg border bg-muted">
@@ -204,6 +301,102 @@ export function ImageDropzone({
         );
     }
 
+    if (images.length) {
+        return (
+            <div className="space-y-3 rounded-xl border bg-card p-4">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="text-sm font-medium">
+                        {countLabel(images.length, 'image')} · {formatFileSize(totalBytes(images))}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                        up to {max} · {MAX_BATCH_SIZE_LABEL} in total
+                    </p>
+                </div>
+
+                <ul className="divide-y rounded-lg border">
+                    {images.map((image, index) => (
+                        <li key={image.previewUrl} className="flex items-center gap-3 p-2">
+                            <div className="relative size-12 shrink-0 overflow-hidden rounded border bg-muted">
+                                <Image
+                                    src={image.previewUrl}
+                                    alt={image.file.name}
+                                    fill
+                                    unoptimized
+                                    className="object-contain"
+                                />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium">{image.file.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {image.width} × {image.height} ·{' '}
+                                    {formatFileSize(image.file.size)}
+                                </p>
+                            </div>
+                            {onMove && (
+                                <div className="flex shrink-0 flex-col">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="size-6"
+                                        aria-label={`Move ${image.file.name} up`}
+                                        disabled={disabled || index === 0}
+                                        onClick={() => onMove(index, index - 1)}
+                                    >
+                                        <ArrowUp className="size-3.5" />
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="size-6"
+                                        aria-label={`Move ${image.file.name} down`}
+                                        disabled={disabled || index === images.length - 1}
+                                        onClick={() => onMove(index, index + 1)}
+                                    >
+                                        <ArrowDown className="size-3.5" />
+                                    </Button>
+                                </div>
+                            )}
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Remove ${image.file.name}`}
+                                disabled={disabled}
+                                onClick={() => onRemove(index)}
+                            >
+                                <X />
+                            </Button>
+                        </li>
+                    ))}
+                </ul>
+
+                <div className="flex flex-wrap gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={disabled || images.length >= max}
+                        onClick={() => inputRef.current?.click()}
+                    >
+                        Add more
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={disabled}
+                        onClick={onClear}
+                    >
+                        Remove all
+                    </Button>
+                </div>
+                {fileInput}
+            </div>
+        );
+    }
+
     return (
         <label
             className={cn(
@@ -234,11 +427,14 @@ export function ImageDropzone({
             <div>
                 <p className="text-sm font-medium">
                     {isDragging
-                        ? 'Drop the image here'
-                        : 'Drag & drop an image, click to browse, or paste with Ctrl/⌘ + V'}
+                        ? `Drop the ${single ? 'image' : 'images'} here`
+                        : `Drag & drop ${single ? 'an image' : 'images'}, click to browse, or paste with Ctrl/⌘ + V`}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                    {acceptedFormatsLabel(formats)} · up to {MAX_FILE_SIZE_LABEL}
+                    {acceptedFormatsLabel(formats)} ·{' '}
+                    {single
+                        ? `up to ${MAX_FILE_SIZE_LABEL}`
+                        : `up to ${max} at a time, ${MAX_BATCH_SIZE_LABEL} in total`}
                 </p>
             </div>
         </label>

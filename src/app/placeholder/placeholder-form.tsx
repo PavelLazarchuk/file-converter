@@ -33,7 +33,7 @@ const PREVIEW_MAX_WIDTH = 288;
 const PREVIEW_MAX_HEIGHT = 176;
 
 export function PlaceholderForm() {
-    const { isPending, outcome, run, clearResult, autoDownload } =
+    const { isPending, outcome, run, clearResult, downloadAll, autoDownload } =
         useImageAction(generatePlaceholder);
 
     const {
@@ -70,7 +70,7 @@ export function PlaceholderForm() {
             : null;
 
     const onSubmit = handleSubmit(values => {
-        run(null, {
+        run([], {
             width: String(values.width),
             height: String(values.height),
             bgColor: values.bgColor,
@@ -221,7 +221,9 @@ export function PlaceholderForm() {
                 </div>
             )}
 
-            {outcome && <ResultCard outcome={outcome} onDismiss={clearResult} />}
+            {outcome && (
+                <ResultCard outcome={outcome} onDismiss={clearResult} onDownloadAll={downloadAll} />
+            )}
 
             <Button type="submit" className="w-full" disabled={!isValid || isPending}>
                 {isPending ? (

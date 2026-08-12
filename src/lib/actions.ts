@@ -1,7 +1,7 @@
 'use server';
 
 import sharp, { type Metadata, type Sharp } from 'sharp';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, type PDFImage } from 'pdf-lib';
 
 import {
     CONVERT_SOURCE_KEYS,
@@ -11,6 +11,9 @@ import {
     FAVICON_PACK,
     FORMAT_KEYS,
     IMAGE_FORMATS,
+    MAX_BATCH_BYTES,
+    MAX_BATCH_FILES,
+    MAX_BATCH_SIZE_LABEL,
     MAX_FILE_SIZE,
     MAX_FILE_SIZE_LABEL,
     MAX_INPUT_PIXELS,
@@ -27,8 +30,10 @@ import {
     placeholderFontSize,
     placeholderLabel,
     stripExtension,
+    uniqueFilenames,
     type ConvertSource,
     type ImageFormat,
+    type PdfPageSize,
 } from './image';
 import { encodeIco } from './ico';
 import { RATE_LIMIT, checkRateLimit } from './rate-limit';
@@ -43,14 +48,18 @@ import {
     resizeSchema,
 } from './schemas';
 
+export type ActionFile = {
+    data: Uint8Array;
+    filename: string;
+    mimeType: string;
+    originalSize: number;
+    warning?: string;
+};
+
+export type ActionFailure = { filename: string; error: string };
+
 export type ActionResult =
-    | {
-          success: true;
-          data: Uint8Array;
-          filename: string;
-          mimeType: string;
-          warning?: string;
-      }
+    | { success: true; files: ActionFile[]; failures?: ActionFailure[] }
     | { success: false; error: string };
 
 class ProcessingError extends Error {}
@@ -62,7 +71,9 @@ function decode(buffer: Buffer) {
 type SourceImage<Format extends ConvertSource> = {
     buffer: Buffer;
     format: Format;
+    name: string;
     baseName: string;
+    size: number;
     metadata: Metadata;
 };
 
@@ -76,19 +87,10 @@ async function inspect(buffer: Buffer): Promise<Metadata | null> {
     }
 }
 
-async function readImageFile<Format extends ConvertSource>(
-    formData: FormData,
+async function readSource<Format extends ConvertSource>(
+    file: File,
     formats: readonly Format[]
 ): Promise<SourceImage<Format>> {
-    const file = formData.get('file');
-
-    if (!(file instanceof File) || file.size === 0) {
-        throw new ProcessingError('No file provided.');
-    }
-    if (file.size > MAX_FILE_SIZE) {
-        throw new ProcessingError(`File is too large. The maximum size is ${MAX_FILE_SIZE_LABEL}.`);
-    }
-
     const buffer = Buffer.from(await file.arrayBuffer());
     const metadata = await inspect(buffer);
 
@@ -109,9 +111,70 @@ async function readImageFile<Format extends ConvertSource>(
         );
     }
 
-    const baseName = stripExtension(file.name) || 'image';
+    return {
+        buffer,
+        format,
+        name: file.name,
+        baseName: stripExtension(file.name) || 'image',
+        size: file.size,
+        metadata,
+    };
+}
 
-    return { buffer, format, baseName, metadata };
+type SourceBatch<Format extends ConvertSource> = {
+    sources: SourceImage<Format>[];
+    failures: ActionFailure[];
+};
+
+async function readImageFiles<Format extends ConvertSource>(
+    formData: FormData,
+    formats: readonly Format[]
+): Promise<SourceBatch<Format>> {
+    const files = formData
+        .getAll('file')
+        .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+
+    if (!files.length) throw new ProcessingError('No file provided.');
+
+    if (files.length > MAX_BATCH_FILES) {
+        throw new ProcessingError(
+            `Too many files — this tool takes up to ${MAX_BATCH_FILES} images at a time.`
+        );
+    }
+
+    const sources: SourceImage<Format>[] = [];
+    const failures: ActionFailure[] = [];
+    const usable = files.filter(file => {
+        if (file.size <= MAX_FILE_SIZE) return true;
+
+        failures.push({
+            filename: file.name,
+            error: `File is too large. The maximum size is ${MAX_FILE_SIZE_LABEL}.`,
+        });
+
+        return false;
+    });
+    const totalBytes = usable.reduce((sum, file) => sum + file.size, 0);
+
+    if (totalBytes > MAX_BATCH_BYTES) {
+        throw new ProcessingError(
+            `These files add up to ${formatFileSize(totalBytes)}. Keep a batch under ${MAX_BATCH_SIZE_LABEL} in total.`
+        );
+    }
+
+    for (const file of usable) {
+        try {
+            sources.push(await readSource(file, formats));
+        } catch (error) {
+            failures.push(describeFailure(file.name, error));
+        }
+    }
+
+    if (!sources.length) {
+        throw new ProcessingError(failures[0]?.error ?? 'No file provided.');
+    }
+
+    return { sources, failures };
 }
 
 function flag(formData: FormData, name: string): boolean {
@@ -122,17 +185,58 @@ function keepMetadataRequested(formData: FormData): boolean {
     return flag(formData, 'keepMetadata');
 }
 
-function success(data: Buffer, filename: string, mimeType: string, warning?: string): ActionResult {
-    return { success: true, data: new Uint8Array(data), filename, mimeType, warning };
+function output(
+    source: { size: number },
+    data: Buffer | Uint8Array,
+    filename: string,
+    mimeType: string,
+    warning?: string
+): ActionFile {
+    return {
+        data: new Uint8Array(data),
+        filename,
+        mimeType,
+        originalSize: source.size,
+        ...(warning ? { warning } : {}),
+    };
 }
 
-async function run(process: () => Promise<ActionResult>): Promise<ActionResult> {
-    const limit = await checkRateLimit();
+function describeFailure(filename: string, error: unknown): ActionFailure {
+    if (error instanceof ProcessingError) return { filename, error: error.message };
+
+    if (error instanceof Error && error.message.includes('pixel limit')) {
+        return { filename, error: 'Image dimensions are too large to process.' };
+    }
+
+    console.error('Image processing failed:', error);
+
+    return { filename, error: 'Something went wrong while processing the image.' };
+}
+
+function collect(files: ActionFile[], failures: ActionFailure[]): ActionResult {
+    if (!files.length) {
+        return {
+            success: false,
+            error: failures[0]?.error ?? 'Something went wrong while processing the image.',
+        };
+    }
+
+    const names = uniqueFilenames(files.map(file => file.filename));
+
+    return {
+        success: true,
+        files: files.map((file, index) => ({ ...file, filename: names[index] })),
+        ...(failures.length ? { failures } : {}),
+    };
+}
+
+async function run(process: () => Promise<ActionResult>, cost = 1): Promise<ActionResult> {
+    const limit = await checkRateLimit(cost);
 
     if (!limit.allowed) {
         return {
             success: false,
-            error: `Too many requests — this tool allows ${RATE_LIMIT.requests} per minute. Try again in ${limit.retryAfterSeconds}s.`,
+            error: `Too many requests — this tool allows ${RATE_LIMIT.images} images per minute. Try again in ${limit.retryAfterSeconds}s.`,
         };
     }
 
@@ -152,9 +256,38 @@ async function run(process: () => Promise<ActionResult>): Promise<ActionResult> 
     }
 }
 
+function uploadCount(formData: FormData): number {
+    return Math.min(MAX_BATCH_FILES, Math.max(1, formData.getAll('file').length));
+}
+
+async function runFiles<Format extends ConvertSource>(
+    formData: FormData,
+    formats: readonly Format[],
+    handle: (batch: SourceBatch<Format>) => Promise<ActionResult>
+): Promise<ActionResult> {
+    return run(async () => handle(await readImageFiles(formData, formats)), uploadCount(formData));
+}
+
+async function eachFile<Format extends ConvertSource>(
+    { sources, failures }: SourceBatch<Format>,
+    process: (source: SourceImage<Format>) => Promise<ActionFile>
+): Promise<ActionResult> {
+    const produced: ActionFile[] = [];
+    const problems = [...failures];
+
+    for (const source of sources) {
+        try {
+            produced.push(await process(source));
+        } catch (error) {
+            problems.push(describeFailure(source.name, error));
+        }
+    }
+
+    return collect(produced, problems);
+}
+
 export async function resizeImage(formData: FormData): Promise<ActionResult> {
-    return run(async () => {
-        const { buffer, format, baseName } = await readImageFile(formData, FORMAT_KEYS);
+    return runFiles(formData, FORMAT_KEYS, async batch => {
         const parsed = resizeSchema.safeParse({
             width: formData.get('width'),
             height: formData.get('height'),
@@ -167,32 +300,43 @@ export async function resizeImage(formData: FormData): Promise<ActionResult> {
         }
 
         const { width, height, rotate, fit } = parsed.data;
-        const background =
-            format === 'jpeg' ? { r: 255, g: 255, b: 255 } : { r: 0, g: 0, b: 0, alpha: 0 };
-        let pipeline = decode(buffer);
+        const withoutEnlargement = flag(formData, 'noEnlarge');
+        const keepMetadata = keepMetadataRequested(formData);
 
-        if (rotate !== '0') pipeline = pipeline.rotate(Number(rotate));
+        return eachFile(batch, async source => {
+            const background =
+                source.format === 'jpeg'
+                    ? { r: 255, g: 255, b: 255 }
+                    : { r: 0, g: 0, b: 0, alpha: 0 };
+            let pipeline = decode(source.buffer);
 
-        pipeline = pipeline
-            .resize(width, height, {
-                fit,
-                withoutEnlargement: flag(formData, 'noEnlarge'),
-                ...(fitPads(fit) && { background }),
-            })
-            .toFormat(format);
+            if (rotate !== '0') pipeline = pipeline.rotate(Number(rotate));
 
-        if (keepMetadataRequested(formData)) pipeline = pipeline.keepMetadata();
+            pipeline = pipeline
+                .resize(width, height, {
+                    fit,
+                    withoutEnlargement,
+                    ...(fitPads(fit) && { background }),
+                })
+                .toFormat(source.format);
 
-        const { data, info } = await pipeline.toBuffer({ resolveWithObject: true });
-        const { extension, mimeType } = IMAGE_FORMATS[format];
+            if (keepMetadata) pipeline = pipeline.keepMetadata();
 
-        return success(data, `${baseName}-${info.width}x${info.height}.${extension}`, mimeType);
+            const { data, info } = await pipeline.toBuffer({ resolveWithObject: true });
+            const { extension, mimeType } = IMAGE_FORMATS[source.format];
+
+            return output(
+                source,
+                data,
+                `${source.baseName}-${info.width}x${info.height}.${extension}`,
+                mimeType
+            );
+        });
     });
 }
 
 export async function cropImage(formData: FormData): Promise<ActionResult> {
-    return run(async () => {
-        const { buffer, format, baseName, metadata } = await readImageFile(formData, FORMAT_KEYS);
+    return runFiles(formData, FORMAT_KEYS, async batch => {
         const parsed = cropSchema.safeParse({
             ratio: formData.get('ratio'),
             shape: formData.get('shape'),
@@ -206,42 +350,52 @@ export async function cropImage(formData: FormData): Promise<ActionResult> {
             throw new ProcessingError(parsed.error.issues[0]?.message ?? 'Invalid crop settings.');
         }
 
-        const swapped = (metadata.orientation ?? 1) >= 5;
-        const srcWidth = (swapped ? metadata.height : metadata.width) ?? 0;
-        const srcHeight = (swapped ? metadata.width : metadata.height) ?? 0;
+        const keepMetadata = keepMetadataRequested(formData);
 
-        if (!srcWidth || !srcHeight) {
-            throw new ProcessingError('Could not read the image dimensions.');
-        }
+        return eachFile(batch, async source => {
+            const { metadata } = source;
+            const swapped = (metadata.orientation ?? 1) >= 5;
+            const srcWidth = (swapped ? metadata.height : metadata.width) ?? 0;
+            const srcHeight = (swapped ? metadata.width : metadata.height) ?? 0;
 
-        const box = clampCropBox(parsed.data, srcWidth, srcHeight);
-        const circle = parsed.data.shape === 'circle';
-        const outFormat = circle ? circleOutputFormat(format) : format;
-        let pipeline = decode(buffer).extract(box);
+            if (!srcWidth || !srcHeight) {
+                throw new ProcessingError('Could not read the image dimensions.');
+            }
 
-        if (circle) {
-            const mask = Buffer.from(
-                `<svg xmlns="http://www.w3.org/2000/svg" width="${box.width}" height="${box.height}">
+            const box = clampCropBox(parsed.data, srcWidth, srcHeight);
+            const circle = parsed.data.shape === 'circle';
+            const outFormat = circle ? circleOutputFormat(source.format) : source.format;
+            let pipeline = decode(source.buffer).extract(box);
+
+            if (circle) {
+                const mask = Buffer.from(
+                    `<svg xmlns="http://www.w3.org/2000/svg" width="${box.width}" height="${box.height}">
                     <ellipse cx="${box.width / 2}" cy="${box.height / 2}" rx="${box.width / 2}" ry="${box.height / 2}" fill="#fff"/>
                 </svg>`
+                );
+
+                pipeline = pipeline.ensureAlpha().composite([{ input: mask, blend: 'dest-in' }]);
+            }
+
+            pipeline = pipeline.toFormat(outFormat);
+
+            if (keepMetadata) pipeline = pipeline.keepMetadata();
+
+            const data = await pipeline.toBuffer();
+            const { extension, mimeType } = IMAGE_FORMATS[outFormat];
+            const ratioLabel =
+                parsed.data.ratio === 'free'
+                    ? `${box.width}x${box.height}`
+                    : parsed.data.ratio.replace(':', 'x');
+            const shapeLabel = circle ? '-circle' : '';
+
+            return output(
+                source,
+                data,
+                `${source.baseName}-${ratioLabel}${shapeLabel}.${extension}`,
+                mimeType
             );
-
-            pipeline = pipeline.ensureAlpha().composite([{ input: mask, blend: 'dest-in' }]);
-        }
-
-        pipeline = pipeline.toFormat(outFormat);
-
-        if (keepMetadataRequested(formData)) pipeline = pipeline.keepMetadata();
-
-        const data = await pipeline.toBuffer();
-        const { extension, mimeType } = IMAGE_FORMATS[outFormat];
-        const ratioLabel =
-            parsed.data.ratio === 'free'
-                ? `${box.width}x${box.height}`
-                : parsed.data.ratio.replace(':', 'x');
-        const shapeLabel = circle ? '-circle' : '';
-
-        return success(data, `${baseName}-${ratioLabel}${shapeLabel}.${extension}`, mimeType);
+        });
     });
 }
 
@@ -275,9 +429,56 @@ async function createDecoder(buffer: Buffer, metadata: Metadata): Promise<() => 
         });
 }
 
+async function compressToTarget(
+    source: SourceImage<ImageFormat>,
+    targetKb: number,
+    filename: string
+): Promise<ActionFile> {
+    const { mimeType } = IMAGE_FORMATS[source.format];
+    const targetBytes = targetKb * 1024;
+    const nextPipeline = await createDecoder(source.buffer, source.metadata);
+    let low = QUALITY_LIMITS.min;
+    let high = QUALITY_LIMITS.max;
+    let best: Buffer | null = null;
+    let smallest: Buffer | null = null;
+
+    for (let step = 0; step < MAX_QUALITY_STEPS && low <= high; step += 1) {
+        const candidateQuality = Math.floor((low + high) / 2);
+        const candidate = await applyQuality(
+            nextPipeline(),
+            source.format,
+            candidateQuality
+        ).toBuffer();
+
+        if (candidate.length <= targetBytes) {
+            best = candidate;
+
+            if (candidate.length >= targetBytes * CLOSE_ENOUGH_RATIO) break;
+
+            low = candidateQuality + 1;
+        } else {
+            if (!smallest || candidate.length < smallest.length) smallest = candidate;
+
+            high = candidateQuality - 1;
+        }
+    }
+
+    if (best) return output(source, best, filename, mimeType);
+
+    if (!smallest) throw new ProcessingError('Could not compress this image.');
+
+    return output(
+        source,
+        smallest,
+        filename,
+        mimeType,
+        `Couldn't reach ${formatFileSize(targetBytes)} at these dimensions — the smallest ` +
+            `this image compresses to is ${formatFileSize(smallest.length)}. Resize it first for anything smaller.`
+    );
+}
+
 export async function compressImage(formData: FormData): Promise<ActionResult> {
-    return run(async () => {
-        const { buffer, format, baseName, metadata } = await readImageFile(formData, FORMAT_KEYS);
+    return runFiles(formData, FORMAT_KEYS, async batch => {
         const parsed = compressSchema.safeParse({
             mode: formData.get('mode') || 'quality',
             quality: formData.get('quality') || String(DEFAULT_QUALITY),
@@ -287,57 +488,23 @@ export async function compressImage(formData: FormData): Promise<ActionResult> {
         if (!parsed.success) {
             throw new ProcessingError(parsed.error.issues[0]?.message ?? 'Invalid settings.');
         }
+
         const { mode, quality, targetKb } = parsed.data;
-        const { extension, mimeType } = IMAGE_FORMATS[format];
-        const filename = `${baseName}-compressed.${extension}`;
 
-        if (mode === 'quality') {
-            const data = await applyQuality(decode(buffer), format, quality).toBuffer();
+        return eachFile(batch, async source => {
+            const { extension, mimeType } = IMAGE_FORMATS[source.format];
+            const filename = `${source.baseName}-compressed.${extension}`;
 
-            return success(data, filename, mimeType);
-        }
+            if (mode === 'size') return compressToTarget(source, targetKb, filename);
 
-        const targetBytes = targetKb * 1024;
-        const nextPipeline = await createDecoder(buffer, metadata);
-        let low = QUALITY_LIMITS.min;
-        let high = QUALITY_LIMITS.max;
-        let best: Buffer | null = null;
-        let smallest: Buffer | null = null;
-
-        for (let step = 0; step < MAX_QUALITY_STEPS && low <= high; step += 1) {
-            const candidateQuality = Math.floor((low + high) / 2);
-            const candidate = await applyQuality(
-                nextPipeline(),
-                format,
-                candidateQuality
+            const data = await applyQuality(
+                decode(source.buffer),
+                source.format,
+                quality
             ).toBuffer();
 
-            if (candidate.length <= targetBytes) {
-                best = candidate;
-
-                if (candidate.length >= targetBytes * CLOSE_ENOUGH_RATIO) break;
-
-                low = candidateQuality + 1;
-            } else {
-                if (!smallest || candidate.length < smallest.length) smallest = candidate;
-
-                high = candidateQuality - 1;
-            }
-        }
-
-        if (!best) {
-            if (!smallest) throw new ProcessingError('Could not compress this image.');
-
-            return success(
-                smallest,
-                filename,
-                mimeType,
-                `Couldn't reach ${formatFileSize(targetBytes)} at these dimensions — the smallest ` +
-                    `this image compresses to is ${formatFileSize(smallest.length)}. Resize it first for anything smaller.`
-            );
-        }
-
-        return success(best, filename, mimeType);
+            return output(source, data, filename, mimeType);
+        });
     });
 }
 
@@ -431,13 +598,7 @@ function faviconPackEntries(
 }
 
 export async function convertImage(formData: FormData): Promise<ActionResult> {
-    return run(async () => {
-        const {
-            buffer,
-            format: source,
-            baseName,
-            metadata,
-        } = await readImageFile(formData, CONVERT_SOURCE_KEYS);
+    return runFiles(formData, CONVERT_SOURCE_KEYS, async batch => {
         const parsed = convertSchema.safeParse({ format: formData.get('format') });
 
         if (!parsed.success) {
@@ -445,100 +606,151 @@ export async function convertImage(formData: FormData): Promise<ActionResult> {
         }
 
         const target = parsed.data.format;
+        const keepMetadata = keepMetadataRequested(formData);
+        const icoOptions =
+            target === 'ico'
+                ? icoOptionsSchema.safeParse({
+                      sizes: formData.get('icoSizes') || DEFAULT_ICO_SIZES.join(','),
+                      pack: formData.get('icoPack') || 'false',
+                  })
+                : null;
 
-        if (target === source) {
-            throw new ProcessingError('Target format must differ from the source format.');
-        }
-
-        if (target === 'base64') {
-            const bytes = await base64Bytes(
-                buffer,
-                source,
-                metadata,
-                keepMetadataRequested(formData)
-            );
-            const dataUri = `data:${IMAGE_FORMATS[source].mimeType};base64,${bytes.toString('base64')}`;
-            const { extension, mimeType } = IMAGE_FORMATS.base64;
-
-            return success(
-                Buffer.from(dataUri, 'utf8'),
-                `${baseName}-base64.${extension}`,
-                mimeType
+        if (icoOptions && !icoOptions.success) {
+            throw new ProcessingError(
+                icoOptions.error.issues[0]?.message ?? 'Invalid favicon settings.'
             );
         }
 
-        if (target === 'svg') {
-            let pipeline = decode(buffer).png();
+        return eachFile(batch, async source => {
+            const { buffer, baseName, format: from, metadata } = source;
 
-            if (keepMetadataRequested(formData)) pipeline = pipeline.keepMetadata();
+            if (target === from) {
+                throw new ProcessingError('Target format must differ from the source format.');
+            }
 
-            const { data: png, info } = await pipeline.toBuffer({ resolveWithObject: true });
-            const svg =
-                `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ` +
-                `width="${info.width}" height="${info.height}" viewBox="0 0 ${info.width} ${info.height}">` +
-                `<image width="${info.width}" height="${info.height}" ` +
-                `xlink:href="data:image/png;base64,${png.toString('base64')}"/>` +
-                `</svg>`;
-            const { extension, mimeType } = IMAGE_FORMATS.svg;
+            if (target === 'base64') {
+                const bytes = await base64Bytes(buffer, from, metadata, keepMetadata);
+                const dataUri = `data:${IMAGE_FORMATS[from].mimeType};base64,${bytes.toString('base64')}`;
+                const { extension, mimeType } = IMAGE_FORMATS.base64;
 
-            return success(Buffer.from(svg, 'utf8'), `${baseName}.${extension}`, mimeType);
-        }
-
-        if (target === 'ico') {
-            const options = icoOptionsSchema.safeParse({
-                sizes: formData.get('icoSizes') || DEFAULT_ICO_SIZES.join(','),
-                pack: formData.get('icoPack') || 'false',
-            });
-
-            if (!options.success) {
-                throw new ProcessingError(
-                    options.error.issues[0]?.message ?? 'Invalid favicon settings.'
+                return output(
+                    source,
+                    Buffer.from(dataUri, 'utf8'),
+                    `${baseName}-base64.${extension}`,
+                    mimeType
                 );
             }
 
-            if (options.data.pack === 'false') {
-                const icon = await buildIco(buffer, options.data.sizes);
-                const { extension, mimeType } = IMAGE_FORMATS.ico;
+            if (target === 'svg') {
+                let pipeline = decode(buffer).png();
 
-                return success(icon, `${baseName}.${extension}`, mimeType);
+                if (keepMetadata) pipeline = pipeline.keepMetadata();
+
+                const { data: png, info } = await pipeline.toBuffer({ resolveWithObject: true });
+                const svg =
+                    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ` +
+                    `width="${info.width}" height="${info.height}" viewBox="0 0 ${info.width} ${info.height}">` +
+                    `<image width="${info.width}" height="${info.height}" ` +
+                    `xlink:href="data:image/png;base64,${png.toString('base64')}"/>` +
+                    `</svg>`;
+                const { extension, mimeType } = IMAGE_FORMATS.svg;
+
+                return output(
+                    source,
+                    Buffer.from(svg, 'utf8'),
+                    `${baseName}.${extension}`,
+                    mimeType
+                );
             }
 
-            const [icon, assets] = await Promise.all([
-                buildIco(buffer, options.data.sizes),
-                buildFaviconPackAssets(buffer, baseName),
-            ]);
+            if (target === 'ico') {
+                const options = icoOptions?.success ? icoOptions.data : null;
 
-            return success(
-                createZip(faviconPackEntries(icon, assets)),
-                `${baseName}-favicons.zip`,
-                ZIP_MIME_TYPE
-            );
-        }
+                if (!options) throw new ProcessingError('Invalid favicon settings.');
 
-        let pipeline = decode(buffer);
+                if (options.pack === 'false') {
+                    const icon = await buildIco(buffer, options.sizes);
+                    const { extension, mimeType } = IMAGE_FORMATS.ico;
 
-        if (target === 'jpeg') {
-            pipeline = pipeline.flatten({ background: '#ffffff' });
-        }
+                    return output(source, icon, `${baseName}.${extension}`, mimeType);
+                }
 
-        pipeline = pipeline.toFormat(target);
+                const [icon, assets] = await Promise.all([
+                    buildIco(buffer, options.sizes),
+                    buildFaviconPackAssets(buffer, baseName),
+                ]);
 
-        if (keepMetadataRequested(formData)) pipeline = pipeline.keepMetadata();
+                return output(
+                    source,
+                    createZip(faviconPackEntries(icon, assets)),
+                    `${baseName}-favicons.zip`,
+                    ZIP_MIME_TYPE
+                );
+            }
 
-        const data = await pipeline.toBuffer();
-        const { extension, mimeType } = IMAGE_FORMATS[target];
+            let pipeline = decode(buffer);
 
-        return success(data, `${baseName}.${extension}`, mimeType);
+            if (target === 'jpeg') {
+                pipeline = pipeline.flatten({ background: '#ffffff' });
+            }
+
+            pipeline = pipeline.toFormat(target);
+
+            if (keepMetadata) pipeline = pipeline.keepMetadata();
+
+            const data = await pipeline.toBuffer();
+            const { extension, mimeType } = IMAGE_FORMATS[target];
+
+            return output(source, data, `${baseName}.${extension}`, mimeType);
+        });
+    });
+}
+
+async function embedPdfImage(
+    pdfDoc: PDFDocument,
+    source: SourceImage<ConvertSource>
+): Promise<PDFImage> {
+    const isJpeg = source.format === 'jpeg';
+    const imageBytes = await decode(source.buffer)
+        .toFormat(isJpeg ? 'jpeg' : 'png', isJpeg ? { quality: 90 } : undefined)
+        .toBuffer();
+
+    return isJpeg ? pdfDoc.embedJpg(imageBytes) : pdfDoc.embedPng(imageBytes);
+}
+
+function drawPdfPage(pdfDoc: PDFDocument, embedded: PDFImage, pageSize: PdfPageSize): void {
+    const { width: imgWidth, height: imgHeight } = embedded;
+
+    if (pageSize === 'fit') {
+        const page = pdfDoc.addPage([imgWidth, imgHeight]);
+
+        page.drawImage(embedded, { x: 0, y: 0, width: imgWidth, height: imgHeight });
+
+        return;
+    }
+
+    const [portraitWidth, portraitHeight] = PDF_PAGE_DIMENSIONS[pageSize];
+    const landscape = imgWidth > imgHeight;
+    const pageWidth = landscape ? portraitHeight : portraitWidth;
+    const pageHeight = landscape ? portraitWidth : portraitHeight;
+    const scale = Math.min(
+        (pageWidth - PDF_PAGE_MARGIN * 2) / imgWidth,
+        (pageHeight - PDF_PAGE_MARGIN * 2) / imgHeight
+    );
+    const drawWidth = imgWidth * scale;
+    const drawHeight = imgHeight * scale;
+    const page = pdfDoc.addPage([pageWidth, pageHeight]);
+
+    page.drawImage(embedded, {
+        x: (pageWidth - drawWidth) / 2,
+        y: (pageHeight - drawHeight) / 2,
+        width: drawWidth,
+        height: drawHeight,
     });
 }
 
 export async function imageToPdf(formData: FormData): Promise<ActionResult> {
-    return run(async () => {
-        const {
-            buffer,
-            format: source,
-            baseName,
-        } = await readImageFile(formData, CONVERT_SOURCE_KEYS);
+    return runFiles(formData, CONVERT_SOURCE_KEYS, async ({ sources, failures }) => {
         const parsed = imageToPdfSchema.safeParse({ pageSize: formData.get('pageSize') });
 
         if (!parsed.success) {
@@ -546,45 +758,32 @@ export async function imageToPdf(formData: FormData): Promise<ActionResult> {
         }
 
         const { pageSize } = parsed.data;
-        const isJpeg = source === 'jpeg';
-        const imageBytes = await decode(buffer)
-            .toFormat(isJpeg ? 'jpeg' : 'png', isJpeg ? { quality: 90 } : undefined)
-            .toBuffer();
-
         const pdfDoc = await PDFDocument.create();
-        const embedded = isJpeg
-            ? await pdfDoc.embedJpg(imageBytes)
-            : await pdfDoc.embedPng(imageBytes);
-        const { width: imgWidth, height: imgHeight } = embedded;
+        const problems = [...failures];
+        const used: SourceImage<ConvertSource>[] = [];
 
-        if (pageSize === 'fit') {
-            const page = pdfDoc.addPage([imgWidth, imgHeight]);
-
-            page.drawImage(embedded, { x: 0, y: 0, width: imgWidth, height: imgHeight });
-        } else {
-            const [portraitWidth, portraitHeight] = PDF_PAGE_DIMENSIONS[pageSize];
-            const landscape = imgWidth > imgHeight;
-            const pageWidth = landscape ? portraitHeight : portraitWidth;
-            const pageHeight = landscape ? portraitWidth : portraitHeight;
-            const scale = Math.min(
-                (pageWidth - PDF_PAGE_MARGIN * 2) / imgWidth,
-                (pageHeight - PDF_PAGE_MARGIN * 2) / imgHeight
-            );
-            const drawWidth = imgWidth * scale;
-            const drawHeight = imgHeight * scale;
-            const page = pdfDoc.addPage([pageWidth, pageHeight]);
-
-            page.drawImage(embedded, {
-                x: (pageWidth - drawWidth) / 2,
-                y: (pageHeight - drawHeight) / 2,
-                width: drawWidth,
-                height: drawHeight,
-            });
+        for (const source of sources) {
+            try {
+                drawPdfPage(pdfDoc, await embedPdfImage(pdfDoc, source), pageSize);
+                used.push(source);
+            } catch (error) {
+                problems.push(describeFailure(source.name, error));
+            }
         }
 
-        const data = await pdfDoc.save();
+        if (!used.length) return collect([], problems);
 
-        return success(Buffer.from(data), `${baseName}.pdf`, 'application/pdf');
+        const data = await pdfDoc.save();
+        const originalSize = used.reduce((sum, source) => sum + source.size, 0);
+        const filename =
+            used.length === 1
+                ? `${used[0].baseName}.pdf`
+                : `${used[0].baseName}-${used.length}-pages.pdf`;
+
+        return collect(
+            [output({ size: originalSize }, data, filename, 'application/pdf')],
+            problems
+        );
     });
 }
 
@@ -629,6 +828,9 @@ export async function generatePlaceholder(formData: FormData): Promise<ActionRes
 
         const { extension, mimeType } = IMAGE_FORMATS[format];
 
-        return success(data, `placeholder-${width}x${height}.${extension}`, mimeType);
+        return collect(
+            [output({ size: 0 }, data, `placeholder-${width}x${height}.${extension}`, mimeType)],
+            []
+        );
     });
 }

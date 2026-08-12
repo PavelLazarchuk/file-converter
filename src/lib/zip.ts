@@ -14,7 +14,7 @@ const crcTable = Int32Array.from({ length: 256 }, (_, index) => {
     return value;
 });
 
-function crc32(data: Buffer): number {
+function crc32(data: Uint8Array): number {
     let crc = -1;
 
     for (const byte of data) crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
@@ -33,59 +33,66 @@ function dosDateTime(date: Date): { time: number; date: number } {
     };
 }
 
-export type ZipEntry = { name: string; data: Buffer };
+export type ZipEntry = { name: string; data: Uint8Array };
 
-export function createZip(entries: ZipEntry[], now = new Date()): Buffer {
+export function createZip(entries: ZipEntry[], now = new Date()): Uint8Array {
     const { time, date } = dosDateTime(now);
-    const locals: Buffer[] = [];
-    const centrals: Buffer[] = [];
-    let offset = 0;
+    const encoder = new TextEncoder();
+    const names = entries.map(entry => encoder.encode(entry.name));
+    const checksums = entries.map(entry => crc32(entry.data));
+    const localBytes = entries.reduce(
+        (sum, entry, index) => sum + LOCAL_HEADER_BYTES + names[index].length + entry.data.length,
+        0
+    );
+    const centralBytes = names.reduce((sum, name) => sum + CENTRAL_ENTRY_BYTES + name.length, 0);
+    const output = new Uint8Array(localBytes + centralBytes + END_RECORD_BYTES);
+    const view = new DataView(output.buffer);
+    const offsets: number[] = [];
+    let cursor = 0;
 
-    for (const entry of entries) {
-        const name = Buffer.from(entry.name, 'utf8');
-        const checksum = crc32(entry.data);
-        const local = Buffer.alloc(LOCAL_HEADER_BYTES);
+    entries.forEach((entry, index) => {
+        const name = names[index];
 
-        local.writeUInt32LE(0x04034b50, 0);
-        local.writeUInt16LE(VERSION, 4);
-        local.writeUInt16LE(UTF8_FLAG, 6);
-        local.writeUInt16LE(0, 8);
-        local.writeUInt16LE(time, 10);
-        local.writeUInt16LE(date, 12);
-        local.writeUInt32LE(checksum, 14);
-        local.writeUInt32LE(entry.data.length, 18);
-        local.writeUInt32LE(entry.data.length, 22);
-        local.writeUInt16LE(name.length, 26);
-        local.writeUInt16LE(0, 28);
+        offsets.push(cursor);
+        view.setUint32(cursor, 0x04034b50, true);
+        view.setUint16(cursor + 4, VERSION, true);
+        view.setUint16(cursor + 6, UTF8_FLAG, true);
+        view.setUint16(cursor + 10, time, true);
+        view.setUint16(cursor + 12, date, true);
+        view.setUint32(cursor + 14, checksums[index], true);
+        view.setUint32(cursor + 18, entry.data.length, true);
+        view.setUint32(cursor + 22, entry.data.length, true);
+        view.setUint16(cursor + 26, name.length, true);
+        output.set(name, cursor + LOCAL_HEADER_BYTES);
+        output.set(entry.data, cursor + LOCAL_HEADER_BYTES + name.length);
+        cursor += LOCAL_HEADER_BYTES + name.length + entry.data.length;
+    });
 
-        const central = Buffer.alloc(CENTRAL_ENTRY_BYTES);
+    const centralStart = cursor;
 
-        central.writeUInt32LE(0x02014b50, 0);
-        central.writeUInt16LE(VERSION, 4);
-        central.writeUInt16LE(VERSION, 6);
-        central.writeUInt16LE(UTF8_FLAG, 8);
-        central.writeUInt16LE(0, 10);
-        central.writeUInt16LE(time, 12);
-        central.writeUInt16LE(date, 14);
-        central.writeUInt32LE(checksum, 16);
-        central.writeUInt32LE(entry.data.length, 20);
-        central.writeUInt32LE(entry.data.length, 24);
-        central.writeUInt16LE(name.length, 28);
-        central.writeUInt32LE(offset, 42);
+    entries.forEach((entry, index) => {
+        const name = names[index];
 
-        locals.push(local, name, entry.data);
-        centrals.push(central, name);
-        offset += LOCAL_HEADER_BYTES + name.length + entry.data.length;
-    }
+        view.setUint32(cursor, 0x02014b50, true);
+        view.setUint16(cursor + 4, VERSION, true);
+        view.setUint16(cursor + 6, VERSION, true);
+        view.setUint16(cursor + 8, UTF8_FLAG, true);
+        view.setUint16(cursor + 12, time, true);
+        view.setUint16(cursor + 14, date, true);
+        view.setUint32(cursor + 16, checksums[index], true);
+        view.setUint32(cursor + 20, entry.data.length, true);
+        view.setUint32(cursor + 24, entry.data.length, true);
+        view.setUint16(cursor + 28, name.length, true);
+        view.setUint32(cursor + 42, offsets[index], true);
+        output.set(name, cursor + CENTRAL_ENTRY_BYTES);
+        cursor += CENTRAL_ENTRY_BYTES + name.length;
+    });
 
-    const centralDirectory = Buffer.concat(centrals);
-    const end = Buffer.alloc(END_RECORD_BYTES);
+    view.setUint32(cursor, 0x06054b50, true);
+    view.setUint16(cursor + 8, entries.length, true);
+    view.setUint16(cursor + 10, entries.length, true);
+    view.setUint32(cursor + 12, centralBytes, true);
+    view.setUint32(cursor + 16, centralStart, true);
 
-    end.writeUInt32LE(0x06054b50, 0);
-    end.writeUInt16LE(entries.length, 8);
-    end.writeUInt16LE(entries.length, 10);
-    end.writeUInt32LE(centralDirectory.length, 12);
-    end.writeUInt32LE(offset, 16);
-
-    return Buffer.concat([...locals, centralDirectory, end]);
+    return output;
 }

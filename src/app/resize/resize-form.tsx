@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import { ImageDropzone, useLoadedImage } from '@/components/image-dropzone';
+import { ImageDropzone, useLoadedImages } from '@/components/image-dropzone';
 import { IntegerInput } from '@/components/integer-input';
 import { MetadataSwitch } from '@/components/metadata-switch';
 import { ResultCard } from '@/components/result-card';
@@ -23,6 +23,7 @@ import { useImageAction } from '@/hooks/use-image-action';
 import { resizeImage } from '@/lib/actions';
 import {
     DIMENSION_LIMITS,
+    MAX_BATCH_FILES,
     RESIZE_FITS,
     RESIZE_FIT_KEYS,
     ROTATIONS,
@@ -38,11 +39,14 @@ function clampDimension(value: number): number {
 }
 
 export function ResizeForm() {
-    const { image, setImage } = useLoadedImage();
+    const { images, addImages, removeImage, clearImages } = useLoadedImages(MAX_BATCH_FILES);
     const [lockAspect, setLockAspect] = useState(true);
     const [removeMetadata, setRemoveMetadata] = useState(true);
     const [noEnlarge, setNoEnlarge] = useState(false);
-    const { isPending, outcome, run, clearResult, autoDownload } = useImageAction(resizeImage);
+    const { isPending, outcome, run, clearResult, downloadAll, autoDownload } = useImageAction(
+        resizeImage,
+        'resized-images.zip'
+    );
 
     const {
         register,
@@ -61,7 +65,9 @@ export function ResizeForm() {
 
     const rotate = useWatch({ control, name: 'rotate' });
     const fit = useWatch({ control, name: 'fit' });
-    const sourceRatio = image ? image.width / image.height : null;
+    const hasImages = images.length > 0;
+    const first = images[0] ?? null;
+    const sourceRatio = first ? first.width / first.height : null;
     const ratio = sourceRatio && rotationSwapsDimensions(rotate) ? 1 / sourceRatio : sourceRatio;
 
     function syncLinkedDimension(
@@ -83,9 +89,9 @@ export function ResizeForm() {
     }
 
     const onSubmit = handleSubmit(values => {
-        if (!image) return;
+        if (!hasImages) return;
 
-        run(image, {
+        run(images, {
             width: String(values.width),
             height: String(values.height),
             rotate: values.rotate,
@@ -98,20 +104,29 @@ export function ResizeForm() {
     return (
         <form onSubmit={onSubmit} className="space-y-6" noValidate>
             <ImageDropzone
-                image={image}
+                images={images}
+                max={MAX_BATCH_FILES}
                 disabled={isPending}
-                onImage={loaded => {
-                    setImage(loaded);
+                onAdd={loaded => {
+                    addImages(loaded);
                     clearResult();
-                    reset({
-                        ...defaultValues,
-                        width: String(loaded.width),
-                        height: String(loaded.height),
-                    });
+
+                    if (!hasImages) {
+                        reset({
+                            ...defaultValues,
+                            width: String(loaded[0].width),
+                            height: String(loaded[0].height),
+                        });
+                    }
+
                     void trigger();
                 }}
+                onRemove={index => {
+                    removeImage(index);
+                    clearResult();
+                }}
                 onClear={() => {
-                    setImage(null);
+                    clearImages();
                     clearResult();
                     reset(defaultValues);
                 }}
@@ -132,13 +147,13 @@ export function ResizeForm() {
                                         value as (typeof ROTATION_KEYS)[number]
                                     );
                                 field.onChange(value);
-                                if (image && swapChanged) {
+                                if (hasImages && swapChanged) {
                                     const { width, height } = getValues();
                                     setValue('width', height, { shouldValidate: true });
                                     setValue('height', width, { shouldValidate: true });
                                 }
                             }}
-                            disabled={!image || isPending}
+                            disabled={!hasImages || isPending}
                         >
                             <SelectTrigger
                                 id="rotate"
@@ -170,7 +185,7 @@ export function ResizeForm() {
                         min={DIMENSION_LIMITS.min}
                         max={DIMENSION_LIMITS.max}
                         placeholder="e.g. 1920"
-                        disabled={!image || isPending}
+                        disabled={!hasImages || isPending}
                         aria-invalid={!!errors.width}
                         {...register('width', {
                             onChange: event => syncLinkedDimension('width', event.target.value),
@@ -187,7 +202,7 @@ export function ResizeForm() {
                         min={DIMENSION_LIMITS.min}
                         max={DIMENSION_LIMITS.max}
                         placeholder="e.g. 1080"
-                        disabled={!image || isPending}
+                        disabled={!hasImages || isPending}
                         aria-invalid={!!errors.height}
                         {...register('height', {
                             onChange: event => syncLinkedDimension('height', event.target.value),
@@ -208,7 +223,7 @@ export function ResizeForm() {
                         <Select
                             value={field.value ?? 'contain'}
                             onValueChange={field.onChange}
-                            disabled={!image || isPending}
+                            disabled={!hasImages || isPending}
                         >
                             <SelectTrigger id="fit" className="w-full" aria-invalid={!!errors.fit}>
                                 <SelectValue placeholder="Choose how the image should fit" />
@@ -233,7 +248,7 @@ export function ResizeForm() {
                 <Switch
                     id="lock-aspect"
                     checked={lockAspect}
-                    disabled={!image || isPending}
+                    disabled={!hasImages || isPending}
                     onCheckedChange={checked => {
                         setLockAspect(checked);
                         if (checked) syncLinkedDimension('width', getValues('width'), true);
@@ -247,7 +262,7 @@ export function ResizeForm() {
                     <Switch
                         id="no-enlarge"
                         checked={noEnlarge}
-                        disabled={!image || isPending}
+                        disabled={!hasImages || isPending}
                         onCheckedChange={setNoEnlarge}
                     />
                     <Label htmlFor="no-enlarge">Don&apos;t enlarge smaller images</Label>
@@ -261,18 +276,20 @@ export function ResizeForm() {
             <MetadataSwitch
                 checked={removeMetadata}
                 onCheckedChange={setRemoveMetadata}
-                disabled={!image || isPending}
+                disabled={!hasImages || isPending}
             />
 
-            {outcome && (
-                <ResultCard
-                    outcome={outcome}
-                    original={image && { size: image.file.size }}
-                    onDismiss={clearResult}
-                />
+            {images.length > 1 && (
+                <p className="text-sm text-muted-foreground">
+                    Every image is resized to the same target box with the fit above.
+                </p>
             )}
 
-            <Button type="submit" className="w-full" disabled={!image || !isValid || isPending}>
+            {outcome && (
+                <ResultCard outcome={outcome} onDismiss={clearResult} onDownloadAll={downloadAll} />
+            )}
+
+            <Button type="submit" className="w-full" disabled={!hasImages || !isValid || isPending}>
                 {isPending ? (
                     <>
                         <Spinner /> Resizing…

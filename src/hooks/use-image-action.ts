@@ -5,30 +5,49 @@ import { toast } from 'sonner';
 
 import type { LoadedImage } from '@/components/image-dropzone';
 import { useAutoDownload } from '@/hooks/use-auto-download';
-import type { ActionResult } from '@/lib/actions';
+import type { ActionFailure, ActionFile, ActionResult } from '@/lib/actions';
 import { downloadFile } from '@/lib/download';
+import { ZIP_MIME_TYPE, countLabel } from '@/lib/image';
+import { createZip } from '@/lib/zip';
 
-export type ActionSuccess = Extract<ActionResult, { success: true }>;
-
-export type ActionOutcome = {
-    result: ActionSuccess;
+export type OutcomeFile = {
+    file: ActionFile;
     previewUrl: string | null;
     width: number | null;
     height: number | null;
 };
 
-export function downloadResult(result: ActionSuccess): void {
-    downloadFile(result.data, result.filename, result.mimeType);
-    toast.success(`Downloading ${result.filename}`);
+export type ActionOutcome = {
+    files: OutcomeFile[];
+    failures: ActionFailure[];
+};
+
+export function downloadResult(file: ActionFile): void {
+    downloadFile(file.data, file.filename, file.mimeType);
+    toast.success(`Downloading ${file.filename}`);
 }
 
-function describe(result: ActionSuccess): Promise<ActionOutcome> {
-    const bare: ActionOutcome = { result, previewUrl: null, width: null, height: null };
+export function downloadResults(files: ActionFile[], zipName: string): void {
+    if (files.length === 0) return;
+    if (files.length === 1) {
+        downloadResult(files[0]);
 
-    if (!result.mimeType.startsWith('image/')) return Promise.resolve(bare);
+        return;
+    }
+
+    const zip = createZip(files.map(file => ({ name: file.filename, data: file.data })));
+
+    downloadFile(zip, zipName, ZIP_MIME_TYPE);
+    toast.success(`Downloading ${countLabel(files.length, 'file')} as ${zipName}`);
+}
+
+function describe(file: ActionFile): Promise<OutcomeFile> {
+    const bare: OutcomeFile = { file, previewUrl: null, width: null, height: null };
+
+    if (!file.mimeType.startsWith('image/')) return Promise.resolve(bare);
 
     const previewUrl = URL.createObjectURL(
-        new Blob([result.data as BlobPart], { type: result.mimeType })
+        new Blob([file.data as BlobPart], { type: file.mimeType })
     );
 
     return new Promise(resolve => {
@@ -36,7 +55,7 @@ function describe(result: ActionSuccess): Promise<ActionOutcome> {
 
         probe.onload = () =>
             resolve({
-                result,
+                file,
                 previewUrl,
                 width: probe.naturalWidth || null,
                 height: probe.naturalHeight || null,
@@ -49,11 +68,20 @@ function describe(result: ActionSuccess): Promise<ActionOutcome> {
     });
 }
 
+function revoke(outcome: ActionOutcome | null): void {
+    for (const entry of outcome?.files ?? []) {
+        if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl);
+    }
+}
+
 type RunOptions = {
-    onResult?: (result: ActionSuccess) => 'handled' | void;
+    onResult?: (files: ActionFile[]) => 'handled' | void;
 };
 
-export function useImageAction(action: (formData: FormData) => Promise<ActionResult>) {
+export function useImageAction(
+    action: (formData: FormData) => Promise<ActionResult>,
+    zipName = 'images.zip'
+) {
     const [isPending, startTransition] = useTransition();
     const [outcome, setOutcomeState] = useState<ActionOutcome | null>(null);
     const currentRef = useRef<ActionOutcome | null>(null);
@@ -63,10 +91,10 @@ export function useImageAction(action: (formData: FormData) => Promise<ActionRes
     const setOutcome = useCallback((next: ActionOutcome | null) => {
         const previous = currentRef.current;
 
-        if (previous?.previewUrl && previous !== next) URL.revokeObjectURL(previous.previewUrl);
+        if (previous !== next) revoke(previous);
 
         if (!mountedRef.current) {
-            if (next?.previewUrl) URL.revokeObjectURL(next.previewUrl);
+            revoke(next);
 
             return;
         }
@@ -80,22 +108,26 @@ export function useImageAction(action: (formData: FormData) => Promise<ActionRes
 
         return () => {
             mountedRef.current = false;
-
-            if (currentRef.current?.previewUrl) URL.revokeObjectURL(currentRef.current.previewUrl);
-
+            revoke(currentRef.current);
             currentRef.current = null;
         };
     }, []);
 
     const clearResult = useCallback(() => setOutcome(null), [setOutcome]);
 
-    function run(image: LoadedImage | null, params: Record<string, string>, options?: RunOptions) {
+    const downloadAll = useCallback(() => {
+        const files = currentRef.current?.files.map(entry => entry.file) ?? [];
+
+        downloadResults(files, zipName);
+    }, [zipName]);
+
+    function run(images: LoadedImage[], params: Record<string, string>, options?: RunOptions) {
         startTransition(async () => {
             setOutcome(null);
 
             const formData = new FormData();
 
-            if (image) formData.append('file', image.file);
+            for (const image of images) formData.append('file', image.file);
             for (const [key, value] of Object.entries(params)) formData.append(key, value);
 
             const result = await action(formData);
@@ -106,13 +138,29 @@ export function useImageAction(action: (formData: FormData) => Promise<ActionRes
                 return;
             }
 
-            if (options?.onResult?.(result) === 'handled') return;
+            const failures = result.failures ?? [];
+            const [first] = failures;
 
-            setOutcome(await describe(result));
+            if (first) {
+                toast.error(
+                    failures.length === 1
+                        ? `${first.filename}: ${first.error}`
+                        : `${countLabel(failures.length, 'file')} could not be processed — ${first.filename}: ${first.error}`
+                );
+            }
 
-            if (autoDownload && !result.warning) downloadResult(result);
+            if (options?.onResult?.(result.files) === 'handled') return;
+
+            setOutcome({
+                files: await Promise.all(result.files.map(describe)),
+                failures,
+            });
+
+            const settled = failures.length === 0 && result.files.every(file => !file.warning);
+
+            if (autoDownload && settled) downloadResults(result.files, zipName);
         });
     }
 
-    return { isPending, outcome, run, clearResult, autoDownload };
+    return { isPending, outcome, run, clearResult, downloadAll, autoDownload };
 }

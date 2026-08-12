@@ -3,7 +3,7 @@
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import { ImageDropzone, useLoadedImage } from '@/components/image-dropzone';
+import { ImageDropzone, useLoadedImages } from '@/components/image-dropzone';
 import { ResultCard } from '@/components/result-card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -17,12 +17,20 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { useImageAction } from '@/hooks/use-image-action';
 import { imageToPdf } from '@/lib/actions';
-import { CONVERT_SOURCE_KEYS, PDF_PAGE_SIZES, PDF_PAGE_SIZE_KEYS } from '@/lib/image';
+import {
+    CONVERT_SOURCE_KEYS,
+    MAX_BATCH_FILES,
+    PDF_PAGE_SIZES,
+    PDF_PAGE_SIZE_KEYS,
+    countLabel,
+} from '@/lib/image';
 import { imageToPdfSchema, type ImageToPdfInput, type ImageToPdfValues } from '@/lib/schemas';
 
 export function PdfForm() {
-    const { image, setImage } = useLoadedImage();
-    const { isPending, outcome, run, clearResult, autoDownload } = useImageAction(imageToPdf);
+    const { images, addImages, removeImage, moveImage, clearImages } =
+        useLoadedImages(MAX_BATCH_FILES);
+    const { isPending, outcome, run, clearResult, downloadAll, autoDownload } =
+        useImageAction(imageToPdf);
 
     const {
         control,
@@ -36,29 +44,46 @@ export function PdfForm() {
     });
 
     const pageSize = useWatch({ control, name: 'pageSize' }) ?? 'fit';
+    const hasImages = images.length > 0;
 
     const onSubmit = handleSubmit(values => {
-        if (!image) return;
+        if (!hasImages) return;
 
-        run(image, { pageSize: values.pageSize });
+        run(images, { pageSize: values.pageSize });
     });
 
     return (
         <form onSubmit={onSubmit} className="space-y-6" noValidate>
             <ImageDropzone
-                image={image}
+                images={images}
+                max={MAX_BATCH_FILES}
                 formats={CONVERT_SOURCE_KEYS}
                 disabled={isPending}
-                onImage={loaded => {
-                    setImage(loaded);
+                onAdd={loaded => {
+                    addImages(loaded);
                     clearResult();
                     void trigger();
                 }}
+                onRemove={index => {
+                    removeImage(index);
+                    clearResult();
+                }}
+                onMove={(from, to) => {
+                    moveImage(from, to);
+                    clearResult();
+                }}
                 onClear={() => {
-                    setImage(null);
+                    clearImages();
                     clearResult();
                 }}
             />
+
+            {images.length > 1 && (
+                <p className="text-sm text-muted-foreground">
+                    {countLabel(images.length, 'image')} become {countLabel(images.length, 'page')}{' '}
+                    in one PDF, in the order above — use the arrows to rearrange them.
+                </p>
+            )}
 
             <div className="space-y-2">
                 <Label htmlFor="pageSize">Page size</Label>
@@ -69,7 +94,7 @@ export function PdfForm() {
                         <Select
                             value={field.value ?? 'fit'}
                             onValueChange={field.onChange}
-                            disabled={!image || isPending}
+                            disabled={!hasImages || isPending}
                         >
                             <SelectTrigger
                                 id="pageSize"
@@ -97,14 +122,10 @@ export function PdfForm() {
             </div>
 
             {outcome && (
-                <ResultCard
-                    outcome={outcome}
-                    original={image && { size: image.file.size }}
-                    onDismiss={clearResult}
-                />
+                <ResultCard outcome={outcome} onDismiss={clearResult} onDownloadAll={downloadAll} />
             )}
 
-            <Button type="submit" className="w-full" disabled={!image || !isValid || isPending}>
+            <Button type="submit" className="w-full" disabled={!hasImages || !isValid || isPending}>
                 {isPending ? (
                     <>
                         <Spinner /> Building PDF…

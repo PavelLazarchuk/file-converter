@@ -1,6 +1,6 @@
 import { headers } from 'next/headers';
 
-export const RATE_LIMIT = { requests: 20, windowMs: 60_000 } as const;
+export const RATE_LIMIT = { images: 40, windowMs: 60_000 } as const;
 
 const MAX_TRACKED_CLIENTS = 2000;
 
@@ -36,7 +36,7 @@ function sweep(now: number): void {
 
 export type RateLimitResult = { allowed: true } | { allowed: false; retryAfterSeconds: number };
 
-export async function checkRateLimit(): Promise<RateLimitResult> {
+export async function checkRateLimit(cost = 1): Promise<RateLimitResult> {
     const key = await clientKey();
 
     if (key === null) return { allowed: true };
@@ -45,10 +45,12 @@ export async function checkRateLimit(): Promise<RateLimitResult> {
 
     if (buckets.size > MAX_TRACKED_CLIENTS) sweep(now);
 
+    const charge = Math.max(1, Math.round(cost));
     const hits = (buckets.get(key) ?? []).filter(hit => now - hit < RATE_LIMIT.windowMs);
+    const overflow = hits.length + charge - RATE_LIMIT.images;
 
-    if (hits.length >= RATE_LIMIT.requests) {
-        const oldest = hits[0] ?? now;
+    if (overflow > 0) {
+        const blocking = hits[Math.min(overflow, hits.length) - 1] ?? now;
 
         buckets.set(key, hits);
 
@@ -56,12 +58,13 @@ export async function checkRateLimit(): Promise<RateLimitResult> {
             allowed: false,
             retryAfterSeconds: Math.max(
                 1,
-                Math.ceil((RATE_LIMIT.windowMs - (now - oldest)) / 1000)
+                Math.ceil((RATE_LIMIT.windowMs - (now - blocking)) / 1000)
             ),
         };
     }
 
-    hits.push(now);
+    for (let index = 0; index < charge; index += 1) hits.push(now);
+
     buckets.set(key, hits);
 
     return { allowed: true };

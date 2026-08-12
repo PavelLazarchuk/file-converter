@@ -5,7 +5,7 @@ import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 
-import { ImageDropzone, useLoadedImage } from '@/components/image-dropzone';
+import { ImageDropzone, useLoadedImages } from '@/components/image-dropzone';
 import { MetadataSwitch } from '@/components/metadata-switch';
 import { ResultCard } from '@/components/result-card';
 import { Button } from '@/components/ui/button';
@@ -30,12 +30,15 @@ import {
     FAVICON_PACK,
     ICO_SIZE_OPTIONS,
     IMAGE_FORMATS,
+    MAX_BATCH_FILES,
     conversionTargets,
     convertSourceFromMimeType,
     formatBase64Output,
     formatFileSize,
     stripExtension,
     type Base64Output,
+    type ConvertSource,
+    type ConvertTarget,
 } from '@/lib/image';
 import { convertSchema, type ConvertInput, type ConvertValues } from '@/lib/schemas';
 import { cn } from '@/lib/utils';
@@ -49,18 +52,22 @@ function withExtension(filename: string, extension: string): string {
 }
 
 export function ConvertForm() {
-    const { image, setImage } = useLoadedImage();
+    const { images, addImages, removeImage, clearImages } = useLoadedImages(MAX_BATCH_FILES);
     const [removeMetadata, setRemoveMetadata] = useState(true);
-    const [dataUri, setDataUri] = useState<DataUriResult | null>(null);
+    const [dataUris, setDataUris] = useState<DataUriResult[] | null>(null);
     const [base64Output, setBase64Output] = useState<Base64Output>('uri');
     const [icoSizes, setIcoSizes] = useState<number[]>([...DEFAULT_ICO_SIZES]);
     const [icoPack, setIcoPack] = useState(false);
-    const { isPending, outcome, run, clearResult, autoDownload } = useImageAction(convertImage);
+    const { isPending, outcome, run, clearResult, downloadAll, autoDownload } = useImageAction(
+        convertImage,
+        'converted-images.zip'
+    );
 
     const {
         control,
         handleSubmit,
         reset,
+        getValues,
         trigger,
         formState: { errors, isValid },
     } = useForm<ConvertInput, unknown, ConvertValues>({
@@ -68,8 +75,15 @@ export function ConvertForm() {
         mode: 'onChange',
     });
 
-    const sourceFormat = image ? convertSourceFromMimeType(image.file.type) : null;
-    const targets = image ? conversionTargets(image.file.type) : [];
+    const hasImages = images.length > 0;
+    const sourceFormats = [
+        ...new Set(
+            images
+                .map(image => convertSourceFromMimeType(image.file.type))
+                .filter((format): format is ConvertSource => format !== null)
+        ),
+    ];
+    const targets = conversionTargets(images.map(image => image.file.type));
     const target = useWatch({ control, name: 'format' });
 
     function toggleIcoSize(size: number) {
@@ -83,22 +97,30 @@ export function ConvertForm() {
     }
 
     const onSubmit = handleSubmit(values => {
-        if (!image) return;
+        if (!hasImages) return;
 
         const keepMetadata = String(!removeMetadata);
 
         if (values.format === 'base64') {
             run(
-                image,
+                images,
                 { format: values.format, keepMetadata },
                 {
-                    onResult: result => {
-                        setDataUri({
-                            value: new TextDecoder().decode(result.data),
-                            filename: result.filename,
-                            alt: image.file.name.replaceAll('"', ''),
-                        });
-                        toast.success('Base64 data URI ready');
+                    onResult: files => {
+                        setDataUris(
+                            files.map(file => ({
+                                value: new TextDecoder().decode(file.data),
+                                filename: file.filename,
+                                alt: stripExtension(file.filename)
+                                    .replace(/-base64$/, '')
+                                    .replaceAll('"', ''),
+                            }))
+                        );
+                        toast.success(
+                            files.length === 1
+                                ? 'Base64 data URI ready'
+                                : `${files.length} base64 data URIs ready`
+                        );
 
                         return 'handled';
                     },
@@ -109,7 +131,7 @@ export function ConvertForm() {
         }
 
         if (values.format === 'ico') {
-            run(image, {
+            run(images, {
                 format: values.format,
                 icoSizes: icoSizes.join(','),
                 icoPack: String(icoPack),
@@ -118,7 +140,7 @@ export function ConvertForm() {
             return;
         }
 
-        run(image, { format: values.format, keepMetadata });
+        run(images, { format: values.format, keepMetadata });
     });
 
     async function copyText(value: string) {
@@ -130,24 +152,51 @@ export function ConvertForm() {
         }
     }
 
-    const snippet = dataUri && formatBase64Output(base64Output, dataUri.value, dataUri.alt);
+    const snippets = dataUris?.map(entry => ({
+        ...entry,
+        snippet: formatBase64Output(base64Output, entry.value, entry.alt),
+    }));
+
+    function keepTargetValid(next: ConvertTarget[]) {
+        const current = getValues('format');
+
+        if (!current || !next.includes(current)) reset({ format: next[0] });
+    }
 
     return (
         <form onSubmit={onSubmit} className="space-y-6" noValidate>
             <ImageDropzone
-                image={image}
+                images={images}
+                max={MAX_BATCH_FILES}
                 formats={CONVERT_SOURCE_KEYS}
                 disabled={isPending}
-                onImage={loaded => {
-                    setImage(loaded);
-                    setDataUri(null);
+                onAdd={loaded => {
+                    addImages(loaded);
+                    setDataUris(null);
                     clearResult();
-                    reset({ format: conversionTargets(loaded.file.type)[0] });
+                    keepTargetValid(
+                        conversionTargets(
+                            [...images, ...loaded]
+                                .slice(0, MAX_BATCH_FILES)
+                                .map(image => image.file.type)
+                        )
+                    );
+                    void trigger();
+                }}
+                onRemove={index => {
+                    removeImage(index);
+                    setDataUris(null);
+                    clearResult();
+                    keepTargetValid(
+                        conversionTargets(
+                            images.filter((_, at) => at !== index).map(image => image.file.type)
+                        )
+                    );
                     void trigger();
                 }}
                 onClear={() => {
-                    setImage(null);
-                    setDataUri(null);
+                    clearImages();
+                    setDataUris(null);
                     clearResult();
                     reset({ format: undefined });
                 }}
@@ -162,11 +211,11 @@ export function ConvertForm() {
                         <Select
                             value={field.value ?? ''}
                             onValueChange={value => {
-                                setDataUri(null);
+                                setDataUris(null);
                                 clearResult();
                                 field.onChange(value);
                             }}
-                            disabled={!image || isPending}
+                            disabled={!hasImages || isPending}
                         >
                             <SelectTrigger
                                 id="format"
@@ -185,10 +234,16 @@ export function ConvertForm() {
                         </Select>
                     )}
                 />
-                {sourceFormat && (
+                {sourceFormats.length > 0 && (
                     <p className="text-sm text-muted-foreground">
-                        Detected source format: {IMAGE_FORMATS[sourceFormat].label} (
-                        {IMAGE_FORMATS[sourceFormat].mimeType})
+                        Detected source {sourceFormats.length === 1 ? 'format' : 'formats'}:{' '}
+                        {sourceFormats.map(format => IMAGE_FORMATS[format].label).join(', ')}
+                    </p>
+                )}
+                {images.length > 1 && (
+                    <p className="text-sm text-muted-foreground">
+                        Every image gets the same target format. Any file that is already in that
+                        format is skipped and reported back.
                     </p>
                 )}
                 {target === 'svg' && (
@@ -209,9 +264,9 @@ export function ConvertForm() {
                         Exports a single still frame — animation is not preserved.
                     </p>
                 )}
-                {sourceFormat === 'gif' && target !== 'gif' && (
+                {sourceFormats.includes('gif') && target !== 'gif' && (
                     <p className="text-sm text-muted-foreground">
-                        If this GIF is animated, only its first frame is converted.
+                        If a GIF is animated, only its first frame is converted.
                     </p>
                 )}
                 {target === 'tiff' && (
@@ -281,13 +336,12 @@ export function ConvertForm() {
                         checked={removeMetadata}
                         onCheckedChange={checked => {
                             setRemoveMetadata(checked);
-                            setDataUri(null);
+                            setDataUris(null);
                         }}
-                        disabled={!image || isPending}
+                        disabled={!hasImages || isPending}
                     />
                     {target === 'base64' &&
-                        sourceFormat !== 'gif' &&
-                        sourceFormat !== 'svg' &&
+                        sourceFormats.some(format => format !== 'gif' && format !== 'svg') &&
                         removeMetadata && (
                             <p className="text-sm text-muted-foreground">
                                 If the image carries metadata, removing it re-encodes the pixels, so
@@ -298,79 +352,89 @@ export function ConvertForm() {
                 </div>
             )}
 
-            {target === 'base64' && snippet && dataUri && (
-                <div className="space-y-2">
-                    <Label htmlFor="base64-output">Output</Label>
-                    <Select
-                        value={base64Output}
-                        onValueChange={value => setBase64Output(value as Base64Output)}
-                    >
-                        <SelectTrigger id="base64-output" className="w-full">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {BASE64_OUTPUT_KEYS.map(key => (
-                                <SelectItem key={key} value={key}>
-                                    {BASE64_OUTPUTS[key].label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <textarea
-                        aria-label="Generated snippet"
-                        readOnly
-                        rows={6}
-                        className="w-full resize-none rounded-md border bg-muted/30 p-3 font-mono text-xs break-all"
-                        value={
-                            snippet.length > DATA_URI_PREVIEW_LIMIT
-                                ? `${snippet.slice(0, DATA_URI_PREVIEW_LIMIT)}…`
-                                : snippet
-                        }
-                    />
-                    <p className="text-sm text-muted-foreground">
-                        {formatFileSize(snippet.length)}
-                        {snippet.length > DATA_URI_PREVIEW_LIMIT &&
-                            ' — preview truncated, Copy and Download include the full string.'}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                        <Button type="button" onClick={() => copyText(snippet)}>
-                            Copy
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() =>
-                                downloadFile(
-                                    new TextEncoder().encode(snippet),
-                                    withExtension(
-                                        dataUri.filename,
-                                        BASE64_OUTPUTS[base64Output].extension
-                                    ),
-                                    IMAGE_FORMATS.base64.mimeType
-                                )
-                            }
+            {target === 'base64' && snippets && snippets.length > 0 && (
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="base64-output">Output</Label>
+                        <Select
+                            value={base64Output}
+                            onValueChange={value => setBase64Output(value as Base64Output)}
                         >
-                            Download .{BASE64_OUTPUTS[base64Output].extension}
-                        </Button>
+                            <SelectTrigger id="base64-output" className="w-full">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {BASE64_OUTPUT_KEYS.map(key => (
+                                    <SelectItem key={key} value={key}>
+                                        {BASE64_OUTPUTS[key].label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
+
+                    {snippets.map(({ snippet, filename, alt }) => (
+                        <div key={filename} className="space-y-2">
+                            {snippets.length > 1 && (
+                                <p className="truncate text-sm font-medium">{alt}</p>
+                            )}
+                            <textarea
+                                aria-label={`Generated snippet for ${alt}`}
+                                readOnly
+                                rows={6}
+                                className="w-full resize-none rounded-md border bg-muted/30 p-3 font-mono text-xs break-all"
+                                value={
+                                    snippet.length > DATA_URI_PREVIEW_LIMIT
+                                        ? `${snippet.slice(0, DATA_URI_PREVIEW_LIMIT)}…`
+                                        : snippet
+                                }
+                            />
+                            <p className="text-sm text-muted-foreground">
+                                {formatFileSize(snippet.length)}
+                                {snippet.length > DATA_URI_PREVIEW_LIMIT &&
+                                    ' — preview truncated, Copy and Download include the full string.'}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                <Button type="button" onClick={() => copyText(snippet)}>
+                                    Copy
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() =>
+                                        downloadFile(
+                                            new TextEncoder().encode(snippet),
+                                            withExtension(
+                                                filename,
+                                                BASE64_OUTPUTS[base64Output].extension
+                                            ),
+                                            IMAGE_FORMATS.base64.mimeType
+                                        )
+                                    }
+                                >
+                                    Download .{BASE64_OUTPUTS[base64Output].extension}
+                                </Button>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )}
 
             {outcome && (
-                <ResultCard
-                    outcome={outcome}
-                    original={image && { size: image.file.size }}
-                    onDismiss={clearResult}
-                />
+                <ResultCard outcome={outcome} onDismiss={clearResult} onDownloadAll={downloadAll} />
             )}
 
-            <Button type="submit" className="w-full" disabled={!image || !isValid || isPending}>
+            <Button type="submit" className="w-full" disabled={!hasImages || !isValid || isPending}>
                 {isPending ? (
                     <>
                         <Spinner /> Converting…
                     </>
                 ) : target === 'base64' ? (
-                    'Generate data URI'
+                    images.length > 1 ? (
+                        'Generate data URIs'
+                    ) : (
+                        'Generate data URI'
+                    )
                 ) : target === 'ico' && icoPack ? (
                     autoDownload ? (
                         'Build favicon pack & download'

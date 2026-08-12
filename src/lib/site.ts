@@ -12,7 +12,7 @@ export const SITE = {
     name: 'Image Toolbox',
     tagline: 'Resize, Crop, Compress & Convert',
     description:
-        'Free browser tools for images: resize with locked aspect ratio, crop to preset ratios or a circle, compress by quality or target size, convert between JPEG, PNG, WEBP, AVIF, GIF, TIFF, SVG and ICO favicons, and wrap images into a PDF.',
+        'Free browser tools for images, in batches of up to 20: resize with locked aspect ratio, crop to preset ratios or a circle, compress by quality or target size, convert between JPEG, PNG, WEBP, AVIF, GIF, TIFF, SVG and ICO favicons, and combine images into a multi-page PDF.',
     url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://file-converter-mu-seven.vercel.app',
 } as const;
 
@@ -29,7 +29,7 @@ export const TOOLS: readonly Tool[] = [
         href: '/resize',
         title: 'Resize',
         description:
-            'Set exact pixel dimensions with a locked aspect ratio, up to 10,000px — with optional rotation.',
+            'Set exact pixel dimensions with a locked aspect ratio, up to 10,000px — with optional rotation. Up to 20 images at once.',
         icon: Scaling,
         gradient: 'from-sky-500 to-blue-600',
     },
@@ -44,7 +44,8 @@ export const TOOLS: readonly Tool[] = [
     {
         href: '/compress',
         title: 'Compress',
-        description: 'Shrink file size by quality or down to a target size like 500 KB.',
+        description:
+            'Shrink file size by quality or down to a target size like 500 KB — one image or a batch of 20.',
         icon: Gauge,
         gradient: 'from-violet-500 to-purple-600',
     },
@@ -52,7 +53,7 @@ export const TOOLS: readonly Tool[] = [
         href: '/convert',
         title: 'Convert',
         description:
-            'Switch between JPEG, PNG, WEBP, AVIF, GIF, TIFF and SVG, build an ICO favicon, or get a Base64 data URI.',
+            'Switch between JPEG, PNG, WEBP, AVIF, GIF, TIFF and SVG in bulk, build an ICO favicon, or get a Base64 data URI.',
         icon: RefreshCw,
         gradient: 'from-emerald-500 to-teal-600',
     },
@@ -65,9 +66,9 @@ export const TOOLS: readonly Tool[] = [
     },
     {
         href: '/pdf',
-        title: 'Image to PDF',
+        title: 'Images to PDF',
         description:
-            'Wrap a JPEG, PNG, WEBP, AVIF, GIF or SVG into a single-page PDF, fit to the image or a standard A4/Letter page.',
+            'Combine JPEG, PNG, WEBP, AVIF, GIF or SVG images into one PDF, a page each, fit to the image or a standard A4/Letter page.',
         icon: FileText,
         gradient: 'from-red-500 to-rose-600',
     },
