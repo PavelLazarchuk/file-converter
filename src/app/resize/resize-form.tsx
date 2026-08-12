@@ -43,10 +43,8 @@ export function ResizeForm() {
     const [lockAspect, setLockAspect] = useState(true);
     const [removeMetadata, setRemoveMetadata] = useState(true);
     const [noEnlarge, setNoEnlarge] = useState(false);
-    const { isPending, outcome, run, clearResult, downloadAll, autoDownload } = useImageAction(
-        resizeImage,
-        'resized-images.zip'
-    );
+    const { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload } =
+        useImageAction(resizeImage, 'resized-images.zip');
 
     const {
         register,
@@ -286,7 +284,12 @@ export function ResizeForm() {
             )}
 
             {outcome && (
-                <ResultCard outcome={outcome} onDismiss={clearResult} onDownloadAll={downloadAll} />
+                <ResultCard
+                    outcome={outcome}
+                    leaving={isLeaving}
+                    onDismiss={clearResult}
+                    onDownloadAll={downloadAll}
+                />
             )}
 
             <Button type="submit" className="w-full" disabled={!hasImages || !isValid || isPending}>

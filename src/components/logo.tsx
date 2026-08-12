@@ -1,5 +1,9 @@
 import { cn } from '@/lib/utils';
 
+// `transform-box: fill-box` makes the transforms below rotate/scale around each
+// shape's own centre instead of the SVG origin.
+const shape = 'origin-center [transform-box:fill-box] transition-transform duration-300 ease-out';
+
 export function Logo({ className }: { className?: string }) {
     return (
         <svg aria-hidden viewBox="0 0 64 64" className={cn('size-6 rounded-md', className)}>
@@ -10,8 +14,22 @@ export function Logo({ className }: { className?: string }) {
                 </linearGradient>
             </defs>
             <rect width="64" height="64" rx="14" fill="url(#site-logo-gradient)" />
-            <circle cx="43" cy="22" r="6" fill="#fff" opacity="0.9" />
-            <path d="M10 50 L26 28 L37 42 L44 34 L54 50 Z" fill="#fff" />
+            <circle
+                cx="43"
+                cy="22"
+                r="6"
+                fill="#fff"
+                opacity="0.9"
+                className={cn(shape, 'group-hover:scale-125 motion-reduce:transition-none')}
+            />
+            <path
+                d="M10 50 L26 28 L37 42 L44 34 L54 50 Z"
+                fill="#fff"
+                className={cn(
+                    shape,
+                    'group-hover:-translate-y-[3px] motion-reduce:transition-none'
+                )}
+            />
         </svg>
     );
 }

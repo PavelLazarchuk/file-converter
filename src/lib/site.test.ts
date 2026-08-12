@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import sitemap from '@/app/sitemap';
-import { SITE, TOOLS } from './site';
+import { SITE, TOOLS, toolTransitionName } from './site';
 
 describe('site metadata', () => {
     it('has an absolute url without a trailing slash', () => {
@@ -21,6 +21,24 @@ describe('the tool list', () => {
             expect(tool.title.length).toBeGreaterThan(0);
             expect(tool.description.length).toBeGreaterThan(0);
         }
+    });
+});
+
+describe('view transition names', () => {
+    it('turns every tool route into a distinct CSS ident', () => {
+        const names = TOOLS.flatMap(tool => [
+            toolTransitionName('icon', tool.href),
+            toolTransitionName('title', tool.href),
+        ]);
+
+        expect(new Set(names).size).toBe(names.length);
+
+        for (const name of names) expect(name).toMatch(/^[a-z][a-z0-9-]*$/);
+    });
+
+    it('pairs the landing card with the page it opens', () => {
+        expect(toolTransitionName('icon', '/resize')).toBe('tool-icon-resize');
+        expect(toolTransitionName('title', '/resize')).toBe('tool-title-resize');
     });
 });
 

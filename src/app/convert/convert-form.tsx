@@ -58,10 +58,8 @@ export function ConvertForm() {
     const [base64Output, setBase64Output] = useState<Base64Output>('uri');
     const [icoSizes, setIcoSizes] = useState<number[]>([...DEFAULT_ICO_SIZES]);
     const [icoPack, setIcoPack] = useState(false);
-    const { isPending, outcome, run, clearResult, downloadAll, autoDownload } = useImageAction(
-        convertImage,
-        'converted-images.zip'
-    );
+    const { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload } =
+        useImageAction(convertImage, 'converted-images.zip');
 
     const {
         control,
@@ -421,7 +419,12 @@ export function ConvertForm() {
             )}
 
             {outcome && (
-                <ResultCard outcome={outcome} onDismiss={clearResult} onDownloadAll={downloadAll} />
+                <ResultCard
+                    outcome={outcome}
+                    leaving={isLeaving}
+                    onDismiss={clearResult}
+                    onDownloadAll={downloadAll}
+                />
             )}
 
             <Button type="submit" className="w-full" disabled={!hasImages || !isValid || isPending}>

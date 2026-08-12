@@ -13,6 +13,7 @@ export const metadata: Metadata = {
 export default function CropPage() {
     return (
         <ToolPage
+            href="/crop"
             title="Crop"
             description="Pick a preset aspect ratio, then drag the frame to choose exactly what to keep."
         >

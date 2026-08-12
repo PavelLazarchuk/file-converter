@@ -78,15 +78,35 @@ type RunOptions = {
     onResult?: (files: ActionFile[]) => 'handled' | void;
 };
 
+/** Matches the exit animation on the result card. */
+const EXIT_DURATION = 200;
+
+function prefersReducedMotion(): boolean {
+    return (
+        typeof window !== 'undefined' &&
+        (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false)
+    );
+}
+
 export function useImageAction(
     action: (formData: FormData) => Promise<ActionResult>,
     zipName = 'images.zip'
 ) {
     const [isPending, startTransition] = useTransition();
     const [outcome, setOutcomeState] = useState<ActionOutcome | null>(null);
+    const [isLeaving, setIsLeaving] = useState(false);
     const currentRef = useRef<ActionOutcome | null>(null);
+    const exitRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const mountedRef = useRef(true);
     const { autoDownload } = useAutoDownload();
+
+    const cancelExit = useCallback(() => {
+        if (exitRef.current === null) return;
+
+        clearTimeout(exitRef.current);
+        exitRef.current = null;
+        setIsLeaving(false);
+    }, []);
 
     const setOutcome = useCallback((next: ActionOutcome | null) => {
         const previous = currentRef.current;
@@ -108,12 +128,28 @@ export function useImageAction(
 
         return () => {
             mountedRef.current = false;
+            if (exitRef.current !== null) clearTimeout(exitRef.current);
             revoke(currentRef.current);
             currentRef.current = null;
         };
     }, []);
 
-    const clearResult = useCallback(() => setOutcome(null), [setOutcome]);
+    // Keeps the card mounted for the length of its exit animation, then drops it.
+    const clearResult = useCallback(() => {
+        if (exitRef.current !== null) return;
+        if (!currentRef.current || prefersReducedMotion()) {
+            setOutcome(null);
+
+            return;
+        }
+
+        setIsLeaving(true);
+        exitRef.current = setTimeout(() => {
+            exitRef.current = null;
+            setIsLeaving(false);
+            setOutcome(null);
+        }, EXIT_DURATION);
+    }, [setOutcome]);
 
     const downloadAll = useCallback(() => {
         const files = currentRef.current?.files.map(entry => entry.file) ?? [];
@@ -122,6 +158,8 @@ export function useImageAction(
     }, [zipName]);
 
     function run(images: LoadedImage[], params: Record<string, string>, options?: RunOptions) {
+        cancelExit();
+
         startTransition(async () => {
             setOutcome(null);
 
@@ -162,5 +200,5 @@ export function useImageAction(
         });
     }
 
-    return { isPending, outcome, run, clearResult, downloadAll, autoDownload };
+    return { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload };
 }

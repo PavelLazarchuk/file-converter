@@ -215,7 +215,7 @@ describe('downloadAll', () => {
 });
 
 describe('object URL bookkeeping', () => {
-    it('revokes the previews when the result is cleared', async () => {
+    it('revokes the previews once the card has finished animating out', async () => {
         const revoke = vi.spyOn(URL, 'revokeObjectURL');
         const action = actionReturning({
             success: true,
@@ -230,8 +230,27 @@ describe('object URL bookkeeping', () => {
 
         act(() => result.current.clearResult());
 
-        expect(result.current.outcome).toBeNull();
+        expect(result.current.isLeaving).toBe(true);
+        expect(result.current.outcome).not.toBeNull();
+
+        await waitFor(() => expect(result.current.outcome).toBeNull());
+
+        expect(result.current.isLeaving).toBe(false);
         for (const url of urls ?? []) expect(revoke).toHaveBeenCalledWith(url);
+    });
+
+    it('drops the result straight away when a new run starts mid-exit', async () => {
+        const action = actionReturning({ success: true, files: [resultFile()] });
+        const { result } = renderHook(() => useImageAction(action));
+
+        act(() => result.current.run([upload()], {}));
+        await waitFor(() => expect(result.current.outcome).not.toBeNull());
+
+        act(() => result.current.clearResult());
+        act(() => result.current.run([upload()], {}));
+
+        expect(result.current.isLeaving).toBe(false);
+        await waitFor(() => expect(result.current.outcome).not.toBeNull());
     });
 
     it('revokes the previews when the component unmounts', async () => {

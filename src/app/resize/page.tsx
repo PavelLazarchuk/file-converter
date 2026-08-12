@@ -13,6 +13,7 @@ export const metadata: Metadata = {
 export default function ResizePage() {
     return (
         <ToolPage
+            href="/resize"
             title="Resize"
             description="Set exact pixel dimensions and optionally rotate the image. Lock the aspect ratio to keep proportions intact; the same box applies to every image in a batch."
         >

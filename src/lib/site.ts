@@ -24,6 +24,14 @@ export type Tool = {
     gradient: string;
 };
 
+/**
+ * Pairs a landing card with the tool page it opens. `view-transition-name` has to
+ * be a CSS ident, so the slash in the href cannot survive.
+ */
+export function toolTransitionName(part: 'icon' | 'title', href: string): string {
+    return `tool-${part}-${href.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '')}`;
+}
+
 export const TOOLS: readonly Tool[] = [
     {
         href: '/resize',

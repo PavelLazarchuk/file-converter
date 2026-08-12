@@ -39,7 +39,7 @@ export function CropForm() {
     const { images, addImages, clearImages } = useLoadedImages();
     const [removeMetadata, setRemoveMetadata] = useState(true);
     const [manualBox, setManualBox] = useState<{ key: string; box: CropBox } | null>(null);
-    const { isPending, outcome, run, clearResult, downloadAll, autoDownload } =
+    const { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload } =
         useImageAction(cropImage);
     const image = images[0] ?? null;
 
@@ -208,7 +208,12 @@ export function CropForm() {
             />
 
             {outcome && (
-                <ResultCard outcome={outcome} onDismiss={clearResult} onDownloadAll={downloadAll} />
+                <ResultCard
+                    outcome={outcome}
+                    leaving={isLeaving}
+                    onDismiss={clearResult}
+                    onDownloadAll={downloadAll}
+                />
             )}
 
             <Button type="submit" className="w-full" disabled={!image || !isValid || isPending}>

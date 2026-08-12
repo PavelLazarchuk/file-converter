@@ -29,7 +29,7 @@ import { imageToPdfSchema, type ImageToPdfInput, type ImageToPdfValues } from '@
 export function PdfForm() {
     const { images, addImages, removeImage, moveImage, clearImages } =
         useLoadedImages(MAX_BATCH_FILES);
-    const { isPending, outcome, run, clearResult, downloadAll, autoDownload } =
+    const { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload } =
         useImageAction(imageToPdf);
 
     const {
@@ -122,7 +122,12 @@ export function PdfForm() {
             </div>
 
             {outcome && (
-                <ResultCard outcome={outcome} onDismiss={clearResult} onDownloadAll={downloadAll} />
+                <ResultCard
+                    outcome={outcome}
+                    leaving={isLeaving}
+                    onDismiss={clearResult}
+                    onDownloadAll={downloadAll}
+                />
             )}
 
             <Button type="submit" className="w-full" disabled={!hasImages || !isValid || isPending}>

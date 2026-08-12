@@ -13,6 +13,7 @@ export const metadata: Metadata = {
 export default function PdfPage() {
     return (
         <ToolPage
+            href="/pdf"
             title="Images to PDF"
             description="Wrap one image in a PDF, or several into a multi-page one, sized to fit the image or a standard page."
         >

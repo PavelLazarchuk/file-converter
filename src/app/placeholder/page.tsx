@@ -13,6 +13,7 @@ export const metadata: Metadata = {
 export default function PlaceholderPage() {
     return (
         <ToolPage
+            href="/placeholder"
             title="Placeholder"
             description="Generate a placeholder image with custom dimensions, colors and text — no upload needed."
         >

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Image from 'next/image';
 import { Download, FileCheck2, TriangleAlert, X } from 'lucide-react';
 
@@ -16,7 +17,12 @@ const CHECKERBOARD: React.CSSProperties = {
     backgroundSize: '16px 16px',
 };
 
+const ROW_STAGGER_MS = 60;
+
 function Preview({ entry, className }: { entry: OutcomeFile; className?: string }) {
+    // The preview is a blob decoded after mount, so it pops in — fade it instead.
+    const [decoded, setDecoded] = useState(false);
+
     return (
         <div
             className={cn(
@@ -27,12 +33,20 @@ function Preview({ entry, className }: { entry: OutcomeFile; className?: string 
         >
             {entry.previewUrl ? (
                 <Image
+                    ref={node => {
+                        if (node?.complete) setDecoded(true);
+                    }}
                     src={entry.previewUrl}
                     alt={entry.file.filename}
                     width={entry.width ?? 320}
                     height={entry.height ?? 320}
                     unoptimized
-                    className="max-h-full w-auto max-w-full object-contain"
+                    onLoad={() => setDecoded(true)}
+                    onError={() => setDecoded(true)}
+                    className={cn(
+                        'max-h-full w-auto max-w-full object-contain transition-[opacity,transform] duration-300 ease-out motion-reduce:transition-none',
+                        decoded ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
+                    )}
                 />
             ) : (
                 <span className="px-2 text-center font-mono text-xs text-muted-foreground">
@@ -58,7 +72,7 @@ function SizeLine({ entry }: { entry: OutcomeFile }) {
                     {formatFileSize(originalSize)}{' '}
                     <span
                         className={cn(
-                            'font-medium',
+                            'inline-block animate-delta-pop font-medium motion-reduce:animate-none',
                             change.direction === 'smaller' &&
                                 'text-emerald-600 dark:text-emerald-400',
                             change.direction === 'larger' && 'text-amber-600 dark:text-amber-400'
@@ -74,26 +88,39 @@ function SizeLine({ entry }: { entry: OutcomeFile }) {
 
 function Warning({ children }: { children: React.ReactNode }) {
     return (
-        <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
-            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-            <div className="min-w-0">{children}</div>
+        // grid-rows 0fr → 1fr, kicked off by @starting-style, reveals the real height.
+        <div className="grid grid-rows-[1fr] rounded-lg border border-amber-500/50 bg-amber-500/10 opacity-100 transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none starting:grid-rows-[0fr] starting:opacity-0">
+            <div className="overflow-hidden">
+                <div className="flex items-start gap-2.5 p-3 text-sm">
+                    <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <div className="min-w-0">{children}</div>
+                </div>
+            </div>
         </div>
     );
 }
 
 type ResultCardProps = {
     outcome: ActionOutcome;
+    leaving?: boolean;
     onDismiss: () => void;
     onDownloadAll: () => void;
 };
 
-export function ResultCard({ outcome, onDismiss, onDownloadAll }: ResultCardProps) {
+export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: ResultCardProps) {
     const { autoDownload, setAutoDownload } = useAutoDownload();
     const { files, failures } = outcome;
     const single = files.length === 1 ? files[0] : null;
 
     return (
-        <div className="space-y-4 rounded-xl border bg-card p-4">
+        <div
+            className={cn(
+                'space-y-4 rounded-xl border bg-card p-4 motion-reduce:animate-none',
+                leaving
+                    ? 'animate-out duration-200 ease-in fade-out-0 zoom-out-95 slide-out-to-top-1'
+                    : 'animate-in duration-300 ease-out fade-in-0 zoom-in-95 slide-in-from-bottom-3'
+            )}
+        >
             <div className="flex items-start gap-2.5">
                 <FileCheck2 className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                 <p className="text-sm font-medium">
@@ -113,8 +140,12 @@ export function ResultCard({ outcome, onDismiss, onDownloadAll }: ResultCardProp
                 </div>
             ) : (
                 <ul className="divide-y rounded-lg border">
-                    {files.map(entry => (
-                        <li key={entry.file.filename} className="flex items-center gap-3 p-2">
+                    {files.map((entry, index) => (
+                        <li
+                            key={entry.file.filename}
+                            className="flex animate-in items-center gap-3 p-2 duration-300 ease-out fade-in-0 slide-in-from-bottom-2 fill-mode-backwards motion-reduce:animate-none"
+                            style={{ animationDelay: `${index * ROW_STAGGER_MS}ms` }}
+                        >
                             <Preview entry={entry} className="size-14 shrink-0" />
                             <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-medium">

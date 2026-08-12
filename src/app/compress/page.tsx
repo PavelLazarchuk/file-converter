@@ -13,6 +13,7 @@ export const metadata: Metadata = {
 export default function CompressPage() {
     return (
         <ToolPage
+            href="/compress"
             title="Compress"
             description="Reduce file size with adjustable quality, or aim for a target size like 500 KB. Drop in up to 20 images at once. EXIF, ICC and XMP metadata are always removed."
         >

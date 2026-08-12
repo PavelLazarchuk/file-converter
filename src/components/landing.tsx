@@ -1,7 +1,8 @@
+import { ViewTransition } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
-import { TOOLS } from '@/lib/site';
+import { TOOLS, toolTransitionName } from '@/lib/site';
 
 const enter =
     'animate-in fade-in fill-mode-backwards duration-500 ease-out motion-reduce:animate-none';
@@ -48,12 +49,22 @@ export function Landing() {
                                 href={tool.href}
                                 className="group flex h-full flex-col rounded-2xl border bg-card p-6 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-primary/25 hover:shadow-lg"
                             >
-                                <div
-                                    className={`flex size-11 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm ${tool.gradient}`}
+                                <ViewTransition
+                                    name={toolTransitionName('icon', tool.href)}
+                                    share="morph"
                                 >
-                                    <tool.icon className="size-5" />
-                                </div>
-                                <h2 className="mt-5 text-lg font-semibold">{tool.title}</h2>
+                                    <div
+                                        className={`flex size-11 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm ${tool.gradient}`}
+                                    >
+                                        <tool.icon className="size-5" />
+                                    </div>
+                                </ViewTransition>
+                                <ViewTransition
+                                    name={toolTransitionName('title', tool.href)}
+                                    share="morph"
+                                >
+                                    <h2 className="mt-5 text-lg font-semibold">{tool.title}</h2>
+                                </ViewTransition>
                                 <p className="mt-1.5 flex-1 text-sm leading-relaxed text-muted-foreground">
                                     {tool.description}
                                 </p>

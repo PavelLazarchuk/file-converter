@@ -38,10 +38,8 @@ const defaultValues: CompressInput = {
 
 export function CompressForm() {
     const { images, addImages, removeImage, clearImages } = useLoadedImages(MAX_BATCH_FILES);
-    const { isPending, outcome, run, clearResult, downloadAll, autoDownload } = useImageAction(
-        compressImage,
-        'compressed-images.zip'
-    );
+    const { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload } =
+        useImageAction(compressImage, 'compressed-images.zip');
 
     const {
         control,
@@ -209,7 +207,12 @@ export function CompressForm() {
             </div>
 
             {outcome && (
-                <ResultCard outcome={outcome} onDismiss={clearResult} onDownloadAll={downloadAll} />
+                <ResultCard
+                    outcome={outcome}
+                    leaving={isLeaving}
+                    onDismiss={clearResult}
+                    onDownloadAll={downloadAll}
+                />
             )}
 
             <Button type="submit" className="w-full" disabled={!hasImages || !isValid || isPending}>
