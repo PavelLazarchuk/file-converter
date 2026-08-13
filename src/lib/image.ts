@@ -434,6 +434,8 @@ export function escapeXml(value: string): string {
         .replaceAll("'", '&apos;');
 }
 
+export const SVG_FONT_STACK = 'Helvetica, Arial, DejaVu Sans, Liberation Sans, sans-serif';
+
 export function watermarkSvg(
     layout: Size & { fontSize: number },
     text: string,
@@ -441,7 +443,7 @@ export function watermarkSvg(
 ): string {
     return (
         `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}" height="${layout.height}">` +
-        `<text x="50%" y="50%" fill="${color}" font-family="Helvetica, Arial, sans-serif" ` +
+        `<text x="50%" y="50%" fill="${color}" font-family="${SVG_FONT_STACK}" ` +
         `font-size="${layout.fontSize}" font-weight="600" text-anchor="middle" ` +
         `dominant-baseline="central">${escapeXml(text)}</text>` +
         `</svg>`

@@ -706,6 +706,30 @@ describe('watermarkImage', () => {
         return [...data.subarray(at, at + 3)];
     }
 
+    async function repainted(
+        file: ActionFile,
+        box: { left: number; top: number; width: number; height: number },
+        background: number[]
+    ) {
+        const { data, info } = await sharp(Buffer.from(file.data))
+            .raw()
+            .toBuffer({ resolveWithObject: true });
+        let count = 0;
+
+        for (let top = box.top; top < box.top + box.height; top += 1) {
+            for (let left = box.left; left < box.left + box.width; left += 1) {
+                const at = (top * info.width + left) * info.channels;
+                const rgb = [...data.subarray(at, at + 3)];
+
+                if (rgb.some((value, index) => value !== background[index])) {
+                    count += 1;
+                }
+            }
+        }
+
+        return count;
+    }
+
     it('stamps text over the image, keeping its format and size', async () => {
         const source = await image('jpeg', { name: 'beach.jpg', width: 200, height: 120 });
         const { files } = expectSuccess(await watermarkImage(form([source.file], text)));
@@ -733,11 +757,20 @@ describe('watermarkImage', () => {
                 })
             )
         );
-        const stamped = await pixel(files[0], 20, 10);
-        const untouched = await pixel(files[0], 195, 115);
+        const background = [220, 40, 40];
+        const stamped = await repainted(
+            files[0],
+            { left: 0, top: 0, width: 100, height: 60 },
+            background
+        );
+        const other = await repainted(
+            files[0],
+            { left: 100, top: 60, width: 100, height: 60 },
+            background
+        );
 
-        expect(untouched).toEqual([220, 40, 40]);
-        expect(stamped).not.toEqual([220, 40, 40]);
+        expect(other).toBe(0);
+        expect(stamped).toBeGreaterThan(0);
     });
 
     it('composites a logo scaled to a share of the width', async () => {

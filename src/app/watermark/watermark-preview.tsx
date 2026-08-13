@@ -4,6 +4,7 @@ import Image from 'next/image';
 
 import type { LoadedImage } from '@/components/image-dropzone';
 import {
+    SVG_FONT_STACK,
     watermarkLogoLayout,
     watermarkOffset,
     watermarkTextLayout,
@@ -75,7 +76,7 @@ export function WatermarkPreview({
                 ) : (
                     <span
                         className="leading-none font-semibold whitespace-pre"
-                        style={{ color, fontSize, fontFamily: 'Helvetica, Arial, sans-serif' }}
+                        style={{ color, fontSize, fontFamily: SVG_FONT_STACK }}
                     >
                         {text}
                     </span>

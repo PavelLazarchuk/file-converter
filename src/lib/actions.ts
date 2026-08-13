@@ -21,6 +21,7 @@ import {
     PDF_PAGE_MARGIN,
     QUALITY_LIMITS,
     STRIP_QUALITY,
+    SVG_FONT_STACK,
     WATERMARK_DEFAULTS,
     ZIP_MIME_TYPE,
     acceptedFormatsLabel,
@@ -875,7 +876,7 @@ export async function generatePlaceholder(formData: FormData): Promise<ActionRes
         const svg =
             `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">` +
             `<rect width="100%" height="100%" fill="${bgColor}"/>` +
-            `<text x="50%" y="50%" fill="${textColor}" font-family="Helvetica, Arial, sans-serif" ` +
+            `<text x="50%" y="50%" fill="${textColor}" font-family="${SVG_FONT_STACK}" ` +
             `font-size="${fontSize}" font-weight="500" text-anchor="middle" ` +
             `dominant-baseline="central">${escapeXml(label)}</text>` +
             `</svg>`;
