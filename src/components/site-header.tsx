@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from 'react';
 import Link from 'next/link';
 
+import { ColorSchemeToggle } from '@/components/color-scheme-toggle';
 import { Logo } from '@/components/logo';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { SITE } from '@/lib/site';
@@ -43,6 +44,7 @@ export function SiteHeader() {
                 </Link>
 
                 <div className="flex items-center gap-2">
+                    <ColorSchemeToggle />
                     <ThemeToggle />
                 </div>
             </div>

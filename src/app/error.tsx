@@ -6,6 +6,7 @@ import { RefreshCw } from 'lucide-react';
 
 import { StatusPage } from '@/components/status-page';
 import { Button } from '@/components/ui/button';
+import { Logger } from '@/lib/logger';
 
 export default function Error({
     error,
@@ -15,7 +16,7 @@ export default function Error({
     unstable_retry: () => void;
 }) {
     useEffect(() => {
-        console.error(error);
+        Logger.error('render.crashed', { digest: error.digest, error });
     }, [error]);
 
     return (

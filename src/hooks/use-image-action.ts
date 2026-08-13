@@ -8,6 +8,7 @@ import { useAutoDownload } from '@/hooks/use-auto-download';
 import type { ActionFailure, ActionFile, ActionResult } from '@/lib/actions';
 import { downloadFile } from '@/lib/download';
 import { ZIP_MIME_TYPE, countLabel } from '@/lib/image';
+import { Logger } from '@/lib/logger';
 import { createZip } from '@/lib/zip';
 
 export type OutcomeFile = {
@@ -171,7 +172,7 @@ export function useImageAction(
             for (const [key, value] of Object.entries(params)) formData.append(key, value);
 
             const result = await action(formData).catch((error: unknown) => {
-                console.error('Server action failed:', error);
+                Logger.error('action.transport_failed', { files: images.length, error });
 
                 return {
                     success: false as const,

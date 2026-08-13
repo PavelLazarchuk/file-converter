@@ -46,6 +46,7 @@ import {
 } from './image';
 import { encodeIco } from './ico';
 import { describeMetadata } from './exif';
+import { Logger, type LogContext } from './logger';
 import { METADATA_MIME_TYPE } from './metadata';
 import { RATE_LIMIT, checkRateLimit } from './rate-limit';
 import { createZip, type ZipEntry } from './zip';
@@ -77,6 +78,18 @@ export type ActionResult =
     | { success: false; error: string };
 
 class ProcessingError extends Error {}
+
+type ToolName =
+    | 'resize'
+    | 'crop'
+    | 'compress'
+    | 'convert'
+    | 'pdf'
+    | 'placeholder'
+    | 'rotate'
+    | 'watermark'
+    | 'inspect'
+    | 'strip';
 
 function decode(buffer: Buffer) {
     return sharp(buffer, { limitInputPixels: MAX_INPUT_PIXELS }).autoOrient();
@@ -146,11 +159,13 @@ async function readSource<Format extends ConvertSource>(
 }
 
 type SourceBatch<Format extends ConvertSource> = {
+    tool: ToolName;
     sources: SourceImage<Format>[];
     failures: ActionFailure[];
 };
 
 async function readImageFiles<Format extends ConvertSource>(
+    tool: ToolName,
     formData: FormData,
     formats: readonly Format[]
 ): Promise<SourceBatch<Format>> {
@@ -190,7 +205,7 @@ async function readImageFiles<Format extends ConvertSource>(
         try {
             sources.push(await readSource(file, formats));
         } catch (error) {
-            failures.push(describeFailure(file.name, error));
+            failures.push(describeFailure(file.name, error, { tool, stage: 'read' }));
         }
     }
 
@@ -198,7 +213,7 @@ async function readImageFiles<Format extends ConvertSource>(
         throw new ProcessingError(failures[0]?.error ?? 'No file provided.');
     }
 
-    return { sources, failures };
+    return { tool, sources, failures };
 }
 
 function flag(formData: FormData, name: string): boolean {
@@ -225,14 +240,23 @@ function output(
     };
 }
 
-function describeFailure(filename: string, error: unknown): ActionFailure {
+function imageContext(source: SourceImage<ConvertSource>): LogContext {
+    return {
+        format: source.format,
+        bytes: source.size,
+        width: source.metadata.width,
+        height: source.metadata.height,
+    };
+}
+
+function describeFailure(filename: string, error: unknown, context: LogContext): ActionFailure {
     if (error instanceof ProcessingError) return { filename, error: error.message };
 
     if (error instanceof Error && error.message.includes('pixel limit')) {
         return { filename, error: 'Image dimensions are too large to process.' };
     }
 
-    console.error('Image processing failed:', error);
+    Logger.error('image.failed', { ...context, error });
 
     return { filename, error: 'Something went wrong while processing the image.' };
 }
@@ -254,10 +278,20 @@ function collect(files: ActionFile[], failures: ActionFailure[]): ActionResult {
     };
 }
 
-async function run(process: () => Promise<ActionResult>, cost = 1): Promise<ActionResult> {
+async function run(
+    tool: ToolName,
+    process: () => Promise<ActionResult>,
+    cost = 1
+): Promise<ActionResult> {
     const limit = await checkRateLimit(cost);
 
     if (!limit.allowed) {
+        Logger.warn('action.rate_limited', {
+            tool,
+            cost,
+            retryAfterSeconds: limit.retryAfterSeconds,
+        });
+
         return {
             success: false,
             error: `Too many requests — this tool allows ${RATE_LIMIT.images} images per minute. Try again in ${limit.retryAfterSeconds}s.`,
@@ -274,7 +308,7 @@ async function run(process: () => Promise<ActionResult>, cost = 1): Promise<Acti
             return { success: false, error: 'Image dimensions are too large to process.' };
         }
 
-        console.error('Image processing failed:', error);
+        Logger.error('action.failed', { tool, cost, error });
 
         return { success: false, error: 'Something went wrong while processing the image.' };
     }
@@ -285,16 +319,17 @@ function uploadCount(formData: FormData): number {
 }
 
 async function runFiles<Format extends ConvertSource>(
+    tool: ToolName,
     formData: FormData,
     formats: readonly Format[],
     handle: (batch: SourceBatch<Format>) => Promise<ActionResult>,
     cost = uploadCount(formData)
 ): Promise<ActionResult> {
-    return run(async () => handle(await readImageFiles(formData, formats)), cost);
+    return run(tool, async () => handle(await readImageFiles(tool, formData, formats)), cost);
 }
 
 async function eachFile<Format extends ConvertSource>(
-    { sources, failures }: SourceBatch<Format>,
+    { tool, sources, failures }: SourceBatch<Format>,
     process: (source: SourceImage<Format>) => Promise<ActionFile>
 ): Promise<ActionResult> {
     const produced: ActionFile[] = [];
@@ -304,7 +339,7 @@ async function eachFile<Format extends ConvertSource>(
         try {
             produced.push(await process(source));
         } catch (error) {
-            problems.push(describeFailure(source.name, error));
+            problems.push(describeFailure(source.name, error, { tool, ...imageContext(source) }));
         }
     }
 
@@ -312,7 +347,7 @@ async function eachFile<Format extends ConvertSource>(
 }
 
 export async function resizeImage(formData: FormData): Promise<ActionResult> {
-    return runFiles(formData, FORMAT_KEYS, async batch => {
+    return runFiles('resize', formData, FORMAT_KEYS, async batch => {
         const parsed = resizeSchema.safeParse({
             width: formData.get('width'),
             height: formData.get('height'),
@@ -361,7 +396,7 @@ export async function resizeImage(formData: FormData): Promise<ActionResult> {
 }
 
 export async function cropImage(formData: FormData): Promise<ActionResult> {
-    return runFiles(formData, FORMAT_KEYS, async batch => {
+    return runFiles('crop', formData, FORMAT_KEYS, async batch => {
         const parsed = cropSchema.safeParse({
             ratio: formData.get('ratio'),
             shape: formData.get('shape'),
@@ -497,6 +532,13 @@ async function compressToTarget(
 
     if (!smallest) throw new ProcessingError('Could not compress this image.');
 
+    Logger.info('compress.target_missed', {
+        tool: 'compress',
+        ...imageContext(source),
+        targetBytes,
+        smallestBytes: smallest.length,
+    });
+
     return output(
         source,
         smallest,
@@ -508,7 +550,7 @@ async function compressToTarget(
 }
 
 export async function compressImage(formData: FormData): Promise<ActionResult> {
-    return runFiles(formData, FORMAT_KEYS, async batch => {
+    return runFiles('compress', formData, FORMAT_KEYS, async batch => {
         const parsed = compressSchema.safeParse({
             mode: formData.get('mode') || 'quality',
             quality: formData.get('quality') || String(DEFAULT_QUALITY),
@@ -621,7 +663,7 @@ function faviconPackEntries(
 }
 
 export async function convertImage(formData: FormData): Promise<ActionResult> {
-    return runFiles(formData, CONVERT_SOURCE_KEYS, async batch => {
+    return runFiles('convert', formData, CONVERT_SOURCE_KEYS, async batch => {
         const parsed = convertSchema.safeParse({ format: formData.get('format') });
 
         if (!parsed.success) {
@@ -773,7 +815,7 @@ function drawPdfPage(pdfDoc: PDFDocument, embedded: PDFImage, pageSize: PdfPageS
 }
 
 export async function imageToPdf(formData: FormData): Promise<ActionResult> {
-    return runFiles(formData, CONVERT_SOURCE_KEYS, async ({ sources, failures }) => {
+    return runFiles('pdf', formData, CONVERT_SOURCE_KEYS, async ({ tool, sources, failures }) => {
         const parsed = imageToPdfSchema.safeParse({ pageSize: formData.get('pageSize') });
 
         if (!parsed.success) {
@@ -790,7 +832,9 @@ export async function imageToPdf(formData: FormData): Promise<ActionResult> {
                 drawPdfPage(pdfDoc, await embedPdfImage(pdfDoc, source), pageSize);
                 used.push(source);
             } catch (error) {
-                problems.push(describeFailure(source.name, error));
+                problems.push(
+                    describeFailure(source.name, error, { tool, ...imageContext(source) })
+                );
             }
         }
 
@@ -811,7 +855,7 @@ export async function imageToPdf(formData: FormData): Promise<ActionResult> {
 }
 
 export async function generatePlaceholder(formData: FormData): Promise<ActionResult> {
-    return run(async () => {
+    return run('placeholder', async () => {
         const parsed = placeholderSchema.safeParse({
             width: formData.get('width'),
             height: formData.get('height'),
@@ -850,7 +894,7 @@ export async function generatePlaceholder(formData: FormData): Promise<ActionRes
 }
 
 export async function rotateImage(formData: FormData): Promise<ActionResult> {
-    return runFiles(formData, FORMAT_KEYS, async batch => {
+    return runFiles('rotate', formData, FORMAT_KEYS, async batch => {
         const parsed = rotateSchema.safeParse({
             angle: formData.get('angle') || '0',
             background: formData.get('background') || '#ffffff',
@@ -967,7 +1011,7 @@ async function readLogo(
 }
 
 export async function watermarkImage(formData: FormData): Promise<ActionResult> {
-    return runFiles(formData, FORMAT_KEYS, async batch => {
+    return runFiles('watermark', formData, FORMAT_KEYS, async batch => {
         const parsed = watermarkSchema.safeParse({
             mode: formData.get('mode') || WATERMARK_DEFAULTS.mode,
             text: formData.get('text') ?? '',
@@ -1011,6 +1055,7 @@ export async function watermarkImage(formData: FormData): Promise<ActionResult> 
 
 export async function inspectImage(formData: FormData): Promise<ActionResult> {
     return runFiles(
+        'inspect',
         formData,
         FORMAT_KEYS,
         async batch =>
@@ -1036,7 +1081,7 @@ export async function inspectImage(formData: FormData): Promise<ActionResult> {
 }
 
 export async function stripImageMetadata(formData: FormData): Promise<ActionResult> {
-    return runFiles(formData, FORMAT_KEYS, async batch =>
+    return runFiles('strip', formData, FORMAT_KEYS, async batch =>
         eachFile(batch, async source => {
             if (!hasStrippableMetadata(source.metadata)) {
                 throw new ProcessingError('This file carries no metadata to remove.');

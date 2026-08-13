@@ -4,9 +4,11 @@ import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
 import { AppToaster } from '@/components/app-toaster';
+import { ColorSchemeProvider } from '@/components/color-scheme-provider';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { ThemeProvider } from '@/components/theme-provider';
+import { COLOR_SCHEME_INIT_SCRIPT } from '@/lib/color-scheme';
 import { SITE } from '@/lib/site';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
 
@@ -67,15 +69,18 @@ export default function RootLayout({
         >
             <head>
                 <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+                <script dangerouslySetInnerHTML={{ __html: COLOR_SCHEME_INIT_SCRIPT }} />
             </head>
             <body className="min-h-full flex flex-col">
                 <ThemeProvider>
-                    <SiteHeader />
-                    {children}
-                    <SiteFooter />
-                    <Analytics />
-                    <SpeedInsights />
-                    <AppToaster />
+                    <ColorSchemeProvider>
+                        <SiteHeader />
+                        {children}
+                        <SiteFooter />
+                        <Analytics />
+                        <SpeedInsights />
+                        <AppToaster />
+                    </ColorSchemeProvider>
                 </ThemeProvider>
             </body>
         </html>
