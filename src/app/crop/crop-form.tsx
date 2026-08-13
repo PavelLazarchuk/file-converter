@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { ImageDropzone, useLoadedImages } from '@/components/image-dropzone';
 import { MetadataSwitch } from '@/components/metadata-switch';
 import { ResultCard } from '@/components/result-card';
+import { SizePresets } from '@/components/size-presets';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -24,10 +25,12 @@ import {
     CROP_SHAPES,
     CROP_SHAPE_KEYS,
     centeredCrop,
+    cropRatioForSize,
     cropRatioLabel,
     cropRatioSize,
     defaultFreeCrop,
     type CropBox,
+    type SizePreset,
 } from '@/lib/image';
 import { cropFormSchema, type CropFormInput, type CropFormValues } from '@/lib/schemas';
 import { CropArea } from './crop-area';
@@ -38,6 +41,7 @@ const defaultValues: CropFormInput = { ratio: '1:1', shape: 'rectangle' };
 export function CropForm() {
     const { images, addImages, clearImages } = useLoadedImages();
     const [removeMetadata, setRemoveMetadata] = useState(true);
+    const [preset, setPreset] = useState<SizePreset | null>(null);
     const [manualBox, setManualBox] = useState<{ key: string; box: CropBox } | null>(null);
     const { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload } =
         useImageAction(cropImage);
@@ -47,6 +51,7 @@ export function CropForm() {
         control,
         handleSubmit,
         reset,
+        setValue,
         trigger,
         formState: { errors, isValid },
     } = useForm<CropFormInput, unknown, CropFormValues>({
@@ -57,8 +62,12 @@ export function CropForm() {
 
     const ratioKey = useWatch({ control, name: 'ratio' });
     const shape = useWatch({ control, name: 'shape' });
-    const ratio = ratioKey ? cropRatioSize(ratioKey) : null;
-    const boxKey = image && ratioKey ? `${image.previewUrl}|${ratioKey}` : null;
+    const ratio = preset
+        ? { width: preset.width, height: preset.height }
+        : ratioKey
+          ? cropRatioSize(ratioKey)
+          : null;
+    const boxKey = image && ratioKey ? `${image.previewUrl}|${preset?.key ?? ratioKey}` : null;
     const defaultBox =
         image && ratioKey
             ? ratio
@@ -70,6 +79,7 @@ export function CropForm() {
     function resetForm() {
         clearImages();
         setManualBox(null);
+        setPreset(null);
         clearResult();
         reset(defaultValues);
     }
@@ -85,6 +95,7 @@ export function CropForm() {
             width: String(box.width),
             height: String(box.height),
             keepMetadata: String(!removeMetadata),
+            ...(preset ? { resizeTo: `${preset.width}x${preset.height}` } : {}),
         });
     });
 
@@ -103,6 +114,22 @@ export function CropForm() {
                 onClear={resetForm}
             />
 
+            <SizePresets
+                activeKey={preset?.key ?? null}
+                disabled={!image || isPending}
+                hint={`Frames that exact ratio and scales the crop to the pixel size the platform expects.${preset ? ' Pick the active preset again to go back to the ratio above.' : ''}`}
+                onSelect={next => {
+                    const cleared = preset?.key === next.key;
+
+                    setPreset(cleared ? null : next);
+                    setManualBox(null);
+                    clearResult();
+
+                    if (!cleared)
+                        setValue('ratio', cropRatioForSize(next), { shouldValidate: true });
+                }}
+            />
+
             <div className="space-y-2">
                 <Label htmlFor="ratio">Aspect ratio</Label>
                 <Controller
@@ -111,7 +138,10 @@ export function CropForm() {
                     render={({ field }) => (
                         <Select
                             value={field.value ?? ''}
-                            onValueChange={field.onChange}
+                            onValueChange={value => {
+                                setPreset(null);
+                                field.onChange(value);
+                            }}
                             disabled={!image || isPending}
                         >
                             <SelectTrigger
@@ -185,8 +215,11 @@ export function CropForm() {
                             }}
                         />
                         <p className="text-sm text-muted-foreground">
-                            Output: {box.width} × {box.height} px. Drag the frame to reposition it,
-                            or pull {ratio ? 'a corner' : 'an edge or corner'} to resize.
+                            Output: {preset ? preset.width : box.width} ×{' '}
+                            {preset ? preset.height : box.height} px
+                            {preset && ` — the ${box.width} × ${box.height} frame is scaled to it`}.
+                            Drag the frame to reposition it, or pull{' '}
+                            {ratio ? 'a corner' : 'an edge or corner'} to resize.
                         </p>
                     </div>
                     <CropFields

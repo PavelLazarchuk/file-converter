@@ -38,6 +38,13 @@ export const IMAGE_FORMATS: Record<
     base64: { label: 'Base64 data URI', mimeType: 'text/plain', extension: 'txt' },
 };
 
+export const STRIP_QUALITY: Record<ImageFormat, number> = {
+    jpeg: 95,
+    webp: 95,
+    avif: 80,
+    png: 100,
+};
+
 const SHARP_FORMAT_ALIASES: Record<string, ConvertSource> = {
     jpeg: 'jpeg',
     jpg: 'jpeg',
@@ -98,6 +105,28 @@ export const ROTATIONS: Record<Rotation, { label: string }> = {
 
 export function rotationSwapsDimensions(rotation: Rotation): boolean {
     return rotation === '90' || rotation === '270';
+}
+
+export const ROTATE_ANGLE_LIMITS = { min: 0, max: 359 } as const;
+
+export const ROTATE_ANGLE_PRESETS = [90, 180, 270] as const;
+
+export const ROTATE_DEFAULTS = { angle: '0', background: '#ffffff' } as const;
+
+export type RotateOptions = { angle: number; flipHorizontal: boolean; flipVertical: boolean };
+
+export function rotateFillsCorners(angle: number): boolean {
+    return angle % 90 !== 0;
+}
+
+export function rotateSuffix({ angle, flipHorizontal, flipVertical }: RotateOptions): string {
+    const parts = [
+        ...(angle ? [`${angle}deg`] : []),
+        ...(flipHorizontal ? ['mirrored'] : []),
+        ...(flipVertical ? ['flipped'] : []),
+    ];
+
+    return parts.length ? parts.join('-') : 'rotated';
 }
 
 export const RESIZE_FIT_KEYS = ['contain', 'cover', 'fill', 'inside'] as const;
@@ -173,6 +202,20 @@ export function cropRatioSize(ratio: CropRatio): { width: number; height: number
     return ratio === 'free' ? null : ASPECT_RATIOS[ratio];
 }
 
+const RATIO_TOLERANCE = 0.001;
+
+export function cropRatioForSize({ width, height }: { width: number; height: number }): CropRatio {
+    const target = width / height;
+
+    return (
+        ASPECT_RATIO_KEYS.find(
+            key =>
+                Math.abs(ASPECT_RATIOS[key].width / ASPECT_RATIOS[key].height - target) <
+                RATIO_TOLERANCE
+        ) ?? 'free'
+    );
+}
+
 export const CROP_SHAPE_KEYS = ['rectangle', 'circle'] as const;
 
 export type CropShape = (typeof CROP_SHAPE_KEYS)[number];
@@ -240,6 +283,168 @@ export function defaultFreeCrop(srcWidth: number, srcHeight: number): CropBox {
         },
         srcWidth,
         srcHeight
+    );
+}
+
+export type SizePreset = { key: string; label: string; width: number; height: number };
+
+export const SIZE_PRESETS: readonly SizePreset[] = [
+    { key: 'instagram-post', label: 'Instagram post', width: 1080, height: 1080 },
+    { key: 'instagram-portrait', label: 'Instagram portrait', width: 1080, height: 1350 },
+    { key: 'instagram-story', label: 'Instagram story / Reel', width: 1080, height: 1920 },
+    { key: 'x-post', label: 'X post', width: 1600, height: 900 },
+    { key: 'x-header', label: 'X header', width: 1500, height: 500 },
+    { key: 'facebook-cover', label: 'Facebook cover', width: 820, height: 312 },
+    { key: 'linkedin-banner', label: 'LinkedIn banner', width: 1584, height: 396 },
+    { key: 'youtube-thumbnail', label: 'YouTube thumbnail', width: 1280, height: 720 },
+    { key: 'og-image', label: 'OG preview image', width: 1200, height: 630 },
+    { key: 'avatar', label: 'Avatar', width: 400, height: 400 },
+] as const;
+
+export function sizePreset(key: string | null): SizePreset | null {
+    return SIZE_PRESETS.find(preset => preset.key === key) ?? null;
+}
+
+export function outputSizeLabel({ width, height }: { width: number; height: number }): string {
+    return `${width}×${height}`;
+}
+
+export const WATERMARK_MODE_KEYS = ['text', 'image'] as const;
+
+export type WatermarkMode = (typeof WATERMARK_MODE_KEYS)[number];
+
+export const WATERMARK_MODES: Record<WatermarkMode, { label: string }> = {
+    text: { label: 'Text' },
+    image: { label: 'Logo image' },
+};
+
+export const WATERMARK_POSITION_KEYS = [
+    'top-left',
+    'top',
+    'top-right',
+    'left',
+    'center',
+    'right',
+    'bottom-left',
+    'bottom',
+    'bottom-right',
+] as const;
+
+export type WatermarkPosition = (typeof WATERMARK_POSITION_KEYS)[number];
+
+export const WATERMARK_POSITIONS: Record<
+    WatermarkPosition,
+    { label: string; x: number; y: number }
+> = {
+    'top-left': { label: 'Top left', x: 0, y: 0 },
+    top: { label: 'Top center', x: 0.5, y: 0 },
+    'top-right': { label: 'Top right', x: 1, y: 0 },
+    left: { label: 'Middle left', x: 0, y: 0.5 },
+    center: { label: 'Center', x: 0.5, y: 0.5 },
+    right: { label: 'Middle right', x: 1, y: 0.5 },
+    'bottom-left': { label: 'Bottom left', x: 0, y: 1 },
+    bottom: { label: 'Bottom center', x: 0.5, y: 1 },
+    'bottom-right': { label: 'Bottom right', x: 1, y: 1 },
+};
+
+export const WATERMARK_OPACITY_LIMITS = { min: 1, max: 100 } as const;
+export const WATERMARK_SCALE_LIMITS = { min: 1, max: 100 } as const;
+export const WATERMARK_MARGIN_LIMITS = { min: 0, max: 500 } as const;
+export const WATERMARK_TEXT_MAX_LENGTH = 60;
+
+export const WATERMARK_DEFAULTS = {
+    mode: 'text',
+    text: '',
+    color: '#ffffff',
+    opacity: '55',
+    scale: '30',
+    margin: '24',
+    position: 'bottom-right',
+} as const;
+
+export type Size = { width: number; height: number };
+
+const TEXT_GLYPH_WIDTH = 0.58;
+const TEXT_LINE_HEIGHT = 1.32;
+
+export function watermarkTextLayout(
+    image: Size,
+    scale: number,
+    text: string
+): Size & { fontSize: number } {
+    const label = text.trim() || ' ';
+    const perFontSize = label.length * TEXT_GLYPH_WIDTH;
+    const fontSize = Math.max(
+        4,
+        Math.floor(
+            Math.min(
+                (image.width * scale) / 100 / perFontSize,
+                image.width / perFontSize,
+                image.height / TEXT_LINE_HEIGHT
+            )
+        )
+    );
+
+    return {
+        fontSize,
+        width: Math.max(1, Math.min(Math.round(fontSize * perFontSize), image.width)),
+        height: Math.max(1, Math.min(Math.round(fontSize * TEXT_LINE_HEIGHT), image.height)),
+    };
+}
+
+export function watermarkLogoLayout(image: Size, scale: number, logo: Size): Size {
+    const factor = Math.min(
+        (image.width * scale) / 100 / logo.width,
+        image.width / logo.width,
+        image.height / logo.height
+    );
+
+    return {
+        width: Math.max(1, Math.min(Math.round(logo.width * factor), image.width)),
+        height: Math.max(1, Math.min(Math.round(logo.height * factor), image.height)),
+    };
+}
+
+export function watermarkOffset(
+    position: WatermarkPosition,
+    image: Size,
+    overlay: Size,
+    margin: number
+): { left: number; top: number } {
+    const anchor = WATERMARK_POSITIONS[position];
+    const place = (span: number, size: number, at: number) => {
+        const free = Math.max(0, span - size);
+        const raw = at === 0 ? margin : at === 1 ? free - margin : free / 2;
+
+        return Math.max(0, Math.min(Math.round(raw), free));
+    };
+
+    return {
+        left: place(image.width, overlay.width, anchor.x),
+        top: place(image.height, overlay.height, anchor.y),
+    };
+}
+
+export function escapeXml(value: string): string {
+    return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&apos;');
+}
+
+export function watermarkSvg(
+    layout: Size & { fontSize: number },
+    text: string,
+    color: string
+): string {
+    return (
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}" height="${layout.height}">` +
+        `<text x="50%" y="50%" fill="${color}" font-family="Helvetica, Arial, sans-serif" ` +
+        `font-size="${layout.fontSize}" font-weight="600" text-anchor="middle" ` +
+        `dominant-baseline="central">${escapeXml(text)}</text>` +
+        `</svg>`
     );
 }
 

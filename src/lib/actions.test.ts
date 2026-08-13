@@ -8,11 +8,15 @@ import {
     cropImage,
     generatePlaceholder,
     imageToPdf,
+    inspectImage,
     resizeImage,
+    rotateImage,
+    stripImageMetadata,
+    watermarkImage,
     type ActionFile,
     type ActionResult,
 } from './actions';
-import { MAX_BATCH_FILES, MAX_FILE_SIZE } from './image';
+import { MAX_BATCH_BYTES, MAX_BATCH_FILES, MAX_FILE_SIZE } from './image';
 
 type Fixture = { buffer: Buffer; file: File };
 
@@ -245,6 +249,43 @@ describe('cropImage', () => {
         );
 
         await expect(meta(files[0])).resolves.toMatchObject({ width: 40, height: 30 });
+    });
+
+    it('scales the frame to a preset size and names the file after it', async () => {
+        const source = await image('png', { name: 'shot.png', width: 400, height: 400 });
+        const { files } = expectSuccess(
+            await cropImage(
+                form([source.file], {
+                    ratio: '1:1',
+                    shape: 'rectangle',
+                    left: '0',
+                    top: '0',
+                    width: '200',
+                    height: '200',
+                    resizeTo: '1080x1080',
+                })
+            )
+        );
+
+        expect(files[0].filename).toBe('shot-1080x1080.png');
+        await expect(meta(files[0])).resolves.toMatchObject({ width: 1080, height: 1080 });
+    });
+
+    it('rejects a malformed preset size', async () => {
+        const source = await image('png');
+
+        expect(
+            expectFailure(
+                await cropImage(
+                    form([source.file], {
+                        ratio: 'free',
+                        shape: 'rectangle',
+                        ...box,
+                        resizeTo: '1080',
+                    })
+                )
+            )
+        ).toContain('Output size');
     });
 
     it('exports a circular JPEG crop as a transparent PNG', async () => {
@@ -574,6 +615,257 @@ describe('generatePlaceholder', () => {
                 )
             )
         ).toContain('hex color');
+    });
+});
+
+describe('rotateImage', () => {
+    it('turns the canvas with a right angle and names the output', async () => {
+        const source = await image('png', { name: 'wide.png', width: 60, height: 20 });
+        const { files } = expectSuccess(await rotateImage(form([source.file], { angle: '90' })));
+
+        expect(files[0].filename).toBe('wide-90deg.png');
+        await expect(meta(files[0])).resolves.toMatchObject({ width: 20, height: 60 });
+    });
+
+    it('mirrors and flips without an angle', async () => {
+        const source = await image('png', { name: 'a.png' });
+        const { files } = expectSuccess(
+            await rotateImage(
+                form([source.file], {
+                    angle: '0',
+                    flipHorizontal: 'true',
+                    flipVertical: 'true',
+                })
+            )
+        );
+
+        expect(files[0].filename).toBe('a-mirrored-flipped.png');
+        await expect(meta(files[0])).resolves.toMatchObject({ width: 40, height: 30 });
+    });
+
+    it('refuses a request that would change nothing', async () => {
+        const source = await image('png');
+
+        expect(expectFailure(await rotateImage(form([source.file], { angle: '0' })))).toContain(
+            'Nothing to do'
+        );
+    });
+
+    it('grows the canvas for a free angle and fills the corners', async () => {
+        const source = await image('png', { name: 'tilt.png', width: 40, height: 40 });
+        const filled = expectSuccess(
+            await rotateImage(form([source.file], { angle: '45', background: '#ff0000' }))
+        );
+        const transparent = expectSuccess(
+            await rotateImage(
+                form([source.file], { angle: '45', background: '#ff0000', transparent: 'true' })
+            )
+        );
+
+        expect(filled.files[0].filename).toBe('tilt-45deg.png');
+        expect((await meta(filled.files[0])).width).toBeGreaterThan(40);
+        expect((await meta(filled.files[0])).hasAlpha).toBe(false);
+        expect((await meta(transparent.files[0])).hasAlpha).toBe(true);
+    });
+
+    it('keeps a JPEG opaque even when transparent corners are asked for', async () => {
+        const source = await image('jpeg', { name: 'photo.jpg' });
+        const { files } = expectSuccess(
+            await rotateImage(form([source.file], { angle: '30', transparent: 'true' }))
+        );
+
+        await expect(meta(files[0])).resolves.toMatchObject({ format: 'jpeg', hasAlpha: false });
+    });
+
+    it('rejects an angle outside a single turn', async () => {
+        const source = await image('png');
+
+        expect(expectFailure(await rotateImage(form([source.file], { angle: '400' })))).toContain(
+            'Angle must be between'
+        );
+    });
+});
+
+describe('watermarkImage', () => {
+    const text = {
+        mode: 'text',
+        text: '© Test',
+        color: '#ffffff',
+        position: 'bottom-right',
+        opacity: '60',
+        scale: '30',
+        margin: '4',
+    };
+
+    async function pixel(file: ActionFile, left: number, top: number) {
+        const { data, info } = await sharp(Buffer.from(file.data))
+            .raw()
+            .toBuffer({ resolveWithObject: true });
+        const at = (top * info.width + left) * info.channels;
+
+        return [...data.subarray(at, at + 3)];
+    }
+
+    it('stamps text over the image, keeping its format and size', async () => {
+        const source = await image('jpeg', { name: 'beach.jpg', width: 200, height: 120 });
+        const { files } = expectSuccess(await watermarkImage(form([source.file], text)));
+
+        expect(files[0].filename).toBe('beach-watermarked.jpg');
+        expect(files[0].originalSize).toBe(source.file.size);
+        await expect(meta(files[0])).resolves.toMatchObject({
+            format: 'jpeg',
+            width: 200,
+            height: 120,
+        });
+    });
+
+    it('paints in the requested corner and leaves the others alone', async () => {
+        const source = await image('png', { width: 200, height: 120 });
+        const { files } = expectSuccess(
+            await watermarkImage(
+                form([source.file], {
+                    ...text,
+                    text: '@@@@',
+                    position: 'top-left',
+                    opacity: '100',
+                    scale: '50',
+                    margin: '0',
+                })
+            )
+        );
+        const stamped = await pixel(files[0], 20, 10);
+        const untouched = await pixel(files[0], 195, 115);
+
+        expect(untouched).toEqual([220, 40, 40]);
+        expect(stamped).not.toEqual([220, 40, 40]);
+    });
+
+    it('composites a logo scaled to a share of the width', async () => {
+        const source = await image('png', { name: 'shot.png', width: 400, height: 300 });
+        const logoBytes = await sharp({
+            create: { width: 100, height: 50, channels: 3, background: { r: 0, g: 0, b: 255 } },
+        })
+            .png()
+            .toBuffer();
+        const data = form([source.file], {
+            ...text,
+            mode: 'image',
+            position: 'center',
+            opacity: '100',
+            scale: '25',
+        });
+
+        data.append(
+            'logo',
+            new File([new Uint8Array(logoBytes)], 'logo.png', { type: 'image/png' })
+        );
+
+        const { files } = expectSuccess(await watermarkImage(data));
+        const middle = await pixel(files[0], 200, 150);
+        const corner = await pixel(files[0], 5, 5);
+
+        expect(files[0].filename).toBe('shot-watermarked.png');
+        expect(middle).toEqual([0, 0, 255]);
+        expect(corner).toEqual([220, 40, 40]);
+        await expect(meta(files[0])).resolves.toMatchObject({ width: 400, height: 300 });
+    });
+
+    it('charges the logo against the same budget as the batch', async () => {
+        const source = await image('png', { name: 'shot.png' });
+        const data = form([source.file], { ...text, mode: 'image' });
+
+        data.append(
+            'logo',
+            new File([new Uint8Array(MAX_BATCH_BYTES)], 'huge.png', { type: 'image/png' })
+        );
+
+        expect(expectFailure(await watermarkImage(data))).toContain('add up to more than');
+    });
+
+    it('asks for the logo when the image mode has none', async () => {
+        const source = await image('png');
+
+        expect(
+            expectFailure(await watermarkImage(form([source.file], { ...text, mode: 'image' })))
+        ).toContain('Upload the image to use as the watermark');
+    });
+
+    it('requires the text for a text watermark', async () => {
+        const source = await image('png');
+
+        expect(
+            expectFailure(await watermarkImage(form([source.file], { ...text, text: '  ' })))
+        ).toContain('Watermark text is required');
+    });
+
+    it('stamps a whole batch with the same settings', async () => {
+        const sources = await Promise.all([
+            image('png', { name: 'a.png', width: 120, height: 90 }),
+            image('jpeg', { name: 'b.jpg', width: 80, height: 60 }),
+        ]);
+        const { files } = expectSuccess(
+            await watermarkImage(
+                form(
+                    sources.map(source => source.file),
+                    text
+                )
+            )
+        );
+
+        expect(files.map(file => file.filename)).toEqual([
+            'a-watermarked.png',
+            'b-watermarked.jpg',
+        ]);
+    });
+});
+
+describe('inspectImage', () => {
+    it('returns a JSON report per file instead of an image', async () => {
+        const source = await image('jpeg', { name: 'holiday.jpg', width: 64, height: 48 });
+        const { files } = expectSuccess(await inspectImage(form([source.file])));
+        const report = JSON.parse(new TextDecoder().decode(files[0].data));
+
+        expect(files[0].filename).toBe('holiday-metadata.json');
+        expect(files[0].mimeType).toBe('application/json');
+        expect(report).toMatchObject({
+            filename: 'holiday.jpg',
+            format: 'JPEG',
+            width: 64,
+            height: 48,
+        });
+        expect(report.groups.map((group: { title: string }) => group.title)).toContain('File');
+    });
+
+    it('lists the metadata a photo carries', async () => {
+        const withExif = await image('jpeg', { name: 'exif.jpg', exif: true });
+        const bare = await image('png', { name: 'bare.png' });
+        const { files } = expectSuccess(await inspectImage(form([withExif.file, bare.file])));
+        const [first, second] = files.map(file => JSON.parse(new TextDecoder().decode(file.data)));
+
+        expect(first.removable).toContain('EXIF');
+        expect(second.removable).toEqual([]);
+    });
+});
+
+describe('stripImageMetadata', () => {
+    it('re-encodes without the metadata', async () => {
+        const source = await image('jpeg', { name: 'holiday.jpg', exif: true });
+        const { files } = expectSuccess(await stripImageMetadata(form([source.file])));
+
+        expect(files[0].filename).toBe('holiday-clean.jpg');
+        expect((await meta(files[0])).exif).toBeUndefined();
+        await expect(meta(files[0])).resolves.toMatchObject({ format: 'jpeg' });
+    });
+
+    it('skips a file that has nothing to remove, keeping the rest', async () => {
+        const clean = await image('png', { name: 'clean.png' });
+        const tagged = await image('jpeg', { name: 'tagged.jpg', exif: true });
+        const result = expectSuccess(await stripImageMetadata(form([clean.file, tagged.file])));
+
+        expect(result.files.map(file => file.filename)).toEqual(['tagged-clean.jpg']);
+        expect(result.failures).toEqual([
+            { filename: 'clean.png', error: 'This file carries no metadata to remove.' },
+        ]);
     });
 });
 

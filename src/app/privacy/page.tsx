@@ -35,7 +35,8 @@ const sections = [
         title: 'Metadata in your files',
         body: [
             `Every tool bakes the EXIF orientation into the pixels, so a photo can never come out rotated after its orientation tag is dropped.`,
-            `Compress always removes all metadata (EXIF, GPS coordinates, ICC profile, XMP). Resize, crop and convert remove it by default and offer a switch to keep it — worth remembering that GPS coordinates travel inside photos taken on a phone.`,
+            `Compress always removes all metadata (EXIF, GPS coordinates, ICC profile, XMP). Resize, crop, rotate, watermark and convert remove it by default and offer a switch to keep it — worth remembering that GPS coordinates travel inside photos taken on a phone.`,
+            `The metadata tool exists to show you exactly that: it reads the EXIF, camera, GPS and color profile out of a file and reports them back to you, in the same in-memory request as every other tool, then hands you a clean copy if you want one.`,
         ],
     },
     {

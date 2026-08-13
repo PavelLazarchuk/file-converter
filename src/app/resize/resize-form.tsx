@@ -8,6 +8,7 @@ import { ImageDropzone, useLoadedImages } from '@/components/image-dropzone';
 import { IntegerInput } from '@/components/integer-input';
 import { MetadataSwitch } from '@/components/metadata-switch';
 import { ResultCard } from '@/components/result-card';
+import { SizePresets } from '@/components/size-presets';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -43,6 +44,7 @@ export function ResizeForm() {
     const [lockAspect, setLockAspect] = useState(true);
     const [removeMetadata, setRemoveMetadata] = useState(true);
     const [noEnlarge, setNoEnlarge] = useState(false);
+    const [presetKey, setPresetKey] = useState<string | null>(null);
     const { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload } =
         useImageAction(resizeImage, 'resized-images.zip');
 
@@ -73,6 +75,8 @@ export function ResizeForm() {
         rawValue: string,
         locked = lockAspect
     ) {
+        setPresetKey(null);
+
         if (!locked || !ratio || !/^\d+$/.test(rawValue)) return;
 
         const value = Number(rawValue);
@@ -110,6 +114,7 @@ export function ResizeForm() {
                     clearResult();
 
                     if (!hasImages) {
+                        setPresetKey(null);
                         reset({
                             ...defaultValues,
                             width: String(loaded[0].width),
@@ -126,6 +131,7 @@ export function ResizeForm() {
                 onClear={() => {
                     clearImages();
                     clearResult();
+                    setPresetKey(null);
                     reset(defaultValues);
                 }}
             />
@@ -147,6 +153,8 @@ export function ResizeForm() {
                                 field.onChange(value);
                                 if (hasImages && swapChanged) {
                                     const { width, height } = getValues();
+
+                                    setPresetKey(null);
                                     setValue('width', height, { shouldValidate: true });
                                     setValue('height', width, { shouldValidate: true });
                                 }
@@ -174,6 +182,20 @@ export function ResizeForm() {
                     <p className="text-sm text-destructive">{errors.rotate.message}</p>
                 )}
             </div>
+
+            <SizePresets
+                activeKey={presetKey}
+                disabled={!hasImages || isPending}
+                hint="Fills the exact box a platform expects: the fit switches to cover, so the image is scaled up and the overflow is cropped, centered."
+                onSelect={preset => {
+                    clearResult();
+                    setValue('width', String(preset.width), { shouldValidate: true });
+                    setValue('height', String(preset.height), { shouldValidate: true });
+                    setValue('fit', 'cover', { shouldValidate: true });
+                    setLockAspect(false);
+                    setPresetKey(preset.key);
+                }}
+            />
 
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -220,7 +242,10 @@ export function ResizeForm() {
                     render={({ field }) => (
                         <Select
                             value={field.value ?? 'contain'}
-                            onValueChange={field.onChange}
+                            onValueChange={value => {
+                                setPresetKey(null);
+                                field.onChange(value);
+                            }}
                             disabled={!hasImages || isPending}
                         >
                             <SelectTrigger id="fit" className="w-full" aria-invalid={!!errors.fit}>

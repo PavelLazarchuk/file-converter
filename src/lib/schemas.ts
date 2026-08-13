@@ -13,8 +13,15 @@ import {
     PLACEHOLDER_TEXT_MAX_LENGTH,
     QUALITY_LIMITS,
     RESIZE_FIT_KEYS,
+    ROTATE_ANGLE_LIMITS,
     ROTATION_KEYS,
     TARGET_SIZE_LIMITS,
+    WATERMARK_MARGIN_LIMITS,
+    WATERMARK_MODE_KEYS,
+    WATERMARK_OPACITY_LIMITS,
+    WATERMARK_POSITION_KEYS,
+    WATERMARK_SCALE_LIMITS,
+    WATERMARK_TEXT_MAX_LENGTH,
 } from './image';
 
 function integerInRange(min: number, max: number, label: string) {
@@ -47,6 +54,53 @@ export const cropSchema = z.object({
 });
 
 export const cropFormSchema = cropSchema.pick({ ratio: true, shape: true });
+
+export const outputSizeSchema = z
+    .string({ error: 'Invalid output size' })
+    .trim()
+    .regex(/^\d+x\d+$/, 'Output size must look like 1080x1080')
+    .transform(value => {
+        const [width, height] = value.split('x').map(Number);
+
+        return { width, height };
+    })
+    .refine(
+        ({ width, height }) =>
+            [width, height].every(
+                side => side >= DIMENSION_LIMITS.min && side <= DIMENSION_LIMITS.max
+            ),
+        `Output size must be between ${DIMENSION_LIMITS.min} and ${DIMENSION_LIMITS.max} px`
+    );
+
+export const rotateSchema = z.object({
+    angle: integerInRange(ROTATE_ANGLE_LIMITS.min, ROTATE_ANGLE_LIMITS.max, 'Angle'),
+    background: hexColor('Background color'),
+});
+
+export const watermarkSchema = z
+    .object({
+        mode: z.enum(WATERMARK_MODE_KEYS, { error: 'Choose a watermark type' }),
+        text: z
+            .string()
+            .trim()
+            .max(
+                WATERMARK_TEXT_MAX_LENGTH,
+                `Text must be at most ${WATERMARK_TEXT_MAX_LENGTH} characters`
+            ),
+        color: hexColor('Text color'),
+        position: z.enum(WATERMARK_POSITION_KEYS, { error: 'Choose a position' }),
+        opacity: integerInRange(
+            WATERMARK_OPACITY_LIMITS.min,
+            WATERMARK_OPACITY_LIMITS.max,
+            'Opacity'
+        ),
+        scale: integerInRange(WATERMARK_SCALE_LIMITS.min, WATERMARK_SCALE_LIMITS.max, 'Size'),
+        margin: integerInRange(WATERMARK_MARGIN_LIMITS.min, WATERMARK_MARGIN_LIMITS.max, 'Margin'),
+    })
+    .refine(values => values.mode !== 'text' || values.text.length > 0, {
+        error: 'Watermark text is required',
+        path: ['text'],
+    });
 
 export const compressSchema = z.object({
     mode: z.enum(COMPRESS_MODES, { error: 'Choose a compression mode' }),
@@ -117,3 +171,7 @@ export type PlaceholderInput = z.input<typeof placeholderSchema>;
 export type PlaceholderValues = z.output<typeof placeholderSchema>;
 export type ImageToPdfInput = z.input<typeof imageToPdfSchema>;
 export type ImageToPdfValues = z.output<typeof imageToPdfSchema>;
+export type RotateInput = z.input<typeof rotateSchema>;
+export type RotateValues = z.output<typeof rotateSchema>;
+export type WatermarkInput = z.input<typeof watermarkSchema>;
+export type WatermarkValues = z.output<typeof watermarkSchema>;

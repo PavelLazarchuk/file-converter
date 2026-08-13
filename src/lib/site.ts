@@ -4,7 +4,10 @@ import {
     Gauge,
     ImagePlus,
     RefreshCw,
+    RotateCw,
     Scaling,
+    ScanSearch,
+    Stamp,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -12,7 +15,7 @@ export const SITE = {
     name: 'Image Toolbox',
     tagline: 'Resize, Crop, Compress & Convert',
     description:
-        'Free browser tools for images, in batches of up to 20: resize with locked aspect ratio, crop to preset ratios or a circle, compress by quality or target size, convert between JPEG, PNG, WEBP, AVIF, GIF, TIFF, SVG and ICO favicons, and combine images into a multi-page PDF.',
+        'Free browser tools for images, in batches of up to 20: resize with locked aspect ratio or a social preset, crop to preset ratios or a circle, rotate and flip, compress by quality or target size, convert between JPEG, PNG, WEBP, AVIF, GIF, TIFF, SVG and ICO favicons, stamp a text or logo watermark, inspect EXIF and GPS metadata, and combine images into a multi-page PDF.',
     url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://file-converter-mu-seven.vercel.app',
 } as const;
 
@@ -24,10 +27,6 @@ export type Tool = {
     gradient: string;
 };
 
-/**
- * Pairs a landing card with the tool page it opens. `view-transition-name` has to
- * be a CSS ident, so the slash in the href cannot survive.
- */
 export function toolTransitionName(part: 'icon' | 'title', href: string): string {
     return `tool-${part}-${href.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '')}`;
 }
@@ -50,6 +49,14 @@ export const TOOLS: readonly Tool[] = [
         gradient: 'from-amber-500 to-orange-600',
     },
     {
+        href: '/rotate',
+        title: 'Rotate & Flip',
+        description:
+            'Turn photos by 90°, 180° or any angle you type, mirror them horizontally or vertically — 20 at a time.',
+        icon: RotateCw,
+        gradient: 'from-lime-500 to-green-600',
+    },
+    {
         href: '/compress',
         title: 'Compress',
         description:
@@ -64,6 +71,22 @@ export const TOOLS: readonly Tool[] = [
             'Switch between JPEG, PNG, WEBP, AVIF, GIF, TIFF and SVG in bulk, build an ICO favicon, or get a Base64 data URI.',
         icon: RefreshCw,
         gradient: 'from-emerald-500 to-teal-600',
+    },
+    {
+        href: '/watermark',
+        title: 'Watermark',
+        description:
+            'Stamp text or a logo onto a batch — nine positions, adjustable size, margin and opacity.',
+        icon: Stamp,
+        gradient: 'from-cyan-500 to-sky-600',
+    },
+    {
+        href: '/metadata',
+        title: 'Metadata',
+        description:
+            'See the EXIF, camera, GPS location and color profile hiding in a photo — and download a clean copy without it.',
+        icon: ScanSearch,
+        gradient: 'from-indigo-500 to-blue-700',
     },
     {
         href: '/placeholder',

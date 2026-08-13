@@ -153,7 +153,36 @@
     }
 }
 
-/* Shared-element morph between a landing card and the tool page it opens. */
+@supports (animation-timeline: scroll()) {
+    .glow-parallax {
+        animation-name: glow-drift;
+        animation-timing-function: linear;
+        animation-fill-mode: both;
+        animation-timeline: scroll(root block);
+        will-change: transform;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .glow-parallax {
+            animation-name: none;
+        }
+    }
+}
+
+@keyframes glow-drift {
+    from {
+        transform: translateY(0) scale(1) rotate(0deg);
+    }
+    50% {
+        transform: translateY(22vh) scale(1.14) rotate(3deg);
+        opacity: 0.95;
+    }
+    to {
+        transform: translateY(45vh) scale(1.28) rotate(6deg);
+        opacity: 0.85;
+    }
+}
+
 ::view-transition-group(.morph) {
     animation-duration: 320ms;
     animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
@@ -169,7 +198,6 @@
     }
 }
 
-/* The header is the spatial anchor: it must not cross-fade with the content. */
 ::view-transition-group(site-header) {
     animation: none;
     z-index: 100;

@@ -1,7 +1,5 @@
 import { cn } from '@/lib/utils';
 
-// `transform-box: fill-box` makes the transforms below rotate/scale around each
-// shape's own centre instead of the SVG origin.
 const shape = 'origin-center [transform-box:fill-box] transition-transform duration-300 ease-out';
 
 export function Logo({ className }: { className?: string }) {

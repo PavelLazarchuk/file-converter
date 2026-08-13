@@ -5,7 +5,9 @@ import {
     CONVERT_SOURCE_KEYS,
     CONVERT_TARGET_KEYS,
     CROP_RATIO_KEYS,
+    DIMENSION_LIMITS,
     FORMAT_KEYS,
+    SIZE_PRESETS,
     IMAGE_FORMATS,
     MAX_BATCH_BYTES,
     MAX_BATCH_FILES,
@@ -18,6 +20,7 @@ import {
     convertSourceFromMimeType,
     convertSourceFromSharpFormat,
     countLabel,
+    cropRatioForSize,
     cropRatioLabel,
     cropRatioSize,
     defaultFreeCrop,
@@ -28,10 +31,17 @@ import {
     formatFromMimeType,
     placeholderFontSize,
     placeholderLabel,
+    rotateFillsCorners,
+    rotateSuffix,
     rotationSwapsDimensions,
     sizeChange,
+    sizePreset,
     stripExtension,
     uniqueFilenames,
+    watermarkLogoLayout,
+    watermarkOffset,
+    watermarkSvg,
+    watermarkTextLayout,
 } from './image';
 
 describe('format tables', () => {
@@ -237,6 +247,129 @@ describe('placeholder text', () => {
             placeholderFontSize(600, 400, 'x')
         );
         expect(placeholderFontSize(10, 10, 'x'.repeat(60))).toBeGreaterThanOrEqual(4);
+    });
+});
+
+describe('rotation naming', () => {
+    it('records every operation that was applied', () => {
+        expect(rotateSuffix({ angle: 90, flipHorizontal: false, flipVertical: false })).toBe(
+            '90deg'
+        );
+        expect(rotateSuffix({ angle: 0, flipHorizontal: true, flipVertical: false })).toBe(
+            'mirrored'
+        );
+        expect(rotateSuffix({ angle: 45, flipHorizontal: true, flipVertical: true })).toBe(
+            '45deg-mirrored-flipped'
+        );
+        expect(rotateSuffix({ angle: 0, flipHorizontal: false, flipVertical: false })).toBe(
+            'rotated'
+        );
+    });
+
+    it('knows which angles expose corners', () => {
+        expect(rotateFillsCorners(0)).toBe(false);
+        expect(rotateFillsCorners(270)).toBe(false);
+        expect(rotateFillsCorners(45)).toBe(true);
+    });
+});
+
+describe('size presets', () => {
+    it('gives every preset a unique key and a usable box', () => {
+        const keys = SIZE_PRESETS.map(preset => preset.key);
+
+        expect(new Set(keys).size).toBe(keys.length);
+
+        for (const preset of SIZE_PRESETS) {
+            expect(preset.width).toBeGreaterThan(0);
+            expect(preset.width).toBeLessThanOrEqual(DIMENSION_LIMITS.max);
+            expect(preset.height).toBeLessThanOrEqual(DIMENSION_LIMITS.max);
+            expect(preset.label.length).toBeGreaterThan(0);
+        }
+    });
+
+    it('matches a preset to the named ratio the crop select shows', () => {
+        expect(cropRatioForSize({ width: 1080, height: 1080 })).toBe('1:1');
+        expect(cropRatioForSize({ width: 1080, height: 1920 })).toBe('9:16');
+        expect(cropRatioForSize({ width: 1280, height: 720 })).toBe('16:9');
+        expect(cropRatioForSize({ width: 1200, height: 630 })).toBe('free');
+    });
+
+    it('looks a preset up by key', () => {
+        expect(sizePreset('avatar')).toMatchObject({ width: 400, height: 400 });
+        expect(sizePreset('nope')).toBeNull();
+        expect(sizePreset(null)).toBeNull();
+    });
+});
+
+describe('watermark layout', () => {
+    const image = { width: 1000, height: 800 };
+
+    it('sizes text against the share of the width it should cover', () => {
+        const quarter = watermarkTextLayout(image, 25, 'Hello');
+        const half = watermarkTextLayout(image, 50, 'Hello');
+
+        expect(quarter.width).toBeLessThan(half.width);
+        expect(quarter.width).toBeGreaterThan(0);
+        expect(half.fontSize).toBeGreaterThan(quarter.fontSize);
+    });
+
+    it('never builds an overlay larger than the image', () => {
+        const wide = watermarkTextLayout({ width: 40, height: 20 }, 100, 'a very long watermark');
+        const tall = watermarkTextLayout({ width: 200, height: 12 }, 100, 'x');
+
+        expect(wide.width).toBeLessThanOrEqual(40);
+        expect(wide.height).toBeLessThanOrEqual(20);
+        expect(tall.height).toBeLessThanOrEqual(12);
+    });
+
+    it('scales a logo to the requested share of the width, keeping its ratio', () => {
+        const layout = watermarkLogoLayout(image, 20, { width: 400, height: 200 });
+
+        expect(layout).toEqual({ width: 200, height: 100 });
+    });
+
+    it('shrinks a logo that would not fit', () => {
+        const layout = watermarkLogoLayout({ width: 100, height: 40 }, 100, {
+            width: 400,
+            height: 400,
+        });
+
+        expect(layout.width).toBeLessThanOrEqual(100);
+        expect(layout.height).toBeLessThanOrEqual(40);
+    });
+
+    it('escapes the text it puts in the SVG', () => {
+        const svg = watermarkSvg({ width: 100, height: 20, fontSize: 14 }, '<Ben & Co>', '#ffffff');
+
+        expect(svg).toContain('&lt;Ben &amp; Co&gt;');
+        expect(svg).not.toContain('<Ben');
+    });
+});
+
+describe('watermark placement', () => {
+    const image = { width: 1000, height: 500 };
+    const overlay = { width: 200, height: 100 };
+
+    it('anchors each corner with the margin', () => {
+        expect(watermarkOffset('top-left', image, overlay, 20)).toEqual({ left: 20, top: 20 });
+        expect(watermarkOffset('bottom-right', image, overlay, 20)).toEqual({
+            left: 780,
+            top: 380,
+        });
+        expect(watermarkOffset('center', image, overlay, 20)).toEqual({ left: 400, top: 200 });
+        expect(watermarkOffset('top', image, overlay, 20)).toEqual({ left: 400, top: 20 });
+        expect(watermarkOffset('left', image, overlay, 20)).toEqual({ left: 20, top: 200 });
+    });
+
+    it('keeps the overlay inside the image when the margin is too big', () => {
+        expect(watermarkOffset('bottom-right', image, overlay, 5000)).toEqual({
+            left: 0,
+            top: 0,
+        });
+        expect(watermarkOffset('top-left', image, { width: 1000, height: 500 }, 50)).toEqual({
+            left: 0,
+            top: 0,
+        });
     });
 });
 

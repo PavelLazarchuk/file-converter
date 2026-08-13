@@ -11,7 +11,7 @@ export function Landing() {
     return (
         <main className="relative flex-1 overflow-hidden">
             <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-                <div className="absolute -top-40 left-1/2 h-130 w-225 -translate-x-1/2 rounded-full bg-gradient-to-r from-sky-500/15 via-violet-500/15 to-emerald-500/15 blur-3xl" />
+                <div className="glow-parallax absolute -top-40 left-1/2 h-130 w-225 -translate-x-1/2 rounded-full bg-gradient-to-r from-sky-500/25 via-violet-500/25 to-emerald-500/25 blur-3xl" />
             </div>
 
             <div className="mx-auto w-full max-w-5xl px-4 py-20 sm:py-28">
@@ -23,8 +23,8 @@ export function Landing() {
                         Your images, exactly how you need them
                     </h1>
                     <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground text-balance">
-                        Six focused tools for everyday image work. Upload, tweak, download — done in
-                        seconds.
+                        {TOOLS.length} focused tools for everyday image work. Upload, tweak,
+                        download — done in seconds.
                     </p>
                     <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
                         Images are processed on the server, in memory, and never stored.{' '}

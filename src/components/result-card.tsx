@@ -20,7 +20,6 @@ const CHECKERBOARD: React.CSSProperties = {
 const ROW_STAGGER_MS = 60;
 
 function Preview({ entry, className }: { entry: OutcomeFile; className?: string }) {
-    // The preview is a blob decoded after mount, so it pops in — fade it instead.
     const [decoded, setDecoded] = useState(false);
 
     return (
@@ -88,7 +87,6 @@ function SizeLine({ entry }: { entry: OutcomeFile }) {
 
 function Warning({ children }: { children: React.ReactNode }) {
     return (
-        // grid-rows 0fr → 1fr, kicked off by @starting-style, reveals the real height.
         <div className="grid grid-rows-[1fr] rounded-lg border border-amber-500/50 bg-amber-500/10 opacity-100 transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none starting:grid-rows-[0fr] starting:opacity-0">
             <div className="overflow-hidden">
                 <div className="flex items-start gap-2.5 p-3 text-sm">

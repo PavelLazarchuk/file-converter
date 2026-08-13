@@ -78,7 +78,6 @@ type RunOptions = {
     onResult?: (files: ActionFile[]) => 'handled' | void;
 };
 
-/** Matches the exit animation on the result card. */
 const EXIT_DURATION = 200;
 
 function prefersReducedMotion(): boolean {
@@ -134,7 +133,6 @@ export function useImageAction(
         };
     }, []);
 
-    // Keeps the card mounted for the length of its exit animation, then drops it.
     const clearResult = useCallback(() => {
         if (exitRef.current !== null) return;
         if (!currentRef.current || prefersReducedMotion()) {
@@ -157,7 +155,11 @@ export function useImageAction(
         downloadResults(files, zipName);
     }, [zipName]);
 
-    function run(images: LoadedImage[], params: Record<string, string>, options?: RunOptions) {
+    function run(
+        images: LoadedImage[],
+        params: Record<string, string | File>,
+        options?: RunOptions
+    ) {
         cancelExit();
 
         startTransition(async () => {
@@ -168,7 +170,14 @@ export function useImageAction(
             for (const image of images) formData.append('file', image.file);
             for (const [key, value] of Object.entries(params)) formData.append(key, value);
 
-            const result = await action(formData);
+            const result = await action(formData).catch((error: unknown) => {
+                console.error('Server action failed:', error);
+
+                return {
+                    success: false as const,
+                    error: 'The request could not be sent. Check your connection and try again.',
+                };
+            });
 
             if (!result.success) {
                 toast.error(result.error);

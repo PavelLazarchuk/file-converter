@@ -20,22 +20,33 @@ import {
     PDF_PAGE_DIMENSIONS,
     PDF_PAGE_MARGIN,
     QUALITY_LIMITS,
+    STRIP_QUALITY,
+    WATERMARK_DEFAULTS,
     ZIP_MIME_TYPE,
     acceptedFormatsLabel,
     circleOutputFormat,
     clampCropBox,
     convertSourceFromSharpFormat,
+    escapeXml,
     fitPads,
     formatFileSize,
     placeholderFontSize,
     placeholderLabel,
+    rotateSuffix,
     stripExtension,
     uniqueFilenames,
+    watermarkLogoLayout,
+    watermarkOffset,
+    watermarkSvg,
+    watermarkTextLayout,
     type ConvertSource,
     type ImageFormat,
     type PdfPageSize,
+    type Size,
 } from './image';
 import { encodeIco } from './ico';
+import { describeMetadata } from './exif';
+import { METADATA_MIME_TYPE } from './metadata';
 import { RATE_LIMIT, checkRateLimit } from './rate-limit';
 import { createZip, type ZipEntry } from './zip';
 import {
@@ -44,8 +55,11 @@ import {
     cropSchema,
     icoOptionsSchema,
     imageToPdfSchema,
+    outputSizeSchema,
     placeholderSchema,
     resizeSchema,
+    rotateSchema,
+    watermarkSchema,
 } from './schemas';
 
 export type ActionFile = {
@@ -66,6 +80,16 @@ class ProcessingError extends Error {}
 
 function decode(buffer: Buffer) {
     return sharp(buffer, { limitInputPixels: MAX_INPUT_PIXELS }).autoOrient();
+}
+
+function sourceSize(metadata: Metadata): Size {
+    const swapped = (metadata.orientation ?? 1) >= 5;
+    const width = (swapped ? metadata.height : metadata.width) ?? 0;
+    const height = (swapped ? metadata.width : metadata.height) ?? 0;
+
+    if (!width || !height) throw new ProcessingError('Could not read the image dimensions.');
+
+    return { width, height };
 }
 
 type SourceImage<Format extends ConvertSource> = {
@@ -263,9 +287,10 @@ function uploadCount(formData: FormData): number {
 async function runFiles<Format extends ConvertSource>(
     formData: FormData,
     formats: readonly Format[],
-    handle: (batch: SourceBatch<Format>) => Promise<ActionResult>
+    handle: (batch: SourceBatch<Format>) => Promise<ActionResult>,
+    cost = uploadCount(formData)
 ): Promise<ActionResult> {
-    return run(async () => handle(await readImageFiles(formData, formats)), uploadCount(formData));
+    return run(async () => handle(await readImageFiles(formData, formats)), cost);
 }
 
 async function eachFile<Format extends ConvertSource>(
@@ -351,17 +376,19 @@ export async function cropImage(formData: FormData): Promise<ActionResult> {
         }
 
         const keepMetadata = keepMetadataRequested(formData);
+        const requestedSize = formData.get('resizeTo');
+        const outputSize = requestedSize ? outputSizeSchema.safeParse(requestedSize) : null;
+
+        if (outputSize && !outputSize.success) {
+            throw new ProcessingError(
+                outputSize.error.issues[0]?.message ?? 'Invalid output size.'
+            );
+        }
+
+        const target = outputSize?.success ? outputSize.data : null;
 
         return eachFile(batch, async source => {
-            const { metadata } = source;
-            const swapped = (metadata.orientation ?? 1) >= 5;
-            const srcWidth = (swapped ? metadata.height : metadata.width) ?? 0;
-            const srcHeight = (swapped ? metadata.width : metadata.height) ?? 0;
-
-            if (!srcWidth || !srcHeight) {
-                throw new ProcessingError('Could not read the image dimensions.');
-            }
-
+            const { width: srcWidth, height: srcHeight } = sourceSize(source.metadata);
             const box = clampCropBox(parsed.data, srcWidth, srcHeight);
             const circle = parsed.data.shape === 'circle';
             const outFormat = circle ? circleOutputFormat(source.format) : source.format;
@@ -377,16 +404,19 @@ export async function cropImage(formData: FormData): Promise<ActionResult> {
                 pipeline = pipeline.ensureAlpha().composite([{ input: mask, blend: 'dest-in' }]);
             }
 
+            if (target) pipeline = pipeline.resize(target.width, target.height, { fit: 'cover' });
+
             pipeline = pipeline.toFormat(outFormat);
 
             if (keepMetadata) pipeline = pipeline.keepMetadata();
 
             const data = await pipeline.toBuffer();
             const { extension, mimeType } = IMAGE_FORMATS[outFormat];
-            const ratioLabel =
-                parsed.data.ratio === 'free'
-                    ? `${box.width}x${box.height}`
-                    : parsed.data.ratio.replace(':', 'x');
+            const ratioLabel = target
+                ? `${target.width}x${target.height}`
+                : parsed.data.ratio === 'free'
+                  ? `${box.width}x${box.height}`
+                  : parsed.data.ratio.replace(':', 'x');
             const shapeLabel = circle ? '-circle' : '';
 
             return output(
@@ -508,13 +538,6 @@ export async function compressImage(formData: FormData): Promise<ActionResult> {
     });
 }
 
-const BASE64_STRIP_QUALITY: Record<ImageFormat, number> = {
-    jpeg: 95,
-    webp: 95,
-    avif: 80,
-    png: 100,
-};
-
 function hasStrippableMetadata(metadata: Metadata): boolean {
     return Boolean(metadata.exif || metadata.icc || metadata.iptc || metadata.xmp);
 }
@@ -528,7 +551,7 @@ async function base64Bytes(
     if (keepMetadata || source === 'gif' || source === 'svg') return buffer;
     if (!hasStrippableMetadata(metadata)) return buffer;
 
-    return decode(buffer).toFormat(source, { quality: BASE64_STRIP_QUALITY[source] }).toBuffer();
+    return decode(buffer).toFormat(source, { quality: STRIP_QUALITY[source] }).toBuffer();
 }
 
 function iconPng(buffer: Buffer, size: number, background?: string): Promise<Buffer> {
@@ -787,15 +810,6 @@ export async function imageToPdf(formData: FormData): Promise<ActionResult> {
     });
 }
 
-function escapeXml(value: string): string {
-    return value
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&apos;');
-}
-
 export async function generatePlaceholder(formData: FormData): Promise<ActionResult> {
     return run(async () => {
         const parsed = placeholderSchema.safeParse({
@@ -833,4 +847,207 @@ export async function generatePlaceholder(formData: FormData): Promise<ActionRes
             []
         );
     });
+}
+
+export async function rotateImage(formData: FormData): Promise<ActionResult> {
+    return runFiles(formData, FORMAT_KEYS, async batch => {
+        const parsed = rotateSchema.safeParse({
+            angle: formData.get('angle') || '0',
+            background: formData.get('background') || '#ffffff',
+        });
+
+        if (!parsed.success) {
+            throw new ProcessingError(parsed.error.issues[0]?.message ?? 'Invalid rotation.');
+        }
+
+        const { angle, background } = parsed.data;
+        const flipHorizontal = flag(formData, 'flipHorizontal');
+        const flipVertical = flag(formData, 'flipVertical');
+        const transparent = flag(formData, 'transparent');
+        const keepMetadata = keepMetadataRequested(formData);
+
+        if (!angle && !flipHorizontal && !flipVertical) {
+            throw new ProcessingError('Nothing to do — pick an angle or a flip.');
+        }
+
+        return eachFile(batch, async source => {
+            let pipeline = decode(source.buffer);
+
+            if (angle) {
+                const fill =
+                    transparent && source.format !== 'jpeg'
+                        ? { r: 0, g: 0, b: 0, alpha: 0 }
+                        : background;
+
+                pipeline = pipeline.rotate(angle, { background: fill });
+            }
+
+            if (flipHorizontal) pipeline = pipeline.flop();
+            if (flipVertical) pipeline = pipeline.flip();
+
+            pipeline = pipeline.toFormat(source.format);
+
+            if (keepMetadata) pipeline = pipeline.keepMetadata();
+
+            const data = await pipeline.toBuffer();
+            const { extension, mimeType } = IMAGE_FORMATS[source.format];
+            const suffix = rotateSuffix({ angle, flipHorizontal, flipVertical });
+
+            return output(source, data, `${source.baseName}-${suffix}.${extension}`, mimeType);
+        });
+    });
+}
+
+function fade(pipeline: Sharp, opacity: number): Sharp {
+    if (opacity >= 100) return pipeline;
+
+    return pipeline.ensureAlpha().composite([
+        {
+            input: Buffer.from([255, 255, 255, Math.round((opacity / 100) * 255)]),
+            raw: { width: 1, height: 1, channels: 4 },
+            tile: true,
+            blend: 'dest-in',
+        },
+    ]);
+}
+
+type Overlay = Size & { data: Buffer };
+
+async function textOverlay(
+    image: Size,
+    options: { text: string; color: string; scale: number; opacity: number }
+): Promise<Overlay> {
+    const layout = watermarkTextLayout(image, options.scale, options.text);
+    const svg = watermarkSvg(layout, options.text, options.color);
+    const data = await fade(
+        sharp(Buffer.from(svg), { limitInputPixels: MAX_INPUT_PIXELS }),
+        options.opacity
+    )
+        .png()
+        .toBuffer();
+
+    return { data, width: layout.width, height: layout.height };
+}
+
+async function logoOverlay(
+    image: Size,
+    logo: { buffer: Buffer; size: Size },
+    options: { scale: number; opacity: number }
+): Promise<Overlay> {
+    const layout = watermarkLogoLayout(image, options.scale, logo.size);
+    const data = await fade(
+        decode(logo.buffer).resize(layout.width, layout.height, { fit: 'fill' }),
+        options.opacity
+    )
+        .png()
+        .toBuffer();
+
+    return { data, ...layout };
+}
+
+async function readLogo(
+    formData: FormData,
+    budget: number
+): Promise<{ buffer: Buffer; size: Size }> {
+    const file = formData.get('logo');
+
+    if (!(file instanceof File) || file.size === 0) {
+        throw new ProcessingError('Upload the image to use as the watermark.');
+    }
+
+    if (file.size > budget) {
+        throw new ProcessingError(
+            `The images and the watermark image add up to more than ${MAX_BATCH_SIZE_LABEL}. Use a smaller watermark, or fewer images.`
+        );
+    }
+
+    const source = await readSource(file, CONVERT_SOURCE_KEYS);
+
+    return { buffer: source.buffer, size: sourceSize(source.metadata) };
+}
+
+export async function watermarkImage(formData: FormData): Promise<ActionResult> {
+    return runFiles(formData, FORMAT_KEYS, async batch => {
+        const parsed = watermarkSchema.safeParse({
+            mode: formData.get('mode') || WATERMARK_DEFAULTS.mode,
+            text: formData.get('text') ?? '',
+            color: formData.get('color') || WATERMARK_DEFAULTS.color,
+            position: formData.get('position') || WATERMARK_DEFAULTS.position,
+            opacity: formData.get('opacity') || WATERMARK_DEFAULTS.opacity,
+            scale: formData.get('scale') || WATERMARK_DEFAULTS.scale,
+            margin: formData.get('margin') || WATERMARK_DEFAULTS.margin,
+        });
+
+        if (!parsed.success) {
+            throw new ProcessingError(
+                parsed.error.issues[0]?.message ?? 'Invalid watermark settings.'
+            );
+        }
+
+        const { mode, text, color, position, opacity, scale, margin } = parsed.data;
+        const keepMetadata = keepMetadataRequested(formData);
+        const uploaded = batch.sources.reduce((sum, source) => sum + source.size, 0);
+        const logo = mode === 'image' ? await readLogo(formData, MAX_BATCH_BYTES - uploaded) : null;
+
+        return eachFile(batch, async source => {
+            const size = sourceSize(source.metadata);
+            const overlay = logo
+                ? await logoOverlay(size, logo, { scale, opacity })
+                : await textOverlay(size, { text, color, scale, opacity });
+            const { left, top } = watermarkOffset(position, size, overlay, margin);
+            let pipeline = decode(source.buffer)
+                .composite([{ input: overlay.data, left, top }])
+                .toFormat(source.format);
+
+            if (keepMetadata) pipeline = pipeline.keepMetadata();
+
+            const data = await pipeline.toBuffer();
+            const { extension, mimeType } = IMAGE_FORMATS[source.format];
+
+            return output(source, data, `${source.baseName}-watermarked.${extension}`, mimeType);
+        });
+    });
+}
+
+export async function inspectImage(formData: FormData): Promise<ActionResult> {
+    return runFiles(
+        formData,
+        FORMAT_KEYS,
+        async batch =>
+            eachFile(batch, async source => {
+                const report = describeMetadata(
+                    {
+                        filename: source.name,
+                        size: source.size,
+                        format: IMAGE_FORMATS[source.format].label,
+                    },
+                    source.metadata
+                );
+
+                return output(
+                    source,
+                    Buffer.from(JSON.stringify(report), 'utf8'),
+                    `${source.baseName}-metadata.json`,
+                    METADATA_MIME_TYPE
+                );
+            }),
+        1
+    );
+}
+
+export async function stripImageMetadata(formData: FormData): Promise<ActionResult> {
+    return runFiles(formData, FORMAT_KEYS, async batch =>
+        eachFile(batch, async source => {
+            if (!hasStrippableMetadata(source.metadata)) {
+                throw new ProcessingError('This file carries no metadata to remove.');
+            }
+
+            const data = await decode(source.buffer)
+                .toFormat(source.format, { quality: STRIP_QUALITY[source.format] })
+                .toBuffer();
+            const { extension, mimeType } = IMAGE_FORMATS[source.format];
+
+            return output(source, data, `${source.baseName}-clean.${extension}`, mimeType);
+        })
+    );
 }
