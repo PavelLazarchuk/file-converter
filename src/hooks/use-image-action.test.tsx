@@ -79,7 +79,11 @@ describe('running an action', () => {
     });
 
     it('toasts the error and keeps the previous result cleared when the action fails', async () => {
-        const action = actionReturning({ success: false, error: 'Too many requests' });
+        const action = actionReturning({
+            success: false,
+            code: 'rate_limited',
+            error: 'Too many requests',
+        });
         const { result } = renderHook(() => useImageAction(action));
 
         act(() => result.current.run([upload()], {}));
@@ -92,7 +96,9 @@ describe('running an action', () => {
         const action = actionReturning({
             success: true,
             files: [resultFile()],
-            failures: [{ filename: 'broken.png', error: 'not a readable image' }],
+            failures: [
+                { filename: 'broken.png', code: 'unreadable_image', error: 'not a readable image' },
+            ],
         });
         const { result } = renderHook(() => useImageAction(action));
 
@@ -113,6 +119,121 @@ describe('running an action', () => {
 
         expect(result.current.outcome).toBeNull();
         expect(downloaded).not.toHaveBeenCalled();
+    });
+});
+
+describe('batching', () => {
+    function uploads(count: number): LoadedImage[] {
+        return Array.from({ length: count }, (_, index) => upload(`photo-${index}.png`));
+    }
+
+    function chunkedAction() {
+        return vi.fn<(formData: FormData) => Promise<ActionResult>>(async formData => ({
+            success: true,
+            files: formData
+                .getAll('file')
+                .filter((entry): entry is File => entry instanceof File)
+                .map(file => resultFile({ filename: file.name })),
+        }));
+    }
+
+    it('splits a batch into sequential requests of the configured size', async () => {
+        const action = chunkedAction();
+        const { result } = renderHook(() => useImageAction(action, 'out.zip', { chunkSize: 2 }));
+
+        act(() => result.current.run(uploads(5), { quality: 80 }));
+        await waitFor(() => expect(result.current.outcome).not.toBeNull());
+
+        expect(action).toHaveBeenCalledTimes(3);
+        expect(action.mock.calls.map(([data]) => data.getAll('file').length)).toEqual([2, 2, 1]);
+        expect(result.current.outcome?.files).toHaveLength(5);
+    });
+
+    it('repeats the parameters on every chunk, including an extra upload', async () => {
+        const action = chunkedAction();
+        const logo = new File([new Uint8Array([1])], 'logo.png', { type: 'image/png' });
+        const { result } = renderHook(() => useImageAction(action, 'out.zip', { chunkSize: 2 }));
+
+        act(() => result.current.run(uploads(3), { mode: 'image', margin: 24, logo }));
+        await waitFor(() => expect(result.current.outcome).not.toBeNull());
+
+        for (const [data] of action.mock.calls) {
+            expect(data.get('mode')).toBe('image');
+            expect(data.get('margin')).toBe('24');
+            expect(data.get('logo')).toBeInstanceOf(File);
+        }
+    });
+
+    it('sends one request when chunking is off, however many images there are', async () => {
+        const action = chunkedAction();
+        const { result } = renderHook(() => useImageAction(action, 'out.zip', { chunkSize: null }));
+
+        act(() => result.current.run(uploads(6), {}));
+        await waitFor(() => expect(result.current.outcome).not.toBeNull());
+
+        expect(action).toHaveBeenCalledTimes(1);
+        expect(action.mock.calls[0][0].getAll('file')).toHaveLength(6);
+    });
+
+    it('still fires once for a form that uploads nothing', async () => {
+        const action = chunkedAction();
+        const { result } = renderHook(() => useImageAction(action, 'out.zip', { chunkSize: 2 }));
+
+        act(() => result.current.run([], { width: 320 }));
+        await waitFor(() => expect(action).toHaveBeenCalled());
+
+        expect(action).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps what succeeded and reports the rest when a later chunk fails', async () => {
+        const action = vi
+            .fn<(formData: FormData) => Promise<ActionResult>>()
+            .mockResolvedValueOnce({
+                success: true,
+                files: [resultFile({ filename: 'photo-0.png' })],
+            })
+            .mockResolvedValue({
+                success: false,
+                code: 'rate_limited',
+                error: 'Too many requests',
+            });
+        const { result } = renderHook(() => useImageAction(action, 'out.zip', { chunkSize: 1 }));
+
+        act(() => result.current.run(uploads(3), {}));
+        await waitFor(() => expect(result.current.outcome).not.toBeNull());
+
+        expect(action).toHaveBeenCalledTimes(2);
+        expect(result.current.outcome?.files).toHaveLength(1);
+        expect(result.current.outcome?.failures.map(failure => failure.filename)).toEqual([
+            'photo-1.png',
+            'photo-2.png',
+        ]);
+    });
+
+    it('toasts and shows no card when the very first chunk fails', async () => {
+        const action = actionReturning({
+            success: false,
+            code: 'rate_limited',
+            error: 'Too many requests',
+        });
+        const { result } = renderHook(() => useImageAction(action, 'out.zip', { chunkSize: 1 }));
+
+        act(() => result.current.run(uploads(3), {}));
+        await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Too many requests'));
+
+        expect(action).toHaveBeenCalledTimes(1);
+        expect(result.current.outcome).toBeNull();
+        expect(result.current.progress).toBeNull();
+    });
+
+    it('leaves progress unset for a batch that fits in one request', async () => {
+        const action = chunkedAction();
+        const { result } = renderHook(() => useImageAction(action, 'out.zip', { chunkSize: 5 }));
+
+        act(() => result.current.run(uploads(3), {}));
+        await waitFor(() => expect(result.current.outcome).not.toBeNull());
+
+        expect(result.current.progress).toBeNull();
     });
 });
 
@@ -181,7 +302,9 @@ describe('automatic downloads', () => {
         const action = actionReturning({
             success: true,
             files: [resultFile()],
-            failures: [{ filename: 'broken.png', error: 'not a readable image' }],
+            failures: [
+                { filename: 'broken.png', code: 'unreadable_image', error: 'not a readable image' },
+            ],
         });
         const { result } = renderHook(() => useImageAction(action));
 

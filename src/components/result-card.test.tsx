@@ -133,8 +133,16 @@ describe('partial failures', () => {
             outcome(
                 [entry({ filename: 'good.png' })],
                 [
-                    { filename: 'broken.png', error: 'not a readable image' },
-                    { filename: 'huge.png', error: 'File is too large.' },
+                    {
+                        filename: 'broken.png',
+                        code: 'unreadable_image' as const,
+                        error: 'not a readable image',
+                    },
+                    {
+                        filename: 'huge.png',
+                        code: 'file_too_large' as const,
+                        error: 'File is too large.',
+                    },
                 ]
             )
         );

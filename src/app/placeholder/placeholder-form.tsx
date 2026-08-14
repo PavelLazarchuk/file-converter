@@ -71,8 +71,8 @@ export function PlaceholderForm() {
 
     const onSubmit = handleSubmit(values => {
         run([], {
-            width: String(values.width),
-            height: String(values.height),
+            width: values.width,
+            height: values.height,
             bgColor: values.bgColor,
             textColor: values.textColor,
             text: values.text,

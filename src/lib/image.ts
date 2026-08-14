@@ -5,6 +5,8 @@ export const MAX_BATCH_FILES = 20;
 export const MAX_BATCH_BYTES = MAX_FILE_SIZE;
 export const MAX_BATCH_SIZE_LABEL = MAX_FILE_SIZE_LABEL;
 
+export const BATCH_CHUNK_SIZE = 5;
+
 export const DIMENSION_LIMITS = { min: 1, max: 10000 } as const;
 export const QUALITY_LIMITS = { min: 1, max: 100 } as const;
 export const DEFAULT_QUALITY = 80;

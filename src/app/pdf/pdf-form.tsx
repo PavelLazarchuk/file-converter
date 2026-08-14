@@ -30,7 +30,7 @@ export function PdfForm() {
     const { images, addImages, removeImage, moveImage, clearImages } =
         useLoadedImages(MAX_BATCH_FILES);
     const { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload } =
-        useImageAction(imageToPdf);
+        useImageAction(imageToPdf, undefined, { chunkSize: null });
 
     const {
         control,

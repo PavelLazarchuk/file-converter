@@ -16,6 +16,7 @@ import {
     type ActionFile,
     type ActionResult,
 } from './actions';
+import type { ActionErrorCode } from './errors';
 import { MAX_BATCH_BYTES, MAX_BATCH_FILES, MAX_FILE_SIZE } from './image';
 
 type Fixture = { buffer: Buffer; file: File };
@@ -63,10 +64,10 @@ function expectSuccess(result: ActionResult): Extract<ActionResult, { success: t
     return result;
 }
 
-function expectFailure(result: ActionResult): string {
+function expectFailure(result: ActionResult): { code: ActionErrorCode; error: string } {
     if (result.success) throw new Error('expected a failure');
 
-    return result.error;
+    return { code: result.code, error: result.error };
 }
 
 function meta(file: ActionFile) {
@@ -139,7 +140,11 @@ describe('resizeImage', () => {
 
         expect(result.files.map(file => file.filename)).toEqual(['good-10x10.png']);
         expect(result.failures).toEqual([
-            { filename: 'broken.png', error: expect.stringContaining("isn't a readable image") },
+            {
+                filename: 'broken.png',
+                code: 'unreadable_image',
+                error: expect.stringContaining("isn't a readable image"),
+            },
         ]);
     });
 
@@ -154,7 +159,10 @@ describe('resizeImage', () => {
 
         expect(
             expectFailure(await resizeImage(form([gif.file], { width: '10', height: '10' })))
-        ).toContain('GIF files are not supported');
+        ).toMatchObject({
+            code: 'unsupported_format',
+            error: expect.stringContaining('GIF files are not supported'),
+        });
     });
 
     it('validates the dimensions before touching the file', async () => {
@@ -162,7 +170,10 @@ describe('resizeImage', () => {
 
         expect(
             expectFailure(await resizeImage(form([source.file], { width: '0', height: '10' })))
-        ).toContain('Width must be between');
+        ).toMatchObject({
+            code: 'invalid_settings',
+            error: expect.stringContaining('Width must be between'),
+        });
     });
 
     it('honours "do not enlarge"', async () => {
@@ -285,7 +296,10 @@ describe('cropImage', () => {
                     })
                 )
             )
-        ).toContain('Output size');
+        ).toMatchObject({
+            code: 'invalid_settings',
+            error: expect.stringContaining('Output size'),
+        });
     });
 
     it('exports a circular JPEG crop as a transparent PNG', async () => {
@@ -396,9 +410,10 @@ describe('convertImage', () => {
     it('refuses a no-op conversion', async () => {
         const source = await image('png');
 
-        expect(expectFailure(await convertImage(form([source.file], { format: 'png' })))).toBe(
-            'Target format must differ from the source format.'
-        );
+        expect(expectFailure(await convertImage(form([source.file], { format: 'png' })))).toEqual({
+            code: 'same_format',
+            error: 'Target format must differ from the source format.',
+        });
     });
 
     it('skips only the no-op file inside a batch', async () => {
@@ -410,7 +425,11 @@ describe('convertImage', () => {
 
         expect(result.files.map(file => file.filename)).toEqual(['photo.png']);
         expect(result.failures).toEqual([
-            { filename: 'already.png', error: 'Target format must differ from the source format.' },
+            {
+                filename: 'already.png',
+                code: 'same_format',
+                error: 'Target format must differ from the source format.',
+            },
         ]);
     });
 
@@ -485,9 +504,12 @@ describe('convertImage', () => {
     it('rejects an unknown target format', async () => {
         const source = await image('png');
 
-        expect(expectFailure(await convertImage(form([source.file], { format: 'bmp' })))).toContain(
-            'target format'
-        );
+        expect(
+            expectFailure(await convertImage(form([source.file], { format: 'bmp' })))
+        ).toMatchObject({
+            code: 'invalid_settings',
+            error: expect.stringContaining('target format'),
+        });
     });
 });
 
@@ -570,9 +592,9 @@ describe('imageToPdf', () => {
     it('validates the page size', async () => {
         const source = await image('png');
 
-        expect(expectFailure(await imageToPdf(form([source.file], { pageSize: 'a3' })))).toContain(
-            'page size'
-        );
+        expect(
+            expectFailure(await imageToPdf(form([source.file], { pageSize: 'a3' })))
+        ).toMatchObject({ code: 'invalid_settings', error: expect.stringContaining('page size') });
     });
 });
 
@@ -614,7 +636,10 @@ describe('generatePlaceholder', () => {
                     })
                 )
             )
-        ).toContain('hex color');
+        ).toMatchObject({
+            code: 'invalid_settings',
+            error: expect.stringContaining('hex color'),
+        });
     });
 });
 
@@ -646,8 +671,11 @@ describe('rotateImage', () => {
     it('refuses a request that would change nothing', async () => {
         const source = await image('png');
 
-        expect(expectFailure(await rotateImage(form([source.file], { angle: '0' })))).toContain(
-            'Nothing to do'
+        expect(expectFailure(await rotateImage(form([source.file], { angle: '0' })))).toMatchObject(
+            {
+                code: 'nothing_to_do',
+                error: expect.stringContaining('Nothing to do'),
+            }
         );
     });
 
@@ -680,9 +708,12 @@ describe('rotateImage', () => {
     it('rejects an angle outside a single turn', async () => {
         const source = await image('png');
 
-        expect(expectFailure(await rotateImage(form([source.file], { angle: '400' })))).toContain(
-            'Angle must be between'
-        );
+        expect(
+            expectFailure(await rotateImage(form([source.file], { angle: '400' })))
+        ).toMatchObject({
+            code: 'invalid_settings',
+            error: expect.stringContaining('Angle must be between'),
+        });
     });
 });
 
@@ -812,7 +843,10 @@ describe('watermarkImage', () => {
             new File([new Uint8Array(MAX_BATCH_BYTES)], 'huge.png', { type: 'image/png' })
         );
 
-        expect(expectFailure(await watermarkImage(data))).toContain('add up to more than');
+        expect(expectFailure(await watermarkImage(data))).toMatchObject({
+            code: 'logo_too_large',
+            error: expect.stringContaining('add up to more than'),
+        });
     });
 
     it('asks for the logo when the image mode has none', async () => {
@@ -820,7 +854,7 @@ describe('watermarkImage', () => {
 
         expect(
             expectFailure(await watermarkImage(form([source.file], { ...text, mode: 'image' })))
-        ).toContain('Upload the image to use as the watermark');
+        ).toMatchObject({ code: 'logo_missing' });
     });
 
     it('requires the text for a text watermark', async () => {
@@ -828,7 +862,10 @@ describe('watermarkImage', () => {
 
         expect(
             expectFailure(await watermarkImage(form([source.file], { ...text, text: '  ' })))
-        ).toContain('Watermark text is required');
+        ).toMatchObject({
+            code: 'invalid_settings',
+            error: expect.stringContaining('Watermark text is required'),
+        });
     });
 
     it('stamps a whole batch with the same settings', async () => {
@@ -897,16 +934,21 @@ describe('stripImageMetadata', () => {
 
         expect(result.files.map(file => file.filename)).toEqual(['tagged-clean.jpg']);
         expect(result.failures).toEqual([
-            { filename: 'clean.png', error: 'This file carries no metadata to remove.' },
+            {
+                filename: 'clean.png',
+                code: 'no_metadata',
+                error: 'This file carries no metadata to remove.',
+            },
         ]);
     });
 });
 
 describe('upload limits', () => {
     it('requires a file', async () => {
-        expect(expectFailure(await convertImage(form([], { format: 'png' })))).toBe(
-            'No file provided.'
-        );
+        expect(expectFailure(await convertImage(form([], { format: 'png' })))).toEqual({
+            code: 'no_file',
+            error: 'No file provided.',
+        });
     });
 
     it('caps the number of files per request', async () => {
@@ -919,9 +961,10 @@ describe('upload limits', () => {
                 })
         );
 
-        expect(expectFailure(await convertImage(form(files, { format: 'webp' })))).toContain(
-            `up to ${MAX_BATCH_FILES} images`
-        );
+        expect(expectFailure(await convertImage(form(files, { format: 'webp' })))).toMatchObject({
+            code: 'too_many_files',
+            error: expect.stringContaining(`up to ${MAX_BATCH_FILES} images`),
+        });
     });
 
     it('caps the total upload size', async () => {
@@ -931,9 +974,10 @@ describe('upload limits', () => {
             new File([half], 'b.png', { type: 'image/png' }),
         ];
 
-        expect(expectFailure(await convertImage(form(files, { format: 'webp' })))).toContain(
-            'Keep a batch under'
-        );
+        expect(expectFailure(await convertImage(form(files, { format: 'webp' })))).toMatchObject({
+            code: 'batch_too_large',
+            error: expect.stringContaining('Keep a batch under'),
+        });
     });
 
     it('rejects an oversized file on its own, keeping the rest of the batch', async () => {
@@ -947,7 +991,11 @@ describe('upload limits', () => {
 
         expect(result.files.map(file => file.filename)).toEqual(['small.webp']);
         expect(result.failures).toEqual([
-            { filename: 'huge.png', error: 'File is too large. The maximum size is 20MB.' },
+            {
+                filename: 'huge.png',
+                code: 'file_too_large',
+                error: 'File is too large. The maximum size is 20MB.',
+            },
         ]);
     });
 });

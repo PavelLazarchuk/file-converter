@@ -90,11 +90,11 @@ export function CropForm() {
         run(images, {
             ratio: values.ratio,
             shape: values.shape,
-            left: String(box.left),
-            top: String(box.top),
-            width: String(box.width),
-            height: String(box.height),
-            keepMetadata: String(!removeMetadata),
+            left: box.left,
+            top: box.top,
+            width: box.width,
+            height: box.height,
+            keepMetadata: !removeMetadata,
             ...(preset ? { resizeTo: `${preset.width}x${preset.height}` } : {}),
         });
     });

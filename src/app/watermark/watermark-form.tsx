@@ -19,7 +19,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { useImageAction } from '@/hooks/use-image-action';
+import { pendingLabel, useImageAction } from '@/hooks/use-image-action';
 import { watermarkImage } from '@/lib/actions';
 import {
     CONVERT_SOURCE_KEYS,
@@ -52,7 +52,7 @@ export function WatermarkForm() {
     const { images, addImages, removeImage, clearImages } = useLoadedImages(MAX_BATCH_FILES);
     const logos = useLoadedImages(1);
     const [removeMetadata, setRemoveMetadata] = useState(true);
-    const { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload } =
+    const { isPending, outcome, isLeaving, progress, run, clearResult, downloadAll, autoDownload } =
         useImageAction(watermarkImage, 'watermarked-images.zip');
 
     const {
@@ -90,10 +90,10 @@ export function WatermarkForm() {
             text: values.text,
             color: values.color,
             position: values.position,
-            opacity: String(values.opacity),
-            scale: String(values.scale),
-            margin: String(values.margin),
-            keepMetadata: String(!removeMetadata),
+            opacity: values.opacity,
+            scale: values.scale,
+            margin: values.margin,
+            keepMetadata: !removeMetadata,
             ...(usesLogo && logo ? { logo: logo.file } : {}),
         });
     });
@@ -348,7 +348,7 @@ export function WatermarkForm() {
             >
                 {isPending ? (
                     <>
-                        <Spinner /> Stamping…
+                        <Spinner /> {pendingLabel('Stamping…', progress)}
                     </>
                 ) : missingLogo ? (
                     'Upload a logo image'

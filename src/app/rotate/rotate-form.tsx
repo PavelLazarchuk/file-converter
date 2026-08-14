@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
-import { useImageAction } from '@/hooks/use-image-action';
+import { pendingLabel, useImageAction } from '@/hooks/use-image-action';
 import { rotateImage } from '@/lib/actions';
 import {
     MAX_BATCH_FILES,
@@ -36,7 +36,7 @@ export function RotateForm() {
     const [flipVertical, setFlipVertical] = useState(false);
     const [transparent, setTransparent] = useState(false);
     const [removeMetadata, setRemoveMetadata] = useState(true);
-    const { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload } =
+    const { isPending, outcome, isLeaving, progress, run, clearResult, downloadAll, autoDownload } =
         useImageAction(rotateImage, 'rotated-images.zip');
 
     const {
@@ -68,12 +68,12 @@ export function RotateForm() {
         if (!hasImages || nothingToDo) return;
 
         run(images, {
-            angle: String(values.angle),
+            angle: values.angle,
             background: values.background,
-            transparent: String(transparent),
-            flipHorizontal: String(flipHorizontal),
-            flipVertical: String(flipVertical),
-            keepMetadata: String(!removeMetadata),
+            transparent,
+            flipHorizontal,
+            flipVertical,
+            keepMetadata: !removeMetadata,
         });
     });
 
@@ -261,7 +261,7 @@ export function RotateForm() {
             >
                 {isPending ? (
                     <>
-                        <Spinner /> Rotating…
+                        <Spinner /> {pendingLabel('Rotating…', progress)}
                     </>
                 ) : nothingToDo ? (
                     'Pick an angle or a flip'

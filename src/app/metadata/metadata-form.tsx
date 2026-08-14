@@ -7,7 +7,7 @@ import { ImageDropzone, useLoadedImages } from '@/components/image-dropzone';
 import { ResultCard } from '@/components/result-card';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { useImageAction } from '@/hooks/use-image-action';
+import { pendingLabel, useImageAction } from '@/hooks/use-image-action';
 import { inspectImage, stripImageMetadata } from '@/lib/actions';
 import { MAX_BATCH_FILES, countLabel } from '@/lib/image';
 import { parseMetadataReport, type MetadataReport } from '@/lib/metadata';
@@ -95,7 +95,7 @@ export function MetadataForm() {
             <Button type="submit" className="w-full" disabled={!hasImages || isPending}>
                 {inspect.isPending ? (
                     <>
-                        <Spinner /> Reading…
+                        <Spinner /> {pendingLabel('Reading…', inspect.progress)}
                     </>
                 ) : (
                     'Read metadata'
@@ -131,7 +131,7 @@ export function MetadataForm() {
                     >
                         {strip.isPending ? (
                             <>
-                                <Spinner /> Cleaning…
+                                <Spinner /> {pendingLabel('Cleaning…', strip.progress)}
                             </>
                         ) : strip.autoDownload ? (
                             'Remove metadata & download'

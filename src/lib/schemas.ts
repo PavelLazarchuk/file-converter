@@ -161,8 +161,11 @@ export const imageToPdfSchema = z.object({
 
 export type ResizeInput = z.input<typeof resizeSchema>;
 export type ResizeValues = z.output<typeof resizeSchema>;
+export type CropValues = z.output<typeof cropSchema>;
 export type CropFormInput = z.input<typeof cropFormSchema>;
 export type CropFormValues = z.output<typeof cropFormSchema>;
+export type OutputSizeValues = z.output<typeof outputSizeSchema>;
+export type IcoOptionsValues = z.output<typeof icoOptionsSchema>;
 export type CompressInput = z.input<typeof compressSchema>;
 export type CompressValues = z.output<typeof compressSchema>;
 export type ConvertInput = z.input<typeof convertSchema>;

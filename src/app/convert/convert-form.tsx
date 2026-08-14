@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
-import { useImageAction } from '@/hooks/use-image-action';
+import { pendingLabel, useImageAction } from '@/hooks/use-image-action';
 import { convertImage } from '@/lib/actions';
 import { downloadFile } from '@/lib/download';
 import {
@@ -58,7 +58,7 @@ export function ConvertForm() {
     const [base64Output, setBase64Output] = useState<Base64Output>('uri');
     const [icoSizes, setIcoSizes] = useState<number[]>([...DEFAULT_ICO_SIZES]);
     const [icoPack, setIcoPack] = useState(false);
-    const { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload } =
+    const { isPending, outcome, isLeaving, progress, run, clearResult, downloadAll, autoDownload } =
         useImageAction(convertImage, 'converted-images.zip');
 
     const {
@@ -97,7 +97,7 @@ export function ConvertForm() {
     const onSubmit = handleSubmit(values => {
         if (!hasImages) return;
 
-        const keepMetadata = String(!removeMetadata);
+        const keepMetadata = !removeMetadata;
 
         if (values.format === 'base64') {
             run(
@@ -132,7 +132,7 @@ export function ConvertForm() {
             run(images, {
                 format: values.format,
                 icoSizes: icoSizes.join(','),
-                icoPack: String(icoPack),
+                icoPack,
             });
 
             return;
@@ -430,7 +430,7 @@ export function ConvertForm() {
             <Button type="submit" className="w-full" disabled={!hasImages || !isValid || isPending}>
                 {isPending ? (
                     <>
-                        <Spinner /> Converting…
+                        <Spinner /> {pendingLabel('Converting…', progress)}
                     </>
                 ) : target === 'base64' ? (
                     images.length > 1 ? (

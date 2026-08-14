@@ -17,7 +17,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { useImageAction } from '@/hooks/use-image-action';
+import { pendingLabel, useImageAction } from '@/hooks/use-image-action';
 import { compressImage } from '@/lib/actions';
 import {
     DEFAULT_QUALITY,
@@ -38,7 +38,7 @@ const defaultValues: CompressInput = {
 
 export function CompressForm() {
     const { images, addImages, removeImage, clearImages } = useLoadedImages(MAX_BATCH_FILES);
-    const { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload } =
+    const { isPending, outcome, isLeaving, progress, run, clearResult, downloadAll, autoDownload } =
         useImageAction(compressImage, 'compressed-images.zip');
 
     const {
@@ -64,8 +64,8 @@ export function CompressForm() {
 
         run(images, {
             mode: values.mode,
-            quality: String(values.quality),
-            targetKb: String(values.targetKb),
+            quality: values.quality,
+            targetKb: values.targetKb,
         });
     });
 
@@ -218,7 +218,7 @@ export function CompressForm() {
             <Button type="submit" className="w-full" disabled={!hasImages || !isValid || isPending}>
                 {isPending ? (
                     <>
-                        <Spinner /> Compressing…
+                        <Spinner /> {pendingLabel('Compressing…', progress)}
                     </>
                 ) : autoDownload ? (
                     'Compress & download'

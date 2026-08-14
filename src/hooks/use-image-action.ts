@@ -7,7 +7,8 @@ import type { LoadedImage } from '@/components/image-dropzone';
 import { useAutoDownload } from '@/hooks/use-auto-download';
 import type { ActionFailure, ActionFile, ActionResult } from '@/lib/actions';
 import { downloadFile } from '@/lib/download';
-import { ZIP_MIME_TYPE, countLabel } from '@/lib/image';
+import { actionErrorMessage } from '@/lib/errors';
+import { BATCH_CHUNK_SIZE, ZIP_MIME_TYPE, countLabel } from '@/lib/image';
 import { Logger } from '@/lib/logger';
 import { createZip } from '@/lib/zip';
 
@@ -79,6 +80,26 @@ type RunOptions = {
     onResult?: (files: ActionFile[]) => 'handled' | void;
 };
 
+export type RunParams = Record<string, string | number | boolean | File>;
+
+export type BatchProgress = { done: number; total: number };
+
+export type ImageActionOptions = { chunkSize?: number | null };
+
+export function chunk<Item>(items: Item[], size: number): Item[][] {
+    const groups: Item[][] = [];
+
+    for (let index = 0; index < items.length; index += size) {
+        groups.push(items.slice(index, index + size));
+    }
+
+    return groups;
+}
+
+export function pendingLabel(verb: string, progress: BatchProgress | null): string {
+    return progress ? `${verb} ${progress.done}/${progress.total}` : verb;
+}
+
 const EXIT_DURATION = 200;
 
 function prefersReducedMotion(): boolean {
@@ -90,11 +111,13 @@ function prefersReducedMotion(): boolean {
 
 export function useImageAction(
     action: (formData: FormData) => Promise<ActionResult>,
-    zipName = 'images.zip'
+    zipName = 'images.zip',
+    { chunkSize = BATCH_CHUNK_SIZE }: ImageActionOptions = {}
 ) {
     const [isPending, startTransition] = useTransition();
     const [outcome, setOutcomeState] = useState<ActionOutcome | null>(null);
     const [isLeaving, setIsLeaving] = useState(false);
+    const [progress, setProgress] = useState<BatchProgress | null>(null);
     const currentRef = useRef<ActionOutcome | null>(null);
     const exitRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const mountedRef = useRef(true);
@@ -156,37 +179,74 @@ export function useImageAction(
         downloadResults(files, zipName);
     }, [zipName]);
 
-    function run(
-        images: LoadedImage[],
-        params: Record<string, string | File>,
-        options?: RunOptions
-    ) {
+    const reportProgress = useCallback((next: BatchProgress | null) => {
+        if (mountedRef.current) setProgress(next);
+    }, []);
+
+    function send(group: LoadedImage[], params: RunParams): Promise<ActionResult> {
+        const formData = new FormData();
+
+        for (const image of group) formData.append('file', image.file);
+
+        for (const [key, value] of Object.entries(params)) {
+            formData.append(key, value instanceof File ? value : String(value));
+        }
+
+        return action(formData).catch((error: unknown): ActionResult => {
+            Logger.error('action.transport_failed', { files: group.length, error });
+
+            return {
+                success: false,
+                code: 'transport_failed',
+                error: actionErrorMessage({ code: 'transport_failed' }),
+            };
+        });
+    }
+
+    function run(images: LoadedImage[], params: RunParams, options?: RunOptions) {
         cancelExit();
 
         startTransition(async () => {
             setOutcome(null);
 
-            const formData = new FormData();
+            const groups = chunkSize && images.length ? chunk(images, chunkSize) : [images];
+            const files: ActionFile[] = [];
+            const failures: ActionFailure[] = [];
+            let done = 0;
 
-            for (const image of images) formData.append('file', image.file);
-            for (const [key, value] of Object.entries(params)) formData.append(key, value);
+            reportProgress(groups.length > 1 ? { done, total: images.length } : null);
 
-            const result = await action(formData).catch((error: unknown) => {
-                Logger.error('action.transport_failed', { files: images.length, error });
+            for (const [index, group] of groups.entries()) {
+                const result = await send(group, params);
 
-                return {
-                    success: false as const,
-                    error: 'The request could not be sent. Check your connection and try again.',
-                };
-            });
+                if (!result.success) {
+                    if (!files.length) {
+                        toast.error(result.error);
+                        reportProgress(null);
 
-            if (!result.success) {
-                toast.error(result.error);
+                        return;
+                    }
 
-                return;
+                    for (const image of groups.slice(index).flat()) {
+                        failures.push({
+                            filename: image.file.name,
+                            code: result.code,
+                            error: result.error,
+                        });
+                    }
+
+                    break;
+                }
+
+                files.push(...result.files);
+                failures.push(...(result.failures ?? []));
+                done += group.length;
+
+                if (groups.length > 1) reportProgress({ done, total: images.length });
             }
 
-            const failures = result.failures ?? [];
+            reportProgress(null);
+
             const [first] = failures;
 
             if (first) {
@@ -197,18 +257,24 @@ export function useImageAction(
                 );
             }
 
-            if (options?.onResult?.(result.files) === 'handled') return;
+            if (options?.onResult?.(files) === 'handled') return;
 
-            setOutcome({
-                files: await Promise.all(result.files.map(describe)),
-                failures,
-            });
+            setOutcome({ files: await Promise.all(files.map(describe)), failures });
 
-            const settled = failures.length === 0 && result.files.every(file => !file.warning);
+            const settled = failures.length === 0 && files.every(file => !file.warning);
 
-            if (autoDownload && settled) downloadResults(result.files, zipName);
+            if (autoDownload && settled) downloadResults(files, zipName);
         });
     }
 
-    return { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload };
+    return {
+        isPending,
+        outcome,
+        isLeaving,
+        progress,
+        run,
+        clearResult,
+        downloadAll,
+        autoDownload,
+    };
 }

@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
-import { useImageAction } from '@/hooks/use-image-action';
+import { pendingLabel, useImageAction } from '@/hooks/use-image-action';
 import { resizeImage } from '@/lib/actions';
 import {
     DIMENSION_LIMITS,
@@ -45,7 +45,7 @@ export function ResizeForm() {
     const [removeMetadata, setRemoveMetadata] = useState(true);
     const [noEnlarge, setNoEnlarge] = useState(false);
     const [presetKey, setPresetKey] = useState<string | null>(null);
-    const { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload } =
+    const { isPending, outcome, isLeaving, progress, run, clearResult, downloadAll, autoDownload } =
         useImageAction(resizeImage, 'resized-images.zip');
 
     const {
@@ -94,12 +94,12 @@ export function ResizeForm() {
         if (!hasImages) return;
 
         run(images, {
-            width: String(values.width),
-            height: String(values.height),
+            width: values.width,
+            height: values.height,
             rotate: values.rotate,
             fit: values.fit,
-            noEnlarge: String(noEnlarge),
-            keepMetadata: String(!removeMetadata),
+            noEnlarge,
+            keepMetadata: !removeMetadata,
         });
     });
 
@@ -320,7 +320,7 @@ export function ResizeForm() {
             <Button type="submit" className="w-full" disabled={!hasImages || !isValid || isPending}>
                 {isPending ? (
                     <>
-                        <Spinner /> Resizing…
+                        <Spinner /> {pendingLabel('Resizing…', progress)}
                     </>
                 ) : autoDownload ? (
                     'Resize & download'
