@@ -30,12 +30,20 @@ export function contentSecurityPolicy(isDev: boolean): string {
     return policy.join('; ');
 }
 
+export const CROSS_ORIGIN_ASSET_PATH = '/opengraph-image';
+
+export function crossOriginAssetHeaders(): HeaderRule[] {
+    return [{ key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' }];
+}
+
 export function securityHeaders(isDev: boolean): HeaderRule[] {
     return [
         { key: 'Content-Security-Policy', value: contentSecurityPolicy(isDev) },
         { key: 'X-Content-Type-Options', value: 'nosniff' },
         { key: 'X-Frame-Options', value: 'DENY' },
         { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+        { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
         {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()',

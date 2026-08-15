@@ -1,4 +1,5 @@
 import {
+    Combine,
     Crop,
     FileText,
     Gauge,
@@ -15,7 +16,7 @@ export const SITE = {
     name: 'Image Toolbox',
     tagline: 'Resize, Crop, Compress & Convert',
     description:
-        'Free browser tools for images, in batches of up to 20: resize with locked aspect ratio or a social preset, crop to preset ratios or a circle, rotate and flip, compress by quality or target size, convert between JPEG, PNG, WEBP, AVIF, GIF, TIFF, SVG and ICO favicons, stamp a text or logo watermark, inspect EXIF and GPS metadata, and combine images into a multi-page PDF.',
+        'Free browser tools for images, in batches of up to 20: resize with locked aspect ratio or a social preset, crop to preset ratios or a circle, rotate and flip, compress by quality or target size, convert between JPEG, PNG, WEBP, AVIF, GIF, TIFF, SVG and ICO favicons, stamp a text or logo watermark, inspect EXIF and GPS metadata, combine images into a multi-page PDF, and merge several PDFs into one.',
     url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://file-converter-mu-seven.vercel.app',
 } as const;
 
@@ -94,6 +95,14 @@ export const TOOLS: readonly Tool[] = [
         description: 'Generate a placeholder image with custom dimensions, colors and text.',
         icon: ImagePlus,
         gradient: 'from-pink-500 to-rose-600',
+    },
+    {
+        href: '/merge-pdf',
+        title: 'Merge PDFs',
+        description:
+            'Combine several PDF files into one document, in the order you arrange them — up to 20 files at a time.',
+        icon: Combine,
+        gradient: 'from-slate-500 to-slate-700',
     },
     {
         href: '/pdf',

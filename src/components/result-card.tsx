@@ -5,10 +5,18 @@ import Image from 'next/image';
 import { Download, FileCheck2, TriangleAlert, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useAutoDownload } from '@/hooks/use-auto-download';
-import { downloadResult, type ActionOutcome, type OutcomeFile } from '@/hooks/use-image-action';
+import { useFilenameTemplate } from '@/hooks/use-filename-template';
+import {
+    downloadResult,
+    outcomeNames,
+    type ActionOutcome,
+    type OutcomeFile,
+} from '@/hooks/use-image-action';
+import { FILENAME_TEMPLATE_MAX_LENGTH, FILENAME_TOKENS } from '@/lib/filename-template';
 import { countLabel, formatFileSize, sizeChange } from '@/lib/image';
 import { cn } from '@/lib/utils';
 
@@ -107,8 +115,10 @@ type ResultCardProps = {
 
 export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: ResultCardProps) {
     const { autoDownload, setAutoDownload } = useAutoDownload();
+    const { template, setTemplate } = useFilenameTemplate();
     const { files, failures } = outcome;
     const single = files.length === 1 ? files[0] : null;
+    const names = outcomeNames(files, template);
 
     return (
         <div
@@ -130,7 +140,7 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                     <Preview entry={single} className="h-40 w-full shrink-0 sm:h-32 sm:w-44" />
                     <div className="min-w-0 flex-1 space-y-1">
-                        <p className="truncate text-sm font-medium">{single.file.filename}</p>
+                        <p className="truncate text-sm font-medium">{names[0]}</p>
                         <p className="text-sm text-muted-foreground">
                             <SizeLine entry={single} />
                         </p>
@@ -146,9 +156,7 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
                         >
                             <Preview entry={entry} className="size-14 shrink-0" />
                             <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium">
-                                    {entry.file.filename}
-                                </p>
+                                <p className="truncate text-sm font-medium">{names[index]}</p>
                                 <p className="text-xs text-muted-foreground">
                                     <SizeLine entry={entry} />
                                 </p>
@@ -162,8 +170,8 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                aria-label={`Download ${entry.file.filename}`}
-                                onClick={() => downloadResult(entry.file)}
+                                aria-label={`Download ${names[index]}`}
+                                onClick={() => downloadResult(entry.file, names[index])}
                             >
                                 <Download />
                             </Button>
@@ -205,20 +213,47 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
                 </Button>
             </div>
 
-            <div className="space-y-1.5 border-t pt-4">
-                <div className="flex items-center gap-3">
-                    <Switch
-                        id="auto-download"
-                        checked={autoDownload}
-                        onCheckedChange={setAutoDownload}
+            <div className="space-y-4 border-t pt-4">
+                <div className="space-y-1.5">
+                    <Label htmlFor="filename-template">Rename on download</Label>
+                    <Input
+                        id="filename-template"
+                        value={template}
+                        maxLength={FILENAME_TEMPLATE_MAX_LENGTH}
+                        placeholder="{name}"
+                        spellCheck={false}
+                        autoComplete="off"
+                        onChange={event => setTemplate(event.target.value)}
                     />
-                    <Label htmlFor="auto-download">Download automatically</Label>
+                    <p className="text-sm text-muted-foreground">
+                        Leave empty to keep the names above. Available:{' '}
+                        {FILENAME_TOKENS.map((token, index) => (
+                            <span key={token}>
+                                {index > 0 && ', '}
+                                <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                                    {`{${token}}`}
+                                </code>
+                            </span>
+                        ))}
+                        . The extension is added for you.
+                    </p>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                    {autoDownload
-                        ? 'Results are saved as soon as they are ready, and still shown here.'
-                        : 'Results stay here until you download them. The preference is remembered on this device.'}
-                </p>
+
+                <div className="space-y-1.5">
+                    <div className="flex items-center gap-3">
+                        <Switch
+                            id="auto-download"
+                            checked={autoDownload}
+                            onCheckedChange={setAutoDownload}
+                        />
+                        <Label htmlFor="auto-download">Download automatically</Label>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                        {autoDownload
+                            ? 'Results are saved as soon as they are ready, and still shown here.'
+                            : 'Results stay here until you download them. The preference is remembered on this device.'}
+                    </p>
+                </div>
             </div>
         </div>
     );

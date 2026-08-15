@@ -9,6 +9,7 @@ import {
     generatePlaceholder,
     imageToPdf,
     inspectImage,
+    mergePdf,
     resizeImage,
     rotateImage,
     stripImageMetadata,
@@ -68,6 +69,21 @@ function expectFailure(result: ActionResult): { code: ActionErrorCode; error: st
     if (result.success) throw new Error('expected a failure');
 
     return { code: result.code, error: result.error };
+}
+
+async function pdfFile(name: string, pages: number, title?: string): Promise<File> {
+    const document = await PDFDocument.create();
+
+    for (let page = 0; page < pages; page += 1) document.addPage([200, 200]);
+
+    if (title) {
+        document.setTitle(title);
+        document.setAuthor('fixture');
+    }
+
+    const bytes = await document.save();
+
+    return new File([new Uint8Array(bytes)], name, { type: 'application/pdf' });
 }
 
 function meta(file: ActionFile) {
@@ -470,6 +486,46 @@ describe('convertImage', () => {
         expect(files[0].filename).toBe('mark.svg');
         expect(svg).toContain('<svg');
         expect(svg).toContain('xlink:href="data:image/png;base64,');
+    });
+
+    it('rejects an SVG entity bomb before it can be rendered', async () => {
+        const entities = ['a', 'b', 'c', 'd'].map((name, index) =>
+            index === 0
+                ? `<!ENTITY a "aaaaaaaaaa">`
+                : `<!ENTITY ${name} "${`&${'abcd'[index - 1]};`.repeat(10)}">`
+        );
+        const bomb =
+            `<?xml version="1.0"?><!DOCTYPE svg [${entities.join('')}]>` +
+            `<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60"><text>&d;</text></svg>`;
+        const file = new File([bomb], 'bomb.svg', { type: 'image/svg+xml' });
+
+        const started = Date.now();
+        const { code } = expectFailure(await convertImage(form([file], { format: 'png' })));
+
+        expect(code).toBe('unsafe_svg');
+        expect(Date.now() - started).toBeLessThan(1000);
+    });
+
+    it('rejects an SVG that pulls in an external file', async () => {
+        const svg =
+            '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ' +
+            'width="60" height="60"><image xlink:href="file:///etc/passwd" width="60" height="60"/></svg>';
+        const file = new File([svg], 'lfi.svg', { type: 'image/svg+xml' });
+
+        expect(expectFailure(await convertImage(form([file], { format: 'png' }))).code).toBe(
+            'unsafe_svg'
+        );
+    });
+
+    it('still converts an ordinary SVG', async () => {
+        const svg =
+            '<svg xmlns="http://www.w3.org/2000/svg" width="60" height="40">' +
+            '<rect width="60" height="40" fill="#ff0000"/></svg>';
+        const file = new File([svg], 'logo.svg', { type: 'image/svg+xml' });
+        const { files } = expectSuccess(await convertImage(form([file], { format: 'png' })));
+
+        expect(files[0].filename).toBe('logo.png');
+        await expect(meta(files[0])).resolves.toMatchObject({ format: 'png' });
     });
 
     it('emits a base64 data URI of the source format', async () => {
@@ -997,5 +1053,83 @@ describe('upload limits', () => {
                 error: 'File is too large. The maximum size is 20MB.',
             },
         ]);
+    });
+});
+
+describe('mergePdf', () => {
+    it('concatenates the pages in the order the files were sent', async () => {
+        const { files } = expectSuccess(
+            await mergePdf(form([await pdfFile('report.pdf', 2), await pdfFile('appendix.pdf', 3)]))
+        );
+        const merged = await PDFDocument.load(Buffer.from(files[0].data));
+
+        expect(files[0].filename).toBe('report-merged.pdf');
+        expect(files[0].mimeType).toBe('application/pdf');
+        expect(merged.getPageCount()).toBe(5);
+    });
+
+    it('reports the combined input size so the card can show the delta', async () => {
+        const inputs = [await pdfFile('a.pdf', 1), await pdfFile('b.pdf', 1)];
+        const { files } = expectSuccess(await mergePdf(form(inputs)));
+
+        expect(files[0].originalSize).toBe(inputs[0].size + inputs[1].size);
+    });
+
+    it('leaves the sources title and author behind', async () => {
+        const { files } = expectSuccess(
+            await mergePdf(
+                form([
+                    await pdfFile('a.pdf', 1, 'Internal salary review'),
+                    await pdfFile('b.pdf', 1, 'Second'),
+                ])
+            )
+        );
+        const merged = await PDFDocument.load(Buffer.from(files[0].data));
+
+        expect(merged.getTitle()).toBeUndefined();
+        expect(merged.getAuthor()).toBeUndefined();
+    });
+
+    it('refuses a single file rather than handing back a copy of it', async () => {
+        expect(expectFailure(await mergePdf(form([await pdfFile('only.pdf', 2)]))).code).toBe(
+            'one_pdf_only'
+        );
+    });
+
+    it('rejects a file that is not a PDF', async () => {
+        const notPdf = new File([new Uint8Array([1, 2, 3, 4])], 'fake.pdf', {
+            type: 'application/pdf',
+        });
+
+        expect(
+            expectFailure(await mergePdf(form([notPdf, await pdfFile('real.pdf', 1)]))).code
+        ).toBe('one_pdf_only');
+    });
+
+    it('merges the readable files and reports the broken one', async () => {
+        const notPdf = new File([new Uint8Array([1, 2, 3, 4])], 'fake.pdf', {
+            type: 'application/pdf',
+        });
+        const result = expectSuccess(
+            await mergePdf(form([await pdfFile('a.pdf', 1), notPdf, await pdfFile('b.pdf', 1)]))
+        );
+
+        expect(result.files).toHaveLength(1);
+        expect(result.failures?.[0]).toMatchObject({
+            filename: 'fake.pdf',
+            code: 'unreadable_pdf',
+        });
+    });
+
+    it('caps the merged page count', async () => {
+        const { code } = expectFailure(
+            await mergePdf(form([await pdfFile('a.pdf', 400), await pdfFile('b.pdf', 200)]))
+        );
+
+        expect(code).toBe('too_many_pages');
+    });
+
+    it('rejects an empty request', async () => {
+        expect(expectFailure(await mergePdf(form([]))).code).toBe('no_file');
     });
 });

@@ -3,14 +3,17 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
-import type { LoadedImage } from '@/components/image-dropzone';
 import { useAutoDownload } from '@/hooks/use-auto-download';
 import type { ActionFailure, ActionFile, ActionResult } from '@/lib/actions';
 import { downloadFile } from '@/lib/download';
+import { renameAll } from '@/lib/filename-template';
 import { actionErrorMessage } from '@/lib/errors';
 import { BATCH_CHUNK_SIZE, ZIP_MIME_TYPE, countLabel } from '@/lib/image';
 import { Logger } from '@/lib/logger';
+import { useFilenameTemplate } from '@/hooks/use-filename-template';
 import { createZip } from '@/lib/zip';
+
+export type Uploaded = { file: File };
 
 export type OutcomeFile = {
     file: ActionFile;
@@ -24,20 +27,36 @@ export type ActionOutcome = {
     failures: ActionFailure[];
 };
 
-export function downloadResult(file: ActionFile): void {
-    downloadFile(file.data, file.filename, file.mimeType);
-    toast.success(`Downloading ${file.filename}`);
+export function downloadResult(file: ActionFile, as = file.filename): void {
+    downloadFile(file.data, as, file.mimeType);
+    toast.success(`Downloading ${as}`);
 }
 
-export function downloadResults(files: ActionFile[], zipName: string): void {
+export function outcomeNames(files: readonly OutcomeFile[], template: string): string[] {
+    return renameAll(
+        files.map(entry => ({
+            filename: entry.file.filename,
+            width: entry.width,
+            height: entry.height,
+        })),
+        template
+    );
+}
+
+export function downloadResults(files: OutcomeFile[], zipName: string, template = ''): void {
     if (files.length === 0) return;
+
+    const names = outcomeNames(files, template);
+
     if (files.length === 1) {
-        downloadResult(files[0]);
+        downloadResult(files[0].file, names[0]);
 
         return;
     }
 
-    const zip = createZip(files.map(file => ({ name: file.filename, data: file.data })));
+    const zip = createZip(
+        files.map((entry, index) => ({ name: names[index], data: entry.file.data }))
+    );
 
     downloadFile(zip, zipName, ZIP_MIME_TYPE);
     toast.success(`Downloading ${countLabel(files.length, 'file')} as ${zipName}`);
@@ -122,6 +141,7 @@ export function useImageAction(
     const exitRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const mountedRef = useRef(true);
     const { autoDownload } = useAutoDownload();
+    const { template } = useFilenameTemplate();
 
     const cancelExit = useCallback(() => {
         if (exitRef.current === null) return;
@@ -174,19 +194,17 @@ export function useImageAction(
     }, [setOutcome]);
 
     const downloadAll = useCallback(() => {
-        const files = currentRef.current?.files.map(entry => entry.file) ?? [];
-
-        downloadResults(files, zipName);
-    }, [zipName]);
+        downloadResults(currentRef.current?.files ?? [], zipName, template);
+    }, [zipName, template]);
 
     const reportProgress = useCallback((next: BatchProgress | null) => {
         if (mountedRef.current) setProgress(next);
     }, []);
 
-    function send(group: LoadedImage[], params: RunParams): Promise<ActionResult> {
+    function send(group: Uploaded[], params: RunParams): Promise<ActionResult> {
         const formData = new FormData();
 
-        for (const image of group) formData.append('file', image.file);
+        for (const upload of group) formData.append('file', upload.file);
 
         for (const [key, value] of Object.entries(params)) {
             formData.append(key, value instanceof File ? value : String(value));
@@ -203,7 +221,7 @@ export function useImageAction(
         });
     }
 
-    function run(images: LoadedImage[], params: RunParams, options?: RunOptions) {
+    function run(images: Uploaded[], params: RunParams, options?: RunOptions) {
         cancelExit();
 
         startTransition(async () => {
@@ -259,11 +277,13 @@ export function useImageAction(
 
             if (options?.onResult?.(files) === 'handled') return;
 
-            setOutcome({ files: await Promise.all(files.map(describe)), failures });
+            const described = await Promise.all(files.map(describe));
+
+            setOutcome({ files: described, failures });
 
             const settled = failures.length === 0 && files.every(file => !file.warning);
 
-            if (autoDownload && settled) downloadResults(files, zipName);
+            if (autoDownload && settled) downloadResults(described, zipName, template);
         });
     }
 

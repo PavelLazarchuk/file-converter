@@ -2,6 +2,7 @@ import {
     MAX_BATCH_FILES,
     MAX_BATCH_SIZE_LABEL,
     MAX_FILE_SIZE_LABEL,
+    MAX_PDF_PAGES,
     formatFileSize,
 } from './image';
 
@@ -14,6 +15,11 @@ export type ActionErrorDetail =
     | { code: 'unsupported_format'; formats: string; detected: string | null }
     | { code: 'unreadable_dimensions' }
     | { code: 'pixel_limit' }
+    | { code: 'unsafe_svg'; threat: 'entity' | 'external_reference' }
+    | { code: 'unreadable_pdf' }
+    | { code: 'encrypted_pdf' }
+    | { code: 'too_many_pages'; pages: number }
+    | { code: 'one_pdf_only' }
     | { code: 'rate_limited'; retryAfterSeconds: number; limit: number }
     | { code: 'invalid_settings'; detail?: string }
     | { code: 'same_format' }
@@ -45,6 +51,18 @@ export function actionErrorMessage(detail: ActionErrorDetail): string {
             return 'Could not read the image dimensions.';
         case 'pixel_limit':
             return 'Image dimensions are too large to process.';
+        case 'unsafe_svg':
+            return detail.threat === 'entity'
+                ? 'This SVG declares XML entities, which can expand without bound while rendering. Re-save it without a DOCTYPE block.'
+                : 'This SVG pulls in an external file — an image, stylesheet or font. Embed it in the SVG itself and try again.';
+        case 'unreadable_pdf':
+            return "This file isn't a readable PDF — its contents don't match the format.";
+        case 'encrypted_pdf':
+            return 'This PDF is password-protected. Remove the password and try again.';
+        case 'too_many_pages':
+            return `These files add up to ${detail.pages} pages. A merged PDF can hold up to ${MAX_PDF_PAGES}.`;
+        case 'one_pdf_only':
+            return 'Add a second PDF — merging needs at least two files.';
         case 'rate_limited':
             return `Too many requests — this tool allows ${detail.limit} images per minute. Try again in ${detail.retryAfterSeconds}s.`;
         case 'invalid_settings':

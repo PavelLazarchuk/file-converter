@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { contentSecurityPolicy, securityHeaders } from './security-headers';
+import {
+    CROSS_ORIGIN_ASSET_PATH,
+    contentSecurityPolicy,
+    crossOriginAssetHeaders,
+    securityHeaders,
+} from './security-headers';
 
 function directives(policy: string): Map<string, string[]> {
     return new Map(
@@ -76,5 +81,28 @@ describe('securityHeaders', () => {
         const keys = securityHeaders(false).map(header => header.key);
 
         expect(new Set(keys).size).toBe(keys.length);
+    });
+
+    it.each([
+        ['Cross-Origin-Opener-Policy', 'same-origin'],
+        ['Cross-Origin-Resource-Policy', 'same-origin'],
+    ])('isolates the page with %s', (key, value) => {
+        expect(securityHeaders(false).find(header => header.key === key)?.value).toBe(value);
+        expect(securityHeaders(true).find(header => header.key === key)?.value).toBe(value);
+    });
+});
+
+describe('crossOriginAssetHeaders', () => {
+    it('re-opens CORP for the opengraph image only', () => {
+        expect(crossOriginAssetHeaders()).toEqual([
+            { key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' },
+        ]);
+        expect(CROSS_ORIGIN_ASSET_PATH).toBe('/opengraph-image');
+    });
+
+    it('overrides the key the site-wide rule sets, so the last rule wins', () => {
+        const siteWide = securityHeaders(false).map(header => header.key);
+
+        expect(siteWide).toContain(crossOriginAssetHeaders()[0].key);
     });
 });

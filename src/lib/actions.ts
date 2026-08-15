@@ -14,6 +14,8 @@ import {
     MAX_BATCH_BYTES,
     MAX_BATCH_FILES,
     MAX_FILE_SIZE,
+    MAX_PDF_PAGES,
+    PDF_MIME_TYPE,
     WATERMARK_DEFAULTS,
     acceptedFormatsLabel,
     convertSourceFromSharpFormat,
@@ -22,7 +24,14 @@ import {
     type ConvertSource,
 } from './image';
 import { Logger, type LogContext } from './logger';
-import { addPdfPage, createPdfDocument, savePdf } from './pipelines/pdf';
+import {
+    addPdfPage,
+    createPdfDocument,
+    loadPdf,
+    mergePdfs,
+    savePdf,
+    type PdfSource,
+} from './pipelines/pdf';
 import { compressPipeline } from './pipelines/compress';
 import { convertPipeline } from './pipelines/convert';
 import {
@@ -41,6 +50,7 @@ import { resizePipeline } from './pipelines/resize';
 import { rotatePipeline } from './pipelines/rotate';
 import { watermarkPipeline, type WatermarkLogo } from './pipelines/watermark';
 import { RATE_LIMIT, checkRateLimit } from './rate-limit';
+import { inspectSvg } from './svg-safety';
 import {
     compressSchema,
     convertSchema,
@@ -74,6 +84,7 @@ type ToolName =
     | 'compress'
     | 'convert'
     | 'pdf'
+    | 'merge-pdf'
     | 'placeholder'
     | 'rotate'
     | 'watermark'
@@ -95,6 +106,10 @@ async function readSource<Format extends ConvertSource>(
     formats: readonly Format[]
 ): Promise<SourceImage<Format>> {
     const buffer = Buffer.from(await file.arrayBuffer());
+    const threat = inspectSvg(buffer);
+
+    if (threat) throw fail({ code: 'unsafe_svg', threat });
+
     const metadata = await inspectMetadata(buffer);
     const accepted = acceptedFormatsLabel(formats);
 
@@ -443,6 +458,101 @@ export async function imageToPdf(formData: FormData): Promise<ActionResult> {
             problems
         );
     });
+}
+
+async function readPdfFiles(tool: ToolName, formData: FormData): Promise<PdfBatch> {
+    const files = formData
+        .getAll('file')
+        .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+
+    if (!files.length) throw fail({ code: 'no_file' });
+
+    if (files.length > MAX_BATCH_FILES) throw fail({ code: 'too_many_files' });
+
+    const failures: ActionFailure[] = [];
+    const usable = files.filter(file => {
+        if (file.size <= MAX_FILE_SIZE) return true;
+
+        failures.push({
+            filename: file.name,
+            code: 'file_too_large',
+            error: actionErrorMessage({ code: 'file_too_large' }),
+        });
+
+        return false;
+    });
+    const totalBytes = usable.reduce((sum, file) => sum + file.size, 0);
+
+    if (totalBytes > MAX_BATCH_BYTES) throw fail({ code: 'batch_too_large', totalBytes });
+
+    const sources: PdfSource[] = [];
+
+    for (const file of usable) {
+        try {
+            const buffer = Buffer.from(await file.arrayBuffer());
+            const document = await loadPdf(buffer);
+
+            sources.push({
+                document,
+                name: file.name,
+                baseName: stripExtension(file.name) || 'document',
+                size: file.size,
+                pageCount: document.getPageCount(),
+            });
+        } catch (error) {
+            failures.push(describeFailure(file.name, error, { tool, stage: 'read' }));
+        }
+    }
+
+    if (!sources.length) {
+        const first = failures[0];
+
+        throw first ? new ProcessingError(first.code, first.error) : fail({ code: 'no_file' });
+    }
+
+    return { sources, failures };
+}
+
+type PdfBatch = { sources: PdfSource[]; failures: ActionFailure[] };
+
+export async function mergePdf(formData: FormData): Promise<ActionResult> {
+    return run(
+        'merge-pdf',
+        async () => {
+            const { sources, failures } = await readPdfFiles('merge-pdf', formData);
+
+            if (sources.length < 2) throw fail({ code: 'one_pdf_only' });
+
+            const pages = sources.reduce((sum, source) => sum + source.pageCount, 0);
+
+            if (pages > MAX_PDF_PAGES) throw fail({ code: 'too_many_pages', pages });
+
+            const data = await mergePdfs(sources);
+            const originalSize = sources.reduce((sum, source) => sum + source.size, 0);
+
+            Logger.info('pdf.merged', {
+                tool: 'merge-pdf',
+                files: sources.length,
+                pages,
+                bytes: data.length,
+            });
+
+            return collect(
+                [
+                    toActionFile(
+                        { size: originalSize },
+                        {
+                            data,
+                            filename: `${sources[0].baseName}-merged.pdf`,
+                            mimeType: PDF_MIME_TYPE,
+                        }
+                    ),
+                ],
+                failures
+            );
+        },
+        uploadCount(formData)
+    );
 }
 
 export async function generatePlaceholder(formData: FormData): Promise<ActionResult> {

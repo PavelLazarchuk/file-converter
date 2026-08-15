@@ -1,7 +1,7 @@
-import { PDFDocument, type PDFImage } from 'pdf-lib';
+import { EncryptedPDFError, PDFDocument, type PDFImage } from 'pdf-lib';
 
 import { PDF_PAGE_DIMENSIONS, PDF_PAGE_MARGIN, type PdfPageSize } from '../image';
-import { decode, type SourceImage } from './core';
+import { decode, fail, type SourceImage } from './core';
 
 export function createPdfDocument(): Promise<PDFDocument> {
     return PDFDocument.create();
@@ -57,4 +57,34 @@ export async function addPdfPage(
 
 export function savePdf(pdfDoc: PDFDocument): Promise<Uint8Array> {
     return pdfDoc.save();
+}
+
+export type PdfSource = {
+    document: PDFDocument;
+    name: string;
+    baseName: string;
+    size: number;
+    pageCount: number;
+};
+
+export async function loadPdf(buffer: Buffer): Promise<PDFDocument> {
+    try {
+        return await PDFDocument.load(buffer);
+    } catch (error) {
+        throw error instanceof EncryptedPDFError
+            ? fail({ code: 'encrypted_pdf' })
+            : fail({ code: 'unreadable_pdf' });
+    }
+}
+
+export async function mergePdfs(sources: readonly PdfSource[]): Promise<Uint8Array> {
+    const merged = await PDFDocument.create();
+
+    for (const source of sources) {
+        const pages = await merged.copyPages(source.document, source.document.getPageIndices());
+
+        for (const page of pages) merged.addPage(page);
+    }
+
+    return savePdf(merged);
 }
