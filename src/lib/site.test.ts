@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import sitemap from '@/app/sitemap';
-import { SITE, TOOLS, toolTransitionName } from './site';
+import {
+    SITE,
+    TOOLS,
+    breadcrumbJsonLd,
+    jsonLdScript,
+    siteJsonLd,
+    toolJsonLd,
+    toolTransitionName,
+} from './site';
 
 describe('site metadata', () => {
     it('has an absolute url without a trailing slash', () => {
@@ -52,5 +60,57 @@ describe('sitemap', () => {
         for (const tool of TOOLS) expect(urls).toContain(`${SITE.url}${tool.href}`);
 
         expect(new Set(urls).size).toBe(urls.length);
+    });
+});
+
+describe('structured data', () => {
+    it('describes every tool from the registry, with absolute urls', () => {
+        for (const tool of TOOLS) {
+            const data = toolJsonLd(tool);
+
+            expect(data['@type']).toBe('WebApplication');
+            expect(data.url).toBe(`${SITE.url}${tool.href}`);
+            expect(data.description).toBe(tool.description);
+            expect(data.name).toContain(tool.title);
+        }
+    });
+
+    it('never invents a rating or a review count', () => {
+        for (const tool of TOOLS) {
+            const data = toolJsonLd(tool);
+
+            expect(data.aggregateRating).toBeUndefined();
+            expect(data.review).toBeUndefined();
+        }
+    });
+
+    it('builds a two-step breadcrumb from the site root to the tool', () => {
+        const trail = breadcrumbJsonLd(TOOLS[0]).itemListElement as Record<string, unknown>[];
+
+        expect(trail.map(step => step.position)).toEqual([1, 2]);
+        expect(trail[0].item).toBe(SITE.url);
+        expect(trail[1].item).toBe(`${SITE.url}${TOOLS[0].href}`);
+        expect(trail[1].name).toBe(TOOLS[0].title);
+    });
+
+    it('lists every tool on the landing page, in registry order', () => {
+        const [website, list] = siteJsonLd();
+        const items = list.itemListElement as Record<string, unknown>[];
+
+        expect(website['@type']).toBe('WebSite');
+        expect(list.numberOfItems).toBe(TOOLS.length);
+        expect(items.map(item => item.url)).toEqual(TOOLS.map(tool => `${SITE.url}${tool.href}`));
+        expect(items.map(item => item.position)).toEqual(TOOLS.map((_, index) => index + 1));
+    });
+
+    it('escapes a closing tag so the payload cannot break out of the script element', () => {
+        expect(jsonLdScript({ name: '</script><img onerror=alert(1)>' })).not.toContain('<');
+        expect(jsonLdScript({ name: '</script>' })).toContain('\\u003c/script>');
+    });
+
+    it('stays parseable after escaping', () => {
+        for (const block of siteJsonLd()) {
+            expect(() => JSON.parse(jsonLdScript(block))).not.toThrow();
+        }
     });
 });

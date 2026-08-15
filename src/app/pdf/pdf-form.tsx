@@ -15,7 +15,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { useImageAction } from '@/hooks/use-image-action';
+import { useFileAction } from '@/hooks/use-file-action';
 import { imageToPdf } from '@/lib/actions';
 import {
     CONVERT_SOURCE_KEYS,
@@ -30,7 +30,7 @@ export function PdfForm() {
     const { images, addImages, removeImage, moveImage, clearImages } =
         useLoadedImages(MAX_BATCH_FILES);
     const { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload } =
-        useImageAction(imageToPdf, undefined, { chunkSize: null });
+        useFileAction(imageToPdf, undefined, { chunkSize: null });
 
     const {
         control,

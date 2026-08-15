@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
-import { pendingLabel, useImageAction } from '@/hooks/use-image-action';
+import { pendingLabel, useFileAction } from '@/hooks/use-file-action';
 import { resizeImage } from '@/lib/actions';
 import {
     DIMENSION_LIMITS,
@@ -46,7 +46,7 @@ export function ResizeForm() {
     const [noEnlarge, setNoEnlarge] = useState(false);
     const [presetKey, setPresetKey] = useState<string | null>(null);
     const { isPending, outcome, isLeaving, progress, run, clearResult, downloadAll, autoDownload } =
-        useImageAction(resizeImage, 'resized-images.zip');
+        useFileAction(resizeImage, 'resized-images.zip');
 
     const {
         register,

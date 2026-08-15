@@ -12,7 +12,7 @@ const CLOSE_ENOUGH_RATIO = 0.94;
 
 export type CompressParams = CompressValues;
 
-function applyQuality(pipeline: Sharp, format: ImageFormat, quality: number): Sharp {
+export function applyQuality(pipeline: Sharp, format: ImageFormat, quality: number): Sharp {
     switch (format) {
         case 'jpeg':
             return pipeline.jpeg({ quality, mozjpeg: true });
@@ -25,7 +25,7 @@ function applyQuality(pipeline: Sharp, format: ImageFormat, quality: number): Sh
     }
 }
 
-async function createDecoder(buffer: Buffer, metadata: Metadata): Promise<() => Sharp> {
+export async function createDecoder(buffer: Buffer, metadata: Metadata): Promise<() => Sharp> {
     const pixels = (metadata.width ?? 0) * (metadata.height ?? 0);
 
     if (!pixels || pixels > RAW_REUSE_MAX_PIXELS) return () => decode(buffer);

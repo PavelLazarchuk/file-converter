@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
-import { pendingLabel, useImageAction } from '@/hooks/use-image-action';
+import { pendingLabel, useFileAction } from '@/hooks/use-file-action';
 import { rotateImage } from '@/lib/actions';
 import {
     MAX_BATCH_FILES,
@@ -37,7 +37,7 @@ export function RotateForm() {
     const [transparent, setTransparent] = useState(false);
     const [removeMetadata, setRemoveMetadata] = useState(true);
     const { isPending, outcome, isLeaving, progress, run, clearResult, downloadAll, autoDownload } =
-        useImageAction(rotateImage, 'rotated-images.zip');
+        useFileAction(rotateImage, 'rotated-images.zip');
 
     const {
         register,

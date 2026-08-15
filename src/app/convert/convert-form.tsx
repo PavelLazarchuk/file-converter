@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
-import { pendingLabel, useImageAction } from '@/hooks/use-image-action';
+import { pendingLabel, useFileAction } from '@/hooks/use-file-action';
 import { convertImage } from '@/lib/actions';
 import { downloadFile } from '@/lib/download';
 import {
@@ -59,7 +59,7 @@ export function ConvertForm() {
     const [icoSizes, setIcoSizes] = useState<number[]>([...DEFAULT_ICO_SIZES]);
     const [icoPack, setIcoPack] = useState(false);
     const { isPending, outcome, isLeaving, progress, run, clearResult, downloadAll, autoDownload } =
-        useImageAction(convertImage, 'converted-images.zip');
+        useFileAction(convertImage, 'converted-images.zip');
 
     const {
         control,

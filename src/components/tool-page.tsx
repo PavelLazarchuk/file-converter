@@ -2,7 +2,8 @@ import { ViewTransition } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
-import { TOOLS, toolTransitionName } from '@/lib/site';
+import { JsonLd } from '@/components/json-ld';
+import { TOOLS, breadcrumbJsonLd, toolJsonLd, toolTransitionName } from '@/lib/site';
 
 const enter =
     'animate-in fade-in fill-mode-backwards duration-500 ease-out motion-reduce:animate-none';
@@ -19,6 +20,7 @@ export function ToolPage({ href, title, description, children }: ToolPageProps) 
 
     return (
         <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:py-16">
+            {tool && <JsonLd data={[toolJsonLd(tool), breadcrumbJsonLd(tool)]} />}
             <Link
                 href="/"
                 className={`${enter} slide-in-from-left-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground`}

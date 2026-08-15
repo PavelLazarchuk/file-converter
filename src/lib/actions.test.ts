@@ -3,6 +3,7 @@ import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 
 import {
+    compareFormats,
     compressImage,
     convertImage,
     cropImage,
@@ -1131,5 +1132,77 @@ describe('mergePdf', () => {
 
     it('rejects an empty request', async () => {
         expect(expectFailure(await mergePdf(form([]))).code).toBe('no_file');
+    });
+});
+
+describe('compareFormats', () => {
+    it('encodes the image once per candidate format', async () => {
+        const source = await image('png', { name: 'shot.png', width: 120, height: 90 });
+        const { files } = expectSuccess(await compareFormats(form([source.file])));
+
+        expect(files.map(file => file.filename)).toEqual([
+            'shot.jpg',
+            'shot.png',
+            'shot.webp',
+            'shot.avif',
+        ]);
+
+        for (const file of files) {
+            expect(file.originalSize).toBe(source.file.size);
+            expect(file.data.byteLength).toBeGreaterThan(0);
+        }
+    });
+
+    it('produces the format it claims, at the requested dimensions', async () => {
+        const source = await image('png', { width: 120, height: 90 });
+        const { files } = expectSuccess(await compareFormats(form([source.file])));
+
+        await expect(meta(files[0])).resolves.toMatchObject({
+            format: 'jpeg',
+            width: 120,
+            height: 90,
+        });
+        await expect(meta(files[2])).resolves.toMatchObject({ format: 'webp' });
+    });
+
+    it('matches what the compress tool produces at the same quality', async () => {
+        const source = await image('png', { name: 'same.png', width: 200, height: 150 });
+        const compared = expectSuccess(
+            await compareFormats(form([source.file], { quality: '55' }))
+        );
+        const compressed = expectSuccess(
+            await compressImage(form([source.file], { mode: 'quality', quality: '55' }))
+        );
+        const comparedPng = compared.files.find(file => file.filename.endsWith('.png'));
+
+        expect(comparedPng?.data.byteLength).toBe(compressed.files[0].data.byteLength);
+    });
+
+    it('honours the quality setting', async () => {
+        const source = await image('jpeg', { width: 300, height: 200 });
+        const low = expectSuccess(await compareFormats(form([source.file], { quality: '20' })));
+        const high = expectSuccess(await compareFormats(form([source.file], { quality: '95' })));
+
+        expect(low.files[0].data.byteLength).toBeLessThan(high.files[0].data.byteLength);
+    });
+
+    it('validates the quality before touching the file', async () => {
+        const source = await image('png');
+
+        expect(
+            expectFailure(await compareFormats(form([source.file], { quality: '0' })))
+        ).toMatchObject({ code: 'invalid_settings' });
+    });
+
+    it('rejects a format it cannot decode', async () => {
+        const gif = await image('gif', { name: 'loop.gif' });
+
+        expect(expectFailure(await compareFormats(form([gif.file]))).code).toBe(
+            'unsupported_format'
+        );
+    });
+
+    it('rejects an empty request', async () => {
+        expect(expectFailure(await compareFormats(form([]))).code).toBe('no_file');
     });
 });

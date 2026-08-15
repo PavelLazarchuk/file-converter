@@ -3,7 +3,6 @@
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { SIZE_PRESETS, outputSizeLabel, type SizePreset } from '@/lib/image';
-import { cn } from '@/lib/utils';
 
 type SizePresetsProps = {
     activeKey: string | null;
@@ -29,10 +28,12 @@ export function SizePresets({ activeKey, disabled, hint, onSelect }: SizePresets
                             aria-pressed={active}
                             disabled={disabled}
                             onClick={() => onSelect(preset)}
-                            className={cn('font-normal', !active && 'text-muted-foreground')}
+                            className="font-normal"
                         >
                             {preset.label}
-                            <span className="text-xs opacity-70">{outputSizeLabel(preset)}</span>
+                            <span className="text-xs text-muted-foreground group-data-[variant=default]/button:text-primary-foreground/80">
+                                {outputSizeLabel(preset)}
+                            </span>
                         </Button>
                     );
                 })}

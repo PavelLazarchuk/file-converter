@@ -3,7 +3,7 @@
 import { ResultCard } from '@/components/result-card';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { useImageAction } from '@/hooks/use-image-action';
+import { useFileAction } from '@/hooks/use-file-action';
 import { mergePdf } from '@/lib/actions';
 import { MAX_BATCH_FILES, MAX_PDF_PAGES, countLabel } from '@/lib/image';
 
@@ -12,7 +12,7 @@ import { PdfDropzone, useLoadedPdfs } from './pdf-dropzone';
 export function MergePdfForm() {
     const { documents, addPdfs, removePdf, movePdf, clearPdfs } = useLoadedPdfs(MAX_BATCH_FILES);
     const { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload } =
-        useImageAction(mergePdf, undefined, { chunkSize: null });
+        useFileAction(mergePdf, undefined, { chunkSize: null });
 
     const ready = documents.length >= 2;
 

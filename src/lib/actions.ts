@@ -5,6 +5,7 @@ import type { Metadata } from 'sharp';
 import type { ActionErrorCode, ActionErrorDetail } from './errors';
 import { actionErrorMessage } from './errors';
 import {
+    COMPARE_FORMAT_KEYS,
     CONVERT_SOURCE_KEYS,
     DEFAULT_ICO_SIZES,
     DEFAULT_QUALITY,
@@ -32,6 +33,7 @@ import {
     savePdf,
     type PdfSource,
 } from './pipelines/pdf';
+import { comparePipeline } from './pipelines/compare';
 import { compressPipeline } from './pipelines/compress';
 import { convertPipeline } from './pipelines/convert';
 import {
@@ -52,6 +54,7 @@ import { watermarkPipeline, type WatermarkLogo } from './pipelines/watermark';
 import { RATE_LIMIT, checkRateLimit } from './rate-limit';
 import { inspectSvg } from './svg-safety';
 import {
+    compareSchema,
     compressSchema,
     convertSchema,
     cropSchema,
@@ -82,6 +85,7 @@ type ToolName =
     | 'resize'
     | 'crop'
     | 'compress'
+    | 'compare'
     | 'convert'
     | 'pdf'
     | 'merge-pdf'
@@ -391,6 +395,37 @@ export async function compressImage(formData: FormData): Promise<ActionResult> {
 
         return eachFile(batch, source => compressPipeline(source, parsed.data));
     });
+}
+
+export async function compareFormats(formData: FormData): Promise<ActionResult> {
+    return runFiles(
+        'compare',
+        formData,
+        FORMAT_KEYS,
+        async ({ tool, sources, failures }) => {
+            const parsed = compareSchema.safeParse({
+                quality: formData.get('quality') || String(DEFAULT_QUALITY),
+            });
+
+            if (!parsed.success) throw invalid(parsed.error, 'Invalid quality.');
+
+            const [source] = sources;
+            const produced = await comparePipeline(source, COMPARE_FORMAT_KEYS, parsed.data);
+
+            Logger.info('compare.encoded', {
+                tool,
+                ...imageContext(source),
+                quality: parsed.data.quality,
+                formats: COMPARE_FORMAT_KEYS.length,
+            });
+
+            return collect(
+                produced.map(output => toActionFile(source, output)),
+                failures
+            );
+        },
+        COMPARE_FORMAT_KEYS.length
+    );
 }
 
 export async function convertImage(formData: FormData): Promise<ActionResult> {

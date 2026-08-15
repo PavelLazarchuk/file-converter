@@ -18,7 +18,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { useImageAction } from '@/hooks/use-image-action';
+import { useFileAction } from '@/hooks/use-file-action';
 import { cropImage } from '@/lib/actions';
 import {
     CROP_RATIO_KEYS,
@@ -44,7 +44,7 @@ export function CropForm() {
     const [preset, setPreset] = useState<SizePreset | null>(null);
     const [manualBox, setManualBox] = useState<{ key: string; box: CropBox } | null>(null);
     const { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload } =
-        useImageAction(cropImage);
+        useFileAction(cropImage);
     const image = images[0] ?? null;
 
     const {

@@ -108,6 +108,10 @@ export const compressSchema = z.object({
     targetKb: integerInRange(TARGET_SIZE_LIMITS.min, TARGET_SIZE_LIMITS.max, 'Target size'),
 });
 
+export const compareSchema = z.object({
+    quality: integerInRange(QUALITY_LIMITS.min, QUALITY_LIMITS.max, 'Quality'),
+});
+
 export const convertSchema = z.object({
     format: z.enum(CONVERT_TARGET_KEYS, { error: 'Choose a target format' }),
 });
@@ -166,6 +170,9 @@ export type CropFormInput = z.input<typeof cropFormSchema>;
 export type CropFormValues = z.output<typeof cropFormSchema>;
 export type OutputSizeValues = z.output<typeof outputSizeSchema>;
 export type IcoOptionsValues = z.output<typeof icoOptionsSchema>;
+export type CompareInput = z.input<typeof compareSchema>;
+export type CompareValues = z.output<typeof compareSchema>;
+
 export type CompressInput = z.input<typeof compressSchema>;
 export type CompressValues = z.output<typeof compressSchema>;
 export type ConvertInput = z.input<typeof convertSchema>;

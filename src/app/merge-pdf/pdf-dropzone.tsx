@@ -1,63 +1,33 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, FileText, UploadCloud, X } from 'lucide-react';
+import { useRef } from 'react';
+import { FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { DropzoneShell, RemoveButton, ReorderControls } from '@/components/dropzone-shell';
 import { Button } from '@/components/ui/button';
+import { useUploads } from '@/hooks/use-uploads';
 import {
-    MAX_BATCH_BYTES,
     MAX_BATCH_SIZE_LABEL,
-    MAX_FILE_SIZE,
     MAX_FILE_SIZE_LABEL,
     PDF_MIME_TYPE,
     countLabel,
     formatFileSize,
 } from '@/lib/image';
-import { cn } from '@/lib/utils';
+import { acceptUploads, totalUploadBytes, uploadProblemSummary } from '@/lib/uploads';
 
 export type LoadedPdf = { file: File; id: string };
 
-function totalBytes(documents: readonly LoadedPdf[]): number {
-    return documents.reduce((sum, entry) => sum + entry.file.size, 0);
-}
-
 export function useLoadedPdfs(max: number) {
-    const [documents, setDocuments] = useState<LoadedPdf[]>([]);
-    const currentRef = useRef<LoadedPdf[]>([]);
+    const { items, addItems, removeItem, moveItem, clearItems } = useUploads<LoadedPdf>({ max });
 
-    const commit = useCallback((next: LoadedPdf[]) => {
-        currentRef.current = next;
-        setDocuments(next);
-    }, []);
-
-    const addPdfs = useCallback(
-        (added: LoadedPdf[]) => commit([...currentRef.current, ...added].slice(0, max)),
-        [commit, max]
-    );
-
-    const removePdf = useCallback(
-        (index: number) => commit(currentRef.current.filter((_, at) => at !== index)),
-        [commit]
-    );
-
-    const movePdf = useCallback(
-        (from: number, to: number) => {
-            const next = [...currentRef.current];
-
-            if (from < 0 || from >= next.length || to < 0 || to >= next.length) return;
-
-            const [moved] = next.splice(from, 1);
-
-            next.splice(to, 0, moved);
-            commit(next);
-        },
-        [commit]
-    );
-
-    const clearPdfs = useCallback(() => commit([]), [commit]);
-
-    return { documents, addPdfs, removePdf, movePdf, clearPdfs };
+    return {
+        documents: items,
+        addPdfs: addItems,
+        removePdf: removeItem,
+        movePdf: moveItem,
+        clearPdfs: clearItems,
+    };
 }
 
 function isPdf(file: File): boolean {
@@ -85,62 +55,34 @@ export function PdfDropzone({
 }: PdfDropzoneProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const idRef = useRef(0);
-    const [isDragging, setIsDragging] = useState(false);
 
     function loadFiles(incoming: File[]) {
         if (disabled || !incoming.length) return;
 
-        const room = max - documents.length;
+        const { accepted, problems } = acceptUploads(incoming, {
+            max,
+            currentCount: documents.length,
+            currentBytes: totalUploadBytes(documents),
+            accepts: isPdf,
+            copy: {
+                full: limit => `You can merge up to ${countLabel(limit, 'PDF')} at a time.`,
+                noRoom: room =>
+                    `There is room for ${countLabel(room, 'more file')} — skipped the rest.`,
+                unsupported: name => `${name}: not a PDF.`,
+                tooLarge: name => `${name}: larger than ${MAX_FILE_SIZE_LABEL}.`,
+                overBudget: name =>
+                    `${name}: the batch has to stay under ${MAX_BATCH_SIZE_LABEL} in total.`,
+            },
+        });
+        const summary = uploadProblemSummary(problems);
 
-        if (room <= 0) {
-            toast.error(`You can merge up to ${countLabel(max, 'PDF')} at a time.`);
+        if (summary) toast.error(summary);
+        if (!accepted.length) return;
 
-            return;
-        }
-
-        const accepted: LoadedPdf[] = [];
-        const problems: string[] = [];
-        let budget = MAX_BATCH_BYTES - totalBytes(documents);
-
-        for (const file of incoming) {
-            if (accepted.length >= room) {
-                problems.push(
-                    `There is room for ${countLabel(room, 'more file')} — skipped the rest.`
-                );
-
-                break;
-            }
-            if (!isPdf(file)) {
-                problems.push(`${file.name}: not a PDF.`);
-
-                continue;
-            }
-            if (file.size > MAX_FILE_SIZE) {
-                problems.push(`${file.name}: larger than ${MAX_FILE_SIZE_LABEL}.`);
-
-                continue;
-            }
-            if (file.size > budget) {
-                problems.push(`${file.name}: the batch has to stay under ${MAX_BATCH_SIZE_LABEL}.`);
-
-                continue;
-            }
-
-            budget -= file.size;
-            accepted.push({ file, id: `pdf-${(idRef.current += 1)}` });
-        }
-
-        if (problems.length) {
-            toast.error(
-                problems.length === 1
-                    ? problems[0]
-                    : `${problems[0]} (+${problems.length - 1} more)`
-            );
-        }
-        if (accepted.length) onAdd(accepted);
+        onAdd(accepted.map(file => ({ file, id: `pdf-${(idRef.current += 1)}` })));
     }
 
-    const fileInput = (
+    const hiddenInput = (
         <input
             ref={inputRef}
             type="file"
@@ -161,7 +103,7 @@ export function PdfDropzone({
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <p className="text-sm font-medium">
                         {countLabel(documents.length, 'PDF')} ·{' '}
-                        {formatFileSize(totalBytes(documents))}
+                        {formatFileSize(totalUploadBytes(documents))}
                     </p>
                     <p className="text-sm text-muted-foreground">
                         up to {max} · {MAX_BATCH_SIZE_LABEL} in total
@@ -181,40 +123,18 @@ export function PdfDropzone({
                                     {formatFileSize(entry.file.size)}
                                 </p>
                             </div>
-                            <div className="flex shrink-0 flex-col">
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-6"
-                                    aria-label={`Move ${entry.file.name} up`}
-                                    disabled={disabled || index === 0}
-                                    onClick={() => onMove(index, index - 1)}
-                                >
-                                    <ArrowUp className="size-3.5" />
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-6"
-                                    aria-label={`Move ${entry.file.name} down`}
-                                    disabled={disabled || index === documents.length - 1}
-                                    onClick={() => onMove(index, index + 1)}
-                                >
-                                    <ArrowDown className="size-3.5" />
-                                </Button>
-                            </div>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                aria-label={`Remove ${entry.file.name}`}
+                            <ReorderControls
+                                label={entry.file.name}
+                                index={index}
+                                count={documents.length}
+                                disabled={disabled}
+                                onMove={onMove}
+                            />
+                            <RemoveButton
+                                label={entry.file.name}
                                 disabled={disabled}
                                 onClick={() => onRemove(index)}
-                            >
-                                <X />
-                            </Button>
+                            />
                         </li>
                     ))}
                 </ol>
@@ -239,50 +159,21 @@ export function PdfDropzone({
                         Remove all
                     </Button>
                 </div>
-                {fileInput}
+                {hiddenInput}
             </div>
         );
     }
 
     return (
-        <label
-            className={cn(
-                'flex w-full cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed px-6 py-12 text-center transition-colors',
-                'hover:border-primary/40 hover:bg-muted/50 has-focus-visible:border-ring has-focus-visible:ring-3 has-focus-visible:ring-ring/50',
-                isDragging && 'border-primary/60 bg-muted/50',
-                disabled && 'pointer-events-none opacity-50'
-            )}
-            onDragOver={event => {
-                event.preventDefault();
-                if (!disabled) setIsDragging(true);
-            }}
-            onDragLeave={event => {
-                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                    setIsDragging(false);
-                }
-            }}
-            onDrop={event => {
-                event.preventDefault();
-                setIsDragging(false);
-                loadFiles([...event.dataTransfer.files]);
-            }}
-        >
-            {fileInput}
-            <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-                {isDragging ? (
-                    <FileText className="size-6 text-primary" />
-                ) : (
-                    <UploadCloud className="size-6 text-muted-foreground" />
-                )}
-            </div>
-            <div>
-                <p className="text-sm font-medium">
-                    {isDragging ? 'Drop the PDFs here' : 'Drag & drop PDFs, or click to browse'}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                    PDF · up to {max} at a time, {MAX_BATCH_SIZE_LABEL} in total
-                </p>
-            </div>
-        </label>
+        <DropzoneShell
+            accept="application/pdf,.pdf"
+            multiple
+            disabled={disabled}
+            onFiles={loadFiles}
+            dragIcon={<FileText className="size-6 text-primary" />}
+            idleLabel="Drag & drop PDFs, or click to browse"
+            dragLabel="Drop the PDFs here"
+            hint={`PDF · up to ${max} at a time, ${MAX_BATCH_SIZE_LABEL} in total`}
+        />
     );
 }

@@ -15,7 +15,7 @@ import {
     outcomeNames,
     type ActionOutcome,
     type OutcomeFile,
-} from '@/hooks/use-image-action';
+} from '@/hooks/use-file-action';
 import { FILENAME_TEMPLATE_MAX_LENGTH, FILENAME_TOKENS } from '@/lib/filename-template';
 import { countLabel, formatFileSize, sizeChange } from '@/lib/image';
 import { cn } from '@/lib/utils';

@@ -16,7 +16,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { useImageAction } from '@/hooks/use-image-action';
+import { useFileAction } from '@/hooks/use-file-action';
 import { generatePlaceholder } from '@/lib/actions';
 import {
     DIMENSION_LIMITS,
@@ -34,7 +34,7 @@ const PREVIEW_MAX_HEIGHT = 176;
 
 export function PlaceholderForm() {
     const { isPending, outcome, isLeaving, run, clearResult, downloadAll, autoDownload } =
-        useImageAction(generatePlaceholder);
+        useFileAction(generatePlaceholder);
 
     const {
         register,

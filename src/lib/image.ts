@@ -17,6 +17,8 @@ export const FORMAT_KEYS = ['jpeg', 'png', 'webp', 'avif'] as const;
 
 export type ImageFormat = (typeof FORMAT_KEYS)[number];
 
+export const COMPARE_FORMAT_KEYS = ['jpeg', 'png', 'webp', 'avif'] as const;
+
 export const CONVERT_SOURCE_KEYS = [...FORMAT_KEYS, 'gif', 'svg'] as const;
 
 export type ConvertSource = (typeof CONVERT_SOURCE_KEYS)[number];

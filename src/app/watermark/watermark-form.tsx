@@ -19,7 +19,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { pendingLabel, useImageAction } from '@/hooks/use-image-action';
+import { pendingLabel, useFileAction } from '@/hooks/use-file-action';
 import { watermarkImage } from '@/lib/actions';
 import {
     CONVERT_SOURCE_KEYS,
@@ -53,7 +53,7 @@ export function WatermarkForm() {
     const logos = useLoadedImages(1);
     const [removeMetadata, setRemoveMetadata] = useState(true);
     const { isPending, outcome, isLeaving, progress, run, clearResult, downloadAll, autoDownload } =
-        useImageAction(watermarkImage, 'watermarked-images.zip');
+        useFileAction(watermarkImage, 'watermarked-images.zip');
 
     const {
         register,

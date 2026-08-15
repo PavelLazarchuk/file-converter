@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ResultCard } from '@/components/result-card';
 import type { ActionFile } from '@/lib/actions';
 import { downloadFile } from '@/lib/download';
-import type { ActionOutcome, OutcomeFile } from '@/hooks/use-image-action';
+import type { ActionOutcome, OutcomeFile } from '@/hooks/use-file-action';
 
 vi.mock('@/lib/download', () => ({ downloadFile: vi.fn() }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));

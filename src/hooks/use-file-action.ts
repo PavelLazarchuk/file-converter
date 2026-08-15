@@ -103,7 +103,7 @@ export type RunParams = Record<string, string | number | boolean | File>;
 
 export type BatchProgress = { done: number; total: number };
 
-export type ImageActionOptions = { chunkSize?: number | null };
+export type FileActionOptions = { chunkSize?: number | null };
 
 export function chunk<Item>(items: Item[], size: number): Item[][] {
     const groups: Item[][] = [];
@@ -128,10 +128,10 @@ function prefersReducedMotion(): boolean {
     );
 }
 
-export function useImageAction(
+export function useFileAction(
     action: (formData: FormData) => Promise<ActionResult>,
     zipName = 'images.zip',
-    { chunkSize = BATCH_CHUNK_SIZE }: ImageActionOptions = {}
+    { chunkSize = BATCH_CHUNK_SIZE }: FileActionOptions = {}
 ) {
     const [isPending, startTransition] = useTransition();
     const [outcome, setOutcomeState] = useState<ActionOutcome | null>(null);

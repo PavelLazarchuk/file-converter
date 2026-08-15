@@ -1,6 +1,7 @@
 import {
     Combine,
     Crop,
+    Scale,
     FileText,
     Gauge,
     ImagePlus,
@@ -58,6 +59,14 @@ export const TOOLS: readonly Tool[] = [
         gradient: 'from-lime-500 to-green-600',
     },
     {
+        href: '/compare',
+        title: 'Compare formats',
+        description:
+            'Encode one image to JPEG, PNG, WEBP and AVIF at the same quality and see which comes out smallest.',
+        icon: Scale,
+        gradient: 'from-fuchsia-500 to-purple-600',
+    },
+    {
         href: '/compress',
         title: 'Compress',
         description:
@@ -113,3 +122,69 @@ export const TOOLS: readonly Tool[] = [
         gradient: 'from-red-500 to-rose-600',
     },
 ] as const;
+
+export type JsonLd = Record<string, unknown>;
+
+const SCHEMA_CONTEXT = 'https://schema.org';
+
+export function jsonLdScript(data: JsonLd): string {
+    return JSON.stringify(data).replace(/</g, '\\u003c');
+}
+
+export function toolJsonLd(tool: Tool): JsonLd {
+    return {
+        '@context': SCHEMA_CONTEXT,
+        '@type': 'WebApplication',
+        name: `${tool.title} — ${SITE.name}`,
+        url: `${SITE.url}${tool.href}`,
+        description: tool.description,
+        applicationCategory: 'MultimediaApplication',
+        browserRequirements: 'Requires JavaScript.',
+        operatingSystem: 'Any',
+        isAccessibleForFree: true,
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+        isPartOf: { '@type': 'WebSite', name: SITE.name, url: SITE.url },
+    };
+}
+
+export function breadcrumbJsonLd(tool: Tool): JsonLd {
+    return {
+        '@context': SCHEMA_CONTEXT,
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'All tools', item: SITE.url },
+            {
+                '@type': 'ListItem',
+                position: 2,
+                name: tool.title,
+                item: `${SITE.url}${tool.href}`,
+            },
+        ],
+    };
+}
+
+export function siteJsonLd(): JsonLd[] {
+    return [
+        {
+            '@context': SCHEMA_CONTEXT,
+            '@type': 'WebSite',
+            name: SITE.name,
+            alternateName: SITE.tagline,
+            url: SITE.url,
+            description: SITE.description,
+        },
+        {
+            '@context': SCHEMA_CONTEXT,
+            '@type': 'ItemList',
+            name: `${SITE.name} tools`,
+            numberOfItems: TOOLS.length,
+            itemListElement: TOOLS.map((tool, index) => ({
+                '@type': 'ListItem',
+                position: index + 1,
+                name: tool.title,
+                description: tool.description,
+                url: `${SITE.url}${tool.href}`,
+            })),
+        },
+    ];
+}

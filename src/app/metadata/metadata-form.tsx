@@ -7,7 +7,7 @@ import { ImageDropzone, useLoadedImages } from '@/components/image-dropzone';
 import { ResultCard } from '@/components/result-card';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { pendingLabel, useImageAction } from '@/hooks/use-image-action';
+import { pendingLabel, useFileAction } from '@/hooks/use-file-action';
 import { inspectImage, stripImageMetadata } from '@/lib/actions';
 import { MAX_BATCH_FILES, countLabel } from '@/lib/image';
 import { parseMetadataReport, type MetadataReport } from '@/lib/metadata';
@@ -18,8 +18,8 @@ type Inspected = { report: MetadataReport; json: string; filename: string };
 export function MetadataForm() {
     const { images, addImages, removeImage, clearImages } = useLoadedImages(MAX_BATCH_FILES);
     const [reports, setReports] = useState<Inspected[] | null>(null);
-    const inspect = useImageAction(inspectImage);
-    const strip = useImageAction(stripImageMetadata, 'clean-images.zip');
+    const inspect = useFileAction(inspectImage);
+    const strip = useFileAction(stripImageMetadata, 'clean-images.zip');
 
     const hasImages = images.length > 0;
     const isPending = inspect.isPending || strip.isPending;

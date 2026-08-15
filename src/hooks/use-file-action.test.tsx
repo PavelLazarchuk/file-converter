@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LoadedImage } from '@/components/image-dropzone';
-import { useImageAction } from '@/hooks/use-image-action';
+import { useFileAction } from '@/hooks/use-file-action';
 import type { ActionFile, ActionResult } from '@/lib/actions';
 import { downloadFile } from '@/lib/download';
 import { AUTO_DOWNLOAD_STORAGE_KEY } from '@/lib/preferences';
@@ -46,7 +46,7 @@ beforeEach(() => {
 describe('running an action', () => {
     it('sends every image under the same field name, plus the parameters', async () => {
         const action = actionReturning({ success: true, files: [resultFile()] });
-        const { result } = renderHook(() => useImageAction(action));
+        const { result } = renderHook(() => useFileAction(action));
 
         act(() => result.current.run([upload('a.png'), upload('b.png')], { quality: '80' }));
         await waitFor(() => expect(action).toHaveBeenCalled());
@@ -65,7 +65,7 @@ describe('running an action', () => {
                 resultFile({ filename: 'b.txt', mimeType: 'text/plain' }),
             ],
         });
-        const { result } = renderHook(() => useImageAction(action));
+        const { result } = renderHook(() => useFileAction(action));
 
         act(() => result.current.run([upload()], {}));
         await waitFor(() => expect(result.current.outcome).not.toBeNull());
@@ -84,7 +84,7 @@ describe('running an action', () => {
             code: 'rate_limited',
             error: 'Too many requests',
         });
-        const { result } = renderHook(() => useImageAction(action));
+        const { result } = renderHook(() => useFileAction(action));
 
         act(() => result.current.run([upload()], {}));
         await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Too many requests'));
@@ -100,7 +100,7 @@ describe('running an action', () => {
                 { filename: 'broken.png', code: 'unreadable_image', error: 'not a readable image' },
             ],
         });
-        const { result } = renderHook(() => useImageAction(action));
+        const { result } = renderHook(() => useFileAction(action));
 
         act(() => result.current.run([upload()], {}));
         await waitFor(() => expect(result.current.outcome).not.toBeNull());
@@ -111,7 +111,7 @@ describe('running an action', () => {
 
     it('hands the raw files to onResult and skips the result card when handled', async () => {
         const action = actionReturning({ success: true, files: [resultFile()] });
-        const { result } = renderHook(() => useImageAction(action));
+        const { result } = renderHook(() => useFileAction(action));
         const onResult = vi.fn(() => 'handled' as const);
 
         act(() => result.current.run([upload()], {}, { onResult }));
@@ -139,7 +139,7 @@ describe('batching', () => {
 
     it('splits a batch into sequential requests of the configured size', async () => {
         const action = chunkedAction();
-        const { result } = renderHook(() => useImageAction(action, 'out.zip', { chunkSize: 2 }));
+        const { result } = renderHook(() => useFileAction(action, 'out.zip', { chunkSize: 2 }));
 
         act(() => result.current.run(uploads(5), { quality: 80 }));
         await waitFor(() => expect(result.current.outcome).not.toBeNull());
@@ -152,7 +152,7 @@ describe('batching', () => {
     it('repeats the parameters on every chunk, including an extra upload', async () => {
         const action = chunkedAction();
         const logo = new File([new Uint8Array([1])], 'logo.png', { type: 'image/png' });
-        const { result } = renderHook(() => useImageAction(action, 'out.zip', { chunkSize: 2 }));
+        const { result } = renderHook(() => useFileAction(action, 'out.zip', { chunkSize: 2 }));
 
         act(() => result.current.run(uploads(3), { mode: 'image', margin: 24, logo }));
         await waitFor(() => expect(result.current.outcome).not.toBeNull());
@@ -166,7 +166,7 @@ describe('batching', () => {
 
     it('sends one request when chunking is off, however many images there are', async () => {
         const action = chunkedAction();
-        const { result } = renderHook(() => useImageAction(action, 'out.zip', { chunkSize: null }));
+        const { result } = renderHook(() => useFileAction(action, 'out.zip', { chunkSize: null }));
 
         act(() => result.current.run(uploads(6), {}));
         await waitFor(() => expect(result.current.outcome).not.toBeNull());
@@ -177,7 +177,7 @@ describe('batching', () => {
 
     it('still fires once for a form that uploads nothing', async () => {
         const action = chunkedAction();
-        const { result } = renderHook(() => useImageAction(action, 'out.zip', { chunkSize: 2 }));
+        const { result } = renderHook(() => useFileAction(action, 'out.zip', { chunkSize: 2 }));
 
         act(() => result.current.run([], { width: 320 }));
         await waitFor(() => expect(action).toHaveBeenCalled());
@@ -197,7 +197,7 @@ describe('batching', () => {
                 code: 'rate_limited',
                 error: 'Too many requests',
             });
-        const { result } = renderHook(() => useImageAction(action, 'out.zip', { chunkSize: 1 }));
+        const { result } = renderHook(() => useFileAction(action, 'out.zip', { chunkSize: 1 }));
 
         act(() => result.current.run(uploads(3), {}));
         await waitFor(() => expect(result.current.outcome).not.toBeNull());
@@ -216,7 +216,7 @@ describe('batching', () => {
             code: 'rate_limited',
             error: 'Too many requests',
         });
-        const { result } = renderHook(() => useImageAction(action, 'out.zip', { chunkSize: 1 }));
+        const { result } = renderHook(() => useFileAction(action, 'out.zip', { chunkSize: 1 }));
 
         act(() => result.current.run(uploads(3), {}));
         await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Too many requests'));
@@ -228,7 +228,7 @@ describe('batching', () => {
 
     it('leaves progress unset for a batch that fits in one request', async () => {
         const action = chunkedAction();
-        const { result } = renderHook(() => useImageAction(action, 'out.zip', { chunkSize: 5 }));
+        const { result } = renderHook(() => useFileAction(action, 'out.zip', { chunkSize: 5 }));
 
         act(() => result.current.run(uploads(3), {}));
         await waitFor(() => expect(result.current.outcome).not.toBeNull());
@@ -240,7 +240,7 @@ describe('batching', () => {
 describe('automatic downloads', () => {
     it('stays off by default', async () => {
         const action = actionReturning({ success: true, files: [resultFile()] });
-        const { result } = renderHook(() => useImageAction(action));
+        const { result } = renderHook(() => useFileAction(action));
 
         act(() => result.current.run([upload()], {}));
         await waitFor(() => expect(result.current.outcome).not.toBeNull());
@@ -252,7 +252,7 @@ describe('automatic downloads', () => {
         localStorage.setItem(AUTO_DOWNLOAD_STORAGE_KEY, 'true');
 
         const action = actionReturning({ success: true, files: [resultFile()] });
-        const { result } = renderHook(() => useImageAction(action));
+        const { result } = renderHook(() => useFileAction(action));
 
         act(() => result.current.run([upload()], {}));
         await waitFor(() => expect(downloaded).toHaveBeenCalled());
@@ -267,7 +267,7 @@ describe('automatic downloads', () => {
             success: true,
             files: [resultFile({ filename: 'a.png' }), resultFile({ filename: 'b.png' })],
         });
-        const { result } = renderHook(() => useImageAction(action, 'compressed-images.zip'));
+        const { result } = renderHook(() => useFileAction(action, 'compressed-images.zip'));
 
         act(() => result.current.run([upload()], {}));
         await waitFor(() => expect(downloaded).toHaveBeenCalled());
@@ -288,7 +288,7 @@ describe('automatic downloads', () => {
             success: true,
             files: [resultFile({ warning: "Couldn't reach 100 KB" })],
         });
-        const { result } = renderHook(() => useImageAction(action));
+        const { result } = renderHook(() => useFileAction(action));
 
         act(() => result.current.run([upload()], {}));
         await waitFor(() => expect(result.current.outcome).not.toBeNull());
@@ -306,7 +306,7 @@ describe('automatic downloads', () => {
                 { filename: 'broken.png', code: 'unreadable_image', error: 'not a readable image' },
             ],
         });
-        const { result } = renderHook(() => useImageAction(action));
+        const { result } = renderHook(() => useFileAction(action));
 
         act(() => result.current.run([upload()], {}));
         await waitFor(() => expect(result.current.outcome).not.toBeNull());
@@ -318,7 +318,7 @@ describe('automatic downloads', () => {
 describe('downloadAll', () => {
     it('downloads a lone result as itself, not as a zip', async () => {
         const action = actionReturning({ success: true, files: [resultFile()] });
-        const { result } = renderHook(() => useImageAction(action));
+        const { result } = renderHook(() => useFileAction(action));
 
         act(() => result.current.run([upload()], {}));
         await waitFor(() => expect(result.current.outcome).not.toBeNull());
@@ -329,7 +329,7 @@ describe('downloadAll', () => {
 
     it('does nothing when there is no result', () => {
         const action = actionReturning({ success: true, files: [resultFile()] });
-        const { result } = renderHook(() => useImageAction(action));
+        const { result } = renderHook(() => useFileAction(action));
 
         act(() => result.current.downloadAll());
 
@@ -344,7 +344,7 @@ describe('object URL bookkeeping', () => {
             success: true,
             files: [resultFile({ filename: 'a.png' }), resultFile({ filename: 'b.png' })],
         });
-        const { result } = renderHook(() => useImageAction(action));
+        const { result } = renderHook(() => useFileAction(action));
 
         act(() => result.current.run([upload()], {}));
         await waitFor(() => expect(result.current.outcome).not.toBeNull());
@@ -364,7 +364,7 @@ describe('object URL bookkeeping', () => {
 
     it('drops the result straight away when a new run starts mid-exit', async () => {
         const action = actionReturning({ success: true, files: [resultFile()] });
-        const { result } = renderHook(() => useImageAction(action));
+        const { result } = renderHook(() => useFileAction(action));
 
         act(() => result.current.run([upload()], {}));
         await waitFor(() => expect(result.current.outcome).not.toBeNull());
@@ -379,7 +379,7 @@ describe('object URL bookkeeping', () => {
     it('revokes the previews when the component unmounts', async () => {
         const revoke = vi.spyOn(URL, 'revokeObjectURL');
         const action = actionReturning({ success: true, files: [resultFile()] });
-        const { result, unmount } = renderHook(() => useImageAction(action));
+        const { result, unmount } = renderHook(() => useFileAction(action));
 
         act(() => result.current.run([upload()], {}));
         await waitFor(() => expect(result.current.outcome).not.toBeNull());
