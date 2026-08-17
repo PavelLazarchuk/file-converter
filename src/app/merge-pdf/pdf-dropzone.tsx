@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 
 import { DropzoneShell, RemoveButton, ReorderControls } from '@/components/dropzone-shell';
 import { Button } from '@/components/ui/button';
+import { useHandoffIntake } from '@/hooks/use-handoff';
 import { useUploads } from '@/hooks/use-uploads';
 import {
     MAX_BATCH_SIZE_LABEL,
@@ -81,6 +82,8 @@ export function PdfDropzone({
 
         onAdd(accepted.map(file => ({ file, id: `pdf-${(idRef.current += 1)}` })));
     }
+
+    useHandoffIntake(loadFiles);
 
     const hiddenInput = (
         <input

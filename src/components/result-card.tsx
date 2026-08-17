@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import { usePathname } from 'next/navigation';
 import { Download, FileCheck2, TriangleAlert, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useAutoDownload } from '@/hooks/use-auto-download';
 import { useFilenameTemplate } from '@/hooks/use-filename-template';
+import { useSendToTool } from '@/hooks/use-handoff';
 import {
     downloadResult,
     outcomeNames,
@@ -17,7 +19,9 @@ import {
     type OutcomeFile,
 } from '@/hooks/use-file-action';
 import { FILENAME_TEMPLATE_MAX_LENGTH, FILENAME_TOKENS } from '@/lib/filename-template';
+import { handoffTargets } from '@/lib/handoff';
 import { countLabel, formatFileSize, sizeChange } from '@/lib/image';
+import { TOOLS } from '@/lib/site';
 import { cn } from '@/lib/utils';
 
 const CHECKERBOARD: React.CSSProperties = {
@@ -102,6 +106,54 @@ function Warning({ children }: { children: React.ReactNode }) {
                     <div className="min-w-0">{children}</div>
                 </div>
             </div>
+        </div>
+    );
+}
+
+function SendToTools({ files, names }: { files: OutcomeFile[]; names: string[] }) {
+    const pathname = usePathname();
+    const sendToTool = useSendToTool();
+    const targets = handoffTargets(
+        files.map(entry => entry.file.mimeType),
+        pathname
+    );
+
+    if (!targets.length) return null;
+
+    const from = TOOLS.find(tool => tool.href === pathname)?.title ?? 'the last step';
+
+    return (
+        <div className="space-y-2 border-t pt-4">
+            <p className="text-sm font-medium">Keep going</p>
+            <div className="flex flex-wrap gap-2">
+                {targets.map(tool => (
+                    <Button
+                        key={tool.href}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                            sendToTool(
+                                tool,
+                                from,
+                                files.map((entry, index) => ({
+                                    data: entry.file.data,
+                                    filename: names[index],
+                                    mimeType: entry.file.mimeType,
+                                }))
+                            )
+                        }
+                    >
+                        <tool.icon />
+                        {tool.title}
+                    </Button>
+                ))}
+            </div>
+            <p className="text-sm text-muted-foreground">
+                Opens the tool with{' '}
+                {files.length === 1 ? 'this result' : `these ${files.length} results`} already
+                loaded — no need to download and upload again.
+            </p>
         </div>
     );
 }
@@ -212,6 +264,8 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
                     Discard
                 </Button>
             </div>
+
+            <SendToTools files={files} names={names} />
 
             <div className="space-y-4 border-t pt-4">
                 <div className="space-y-1.5">

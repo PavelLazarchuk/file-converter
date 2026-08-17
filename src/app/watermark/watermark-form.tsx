@@ -160,6 +160,7 @@ export function WatermarkForm() {
                         images={logos.images}
                         formats={CONVERT_SOURCE_KEYS}
                         disabled={isPending}
+                        receivesHandoff={false}
                         onAdd={loaded => {
                             logos.addImages(loaded);
                             clearResult();

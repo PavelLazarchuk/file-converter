@@ -5,10 +5,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ResultCard } from '@/components/result-card';
 import type { ActionFile } from '@/lib/actions';
 import { downloadFile } from '@/lib/download';
+import { clearHandoff, peekHandoff } from '@/lib/handoff';
 import type { ActionOutcome, OutcomeFile } from '@/hooks/use-file-action';
 
+const push = vi.fn();
+let pathname = '/compress';
+
+vi.mock('next/navigation', () => ({
+    useRouter: () => ({ push }),
+    usePathname: () => pathname,
+}));
 vi.mock('@/lib/download', () => ({ downloadFile: vi.fn() }));
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
 const downloaded = vi.mocked(downloadFile);
 
@@ -42,6 +50,9 @@ function setup(value: ActionOutcome) {
 beforeEach(() => {
     localStorage.clear();
     downloaded.mockClear();
+    push.mockClear();
+    clearHandoff();
+    pathname = '/compress';
 });
 
 describe('a single result', () => {
@@ -150,6 +161,67 @@ describe('partial failures', () => {
         expect(screen.getByText('2 files could not be processed')).toBeInTheDocument();
         expect(screen.getByText(/not a readable image/)).toBeInTheDocument();
         expect(screen.getByText(/File is too large/)).toBeInTheDocument();
+    });
+});
+
+describe('handing the result to another tool', () => {
+    it('offers the other tools that take this format, never the current one', () => {
+        setup(outcome([entry()]));
+
+        expect(screen.getByRole('button', { name: 'Resize' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Crop' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Compress' })).toBeNull();
+    });
+
+    it('queues the files and navigates to the tool', async () => {
+        const { user } = setup(outcome([entry({ filename: 'photo.png' })]));
+
+        await user.click(screen.getByRole('button', { name: 'Resize' }));
+
+        const handoff = peekHandoff();
+
+        expect(push).toHaveBeenCalledWith('/resize');
+        expect(handoff?.from).toBe('Compress');
+        expect(handoff?.files.map(file => file.name)).toEqual(['photo.png']);
+        expect(handoff?.files[0].type).toBe('image/png');
+    });
+
+    it('carries the names the card is showing, not the ones the server sent', async () => {
+        localStorage.setItem('filename-template', 'shot-{index}');
+
+        const { user } = setup(
+            outcome([entry({ filename: 'a.png' }), entry({ filename: 'b.png' })])
+        );
+
+        await user.click(screen.getByRole('button', { name: 'Resize' }));
+
+        expect(peekHandoff()?.files.map(file => file.name)).toEqual(['shot-1.png', 'shot-2.png']);
+    });
+
+    it('offers nothing when no tool takes the format', () => {
+        setup(outcome([entry({ filename: 'brand.ico', mimeType: 'image/x-icon' }, false)]));
+
+        expect(screen.queryByText('Keep going')).toBeNull();
+    });
+
+    it('only offers a tool that takes every file in the batch', () => {
+        setup(
+            outcome([
+                entry({ filename: 'a.png' }),
+                entry({ filename: 'b.svg', mimeType: 'image/svg+xml' }),
+            ])
+        );
+
+        expect(screen.getByRole('button', { name: 'Convert' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Resize' })).toBeNull();
+    });
+
+    it('routes a PDF to the PDF tool rather than the image ones', () => {
+        pathname = '/pdf';
+        setup(outcome([entry({ filename: 'pages.pdf', mimeType: 'application/pdf' }, false)]));
+
+        expect(screen.getByRole('button', { name: 'Merge PDFs' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Resize' })).toBeNull();
     });
 });
 

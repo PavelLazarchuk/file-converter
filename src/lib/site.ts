@@ -13,6 +13,15 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 
+import {
+    CONVERT_SOURCE_KEYS,
+    FORMAT_KEYS,
+    IMAGE_FORMATS,
+    MAX_BATCH_FILES,
+    PDF_MIME_TYPE,
+    type ConvertSource,
+} from './image';
+
 export const SITE = {
     name: 'Image Toolbox',
     tagline: 'Resize, Crop, Compress & Convert',
@@ -21,13 +30,34 @@ export const SITE = {
     url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://file-converter-mu-seven.vercel.app',
 } as const;
 
+export type ToolIntake = { mimeTypes: readonly string[]; max: number };
+
 export type Tool = {
     href: string;
     title: string;
     description: string;
     icon: LucideIcon;
     gradient: string;
+    intake?: ToolIntake;
 };
+
+function mimeTypesOf(formats: readonly ConvertSource[]): readonly string[] {
+    return formats.map(format => IMAGE_FORMATS[format].mimeType);
+}
+
+const RASTER_INTAKE: ToolIntake = {
+    mimeTypes: mimeTypesOf(FORMAT_KEYS),
+    max: MAX_BATCH_FILES,
+};
+
+const CONVERT_INTAKE: ToolIntake = {
+    mimeTypes: mimeTypesOf(CONVERT_SOURCE_KEYS),
+    max: MAX_BATCH_FILES,
+};
+
+const SINGLE_RASTER_INTAKE: ToolIntake = { mimeTypes: RASTER_INTAKE.mimeTypes, max: 1 };
+
+const PDF_INTAKE: ToolIntake = { mimeTypes: [PDF_MIME_TYPE], max: MAX_BATCH_FILES };
 
 export function toolTransitionName(part: 'icon' | 'title', href: string): string {
     return `tool-${part}-${href.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '')}`;
@@ -41,6 +71,7 @@ export const TOOLS: readonly Tool[] = [
             'Set exact pixel dimensions with a locked aspect ratio, up to 10,000px — with optional rotation. Up to 20 images at once.',
         icon: Scaling,
         gradient: 'from-sky-500 to-blue-600',
+        intake: RASTER_INTAKE,
     },
     {
         href: '/crop',
@@ -49,6 +80,7 @@ export const TOOLS: readonly Tool[] = [
             'Trim to a preset aspect ratio — square, 16:9, 4:3 and more — or a circle, and drag to frame it.',
         icon: Crop,
         gradient: 'from-amber-500 to-orange-600',
+        intake: SINGLE_RASTER_INTAKE,
     },
     {
         href: '/rotate',
@@ -57,6 +89,7 @@ export const TOOLS: readonly Tool[] = [
             'Turn photos by 90°, 180° or any angle you type, mirror them horizontally or vertically — 20 at a time.',
         icon: RotateCw,
         gradient: 'from-lime-500 to-green-600',
+        intake: RASTER_INTAKE,
     },
     {
         href: '/compare',
@@ -65,6 +98,7 @@ export const TOOLS: readonly Tool[] = [
             'Encode one image to JPEG, PNG, WEBP and AVIF at the same quality and see which comes out smallest.',
         icon: Scale,
         gradient: 'from-fuchsia-500 to-purple-600',
+        intake: SINGLE_RASTER_INTAKE,
     },
     {
         href: '/compress',
@@ -73,6 +107,7 @@ export const TOOLS: readonly Tool[] = [
             'Shrink file size by quality or down to a target size like 500 KB — one image or a batch of 20.',
         icon: Gauge,
         gradient: 'from-violet-500 to-purple-600',
+        intake: RASTER_INTAKE,
     },
     {
         href: '/convert',
@@ -81,6 +116,7 @@ export const TOOLS: readonly Tool[] = [
             'Switch between JPEG, PNG, WEBP, AVIF, GIF, TIFF and SVG in bulk, build an ICO favicon, or get a Base64 data URI.',
         icon: RefreshCw,
         gradient: 'from-emerald-500 to-teal-600',
+        intake: CONVERT_INTAKE,
     },
     {
         href: '/watermark',
@@ -89,6 +125,7 @@ export const TOOLS: readonly Tool[] = [
             'Stamp text or a logo onto a batch — nine positions, adjustable size, margin and opacity.',
         icon: Stamp,
         gradient: 'from-cyan-500 to-sky-600',
+        intake: RASTER_INTAKE,
     },
     {
         href: '/metadata',
@@ -97,6 +134,7 @@ export const TOOLS: readonly Tool[] = [
             'See the EXIF, camera, GPS location and color profile hiding in a photo — and download a clean copy without it.',
         icon: ScanSearch,
         gradient: 'from-indigo-500 to-blue-700',
+        intake: RASTER_INTAKE,
     },
     {
         href: '/placeholder',
@@ -112,6 +150,7 @@ export const TOOLS: readonly Tool[] = [
             'Combine several PDF files into one document, in the order you arrange them — up to 20 files at a time.',
         icon: Combine,
         gradient: 'from-slate-500 to-slate-700',
+        intake: PDF_INTAKE,
     },
     {
         href: '/pdf',
@@ -120,6 +159,7 @@ export const TOOLS: readonly Tool[] = [
             'Combine JPEG, PNG, WEBP, AVIF, GIF or SVG images into one PDF, a page each, fit to the image or a standard A4/Letter page.',
         icon: FileText,
         gradient: 'from-red-500 to-rose-600',
+        intake: CONVERT_INTAKE,
     },
 ] as const;
 

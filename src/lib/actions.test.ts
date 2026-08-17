@@ -1206,3 +1206,91 @@ describe('compareFormats', () => {
         expect(expectFailure(await compareFormats(form([]))).code).toBe('no_file');
     });
 });
+
+describe('handing a result to the next tool', () => {
+    function asUpload(file: ActionFile): File {
+        return new File([file.data as BlobPart], file.filename, { type: file.mimeType });
+    }
+
+    it('feeds a compressed image straight back into resize', async () => {
+        const { file } = await image('png', { width: 400, height: 300 });
+        const compressed = expectSuccess(
+            await compressImage(form([file], { mode: 'quality', quality: '60' }))
+        );
+
+        const resized = expectSuccess(
+            await resizeImage(
+                form([asUpload(compressed.files[0])], {
+                    width: '100',
+                    height: '75',
+                    fit: 'contain',
+                })
+            )
+        );
+
+        const meta = await sharp(Buffer.from(resized.files[0].data)).metadata();
+
+        expect(meta.width).toBe(100);
+        expect(meta.height).toBe(75);
+    });
+
+    it('carries every format a tool advertises, including the converted ones', async () => {
+        const { file } = await image('png', { width: 120, height: 90 });
+        const converted = expectSuccess(await convertImage(form([file], { format: 'webp' })));
+
+        expect(converted.files[0].mimeType).toBe('image/webp');
+
+        const rotated = expectSuccess(
+            await rotateImage(form([asUpload(converted.files[0])], { angle: '90' }))
+        );
+        const meta = await sharp(Buffer.from(rotated.files[0].data)).metadata();
+
+        expect(meta.width).toBe(90);
+        expect(meta.height).toBe(120);
+    });
+
+    it('takes a generated placeholder, which never was an upload at all', async () => {
+        const placeholder = expectSuccess(
+            await generatePlaceholder(
+                form([], {
+                    width: '300',
+                    height: '200',
+                    bgColor: '#112233',
+                    textColor: '#ffffff',
+                    text: 'hello',
+                    format: 'png',
+                })
+            )
+        );
+
+        const cropped = expectSuccess(
+            await cropImage(
+                form([asUpload(placeholder.files[0])], {
+                    ratio: 'free',
+                    shape: 'rectangle',
+                    left: '0',
+                    top: '0',
+                    width: '150',
+                    height: '100',
+                })
+            )
+        );
+        const meta = await sharp(Buffer.from(cropped.files[0].data)).metadata();
+
+        expect(meta.width).toBe(150);
+        expect(meta.height).toBe(100);
+    });
+
+    it('merges the PDF the image tool just produced', async () => {
+        const { file } = await image('png', { width: 200, height: 150 });
+        const built = expectSuccess(await imageToPdf(form([file], { pageSize: 'fit' })));
+
+        expect(built.files[0].mimeType).toBe('application/pdf');
+
+        const upload = asUpload(built.files[0]);
+        const merged = expectSuccess(await mergePdf(form([upload, upload])));
+        const document = await PDFDocument.load(merged.files[0].data);
+
+        expect(document.getPageCount()).toBe(2);
+    });
+});

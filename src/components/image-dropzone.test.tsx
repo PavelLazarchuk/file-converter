@@ -3,9 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ImageDropzone, useLoadedImages, type LoadedImage } from '@/components/image-dropzone';
+import { clearHandoff, peekHandoff, setHandoff } from '@/lib/handoff';
 import { CONVERT_SOURCE_KEYS, MAX_BATCH_FILES, MAX_FILE_SIZE } from '@/lib/image';
 
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
 const { toast } = await import('sonner');
 
@@ -39,6 +40,61 @@ function setup(props: Partial<React.ComponentProps<typeof ImageDropzone>> = {}) 
 
 beforeEach(() => {
     vi.mocked(toast.error).mockClear();
+    vi.mocked(toast.info).mockClear();
+    clearHandoff();
+});
+
+describe('a result handed over by another tool', () => {
+    it('loads it on mount, without a drop', async () => {
+        setHandoff('Compress', [png('shrunk.png')]);
+
+        const { onAdd } = setup({ max: MAX_BATCH_FILES });
+
+        await waitFor(() => expect(onAdd).toHaveBeenCalled());
+
+        expect(onAdd.mock.calls[0][0].map((image: LoadedImage) => image.file.name)).toEqual([
+            'shrunk.png',
+        ]);
+        expect(toast.info).toHaveBeenCalledWith('1 file from Compress');
+        expect(peekHandoff()).toBeNull();
+    });
+
+    it('puts the files through the same rules a drop obeys', async () => {
+        setHandoff('Convert', [png('fine.png'), sized('huge.png', MAX_FILE_SIZE + 1)]);
+
+        const { onAdd } = setup({ max: MAX_BATCH_FILES });
+
+        await waitFor(() => expect(onAdd).toHaveBeenCalled());
+
+        expect(onAdd.mock.calls[0][0].map((image: LoadedImage) => image.file.name)).toEqual([
+            'fine.png',
+        ]);
+        expect(toast.error).toHaveBeenCalledWith('huge.png: larger than 20MB.');
+    });
+
+    it('keeps only the first image when the tool takes one', async () => {
+        setHandoff('Compare formats', [png('a.png'), png('b.png')]);
+
+        const { onAdd } = setup();
+
+        await waitFor(() => expect(onAdd).toHaveBeenCalled());
+
+        expect(onAdd.mock.calls[0][0].map((image: LoadedImage) => image.file.name)).toEqual([
+            'a.png',
+        ]);
+        expect(toast.error).toHaveBeenCalledWith(
+            'There is room for 1 more image — skipped the rest.'
+        );
+    });
+
+    it('leaves the handoff alone when the dropzone has opted out', () => {
+        setHandoff('Compress', [png('shrunk.png')]);
+
+        const { onAdd } = setup({ receivesHandoff: false });
+
+        expect(onAdd).not.toHaveBeenCalled();
+        expect(peekHandoff()).not.toBeNull();
+    });
 });
 
 describe('the empty dropzone', () => {

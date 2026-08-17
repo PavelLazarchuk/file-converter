@@ -12,6 +12,7 @@ import {
     usePasteFiles,
 } from '@/components/dropzone-shell';
 import { Button } from '@/components/ui/button';
+import { useHandoffIntake } from '@/hooks/use-handoff';
 import { useUploads } from '@/hooks/use-uploads';
 import {
     FORMAT_KEYS,
@@ -72,6 +73,7 @@ type ImageDropzoneProps = {
     disabled?: boolean;
     formats?: readonly ConvertSource[];
     max?: number;
+    receivesHandoff?: boolean;
 };
 
 export function ImageDropzone({
@@ -83,6 +85,7 @@ export function ImageDropzone({
     disabled,
     formats = FORMAT_KEYS,
     max = 1,
+    receivesHandoff = true,
 }: ImageDropzoneProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const loadTokenRef = useRef(0);
@@ -133,6 +136,8 @@ export function ImageDropzone({
         disabled,
         filter: file => file.type.startsWith('image/'),
     });
+
+    useHandoffIntake(files => void loadFiles(files), receivesHandoff);
 
     const accept = formats.map(format => IMAGE_FORMATS[format].mimeType).join(',');
     const hiddenInput = (
