@@ -5,6 +5,7 @@ import {
     FileText,
     Gauge,
     ImagePlus,
+    Palette,
     RefreshCw,
     RotateCw,
     Scaling,
@@ -49,6 +50,7 @@ export type ToolKey =
     | 'compress'
     | 'convert'
     | 'watermark'
+    | 'filters'
     | 'metadata'
     | 'placeholder'
     | 'mergePdf'
@@ -134,6 +136,13 @@ export const TOOLS: readonly Tool[] = [
         href: '/watermark',
         icon: Stamp,
         gradient: 'from-cyan-500 to-sky-600',
+        intake: RASTER_INTAKE,
+    },
+    {
+        key: 'filters',
+        href: '/filters',
+        icon: Palette,
+        gradient: 'from-yellow-500 to-amber-600',
         intake: RASTER_INTAKE,
     },
     {

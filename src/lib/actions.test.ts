@@ -7,6 +7,7 @@ import {
     compressImage,
     convertImage,
     cropImage,
+    filterImage,
     generatePlaceholder,
     imageToPdf,
     inspectImage,
@@ -781,6 +782,111 @@ describe('rotateImage', () => {
             code: 'invalid_settings',
             error: expect.stringContaining('Angle must be between'),
         });
+    });
+});
+
+describe('filterImage', () => {
+    async function pixel(file: ActionFile) {
+        const { data } = await sharp(Buffer.from(file.data))
+            .raw()
+            .toBuffer({ resolveWithObject: true });
+
+        return { r: data[0], g: data[1], b: data[2] };
+    }
+
+    it('drains the color for black & white and names the output after the effect', async () => {
+        const source = await image('png', { name: 'shot.png' });
+        const { files } = expectSuccess(
+            await filterImage(form([source.file], { effect: 'grayscale' }))
+        );
+        const { r, g, b } = await pixel(files[0]);
+
+        expect(files[0].filename).toBe('shot-grayscale.png');
+        expect(r).toBe(g);
+        expect(g).toBe(b);
+    });
+
+    it('inverts a red fixture towards cyan', async () => {
+        const source = await image('png');
+        const { files } = expectSuccess(
+            await filterImage(form([source.file], { effect: 'invert' }))
+        );
+        const { r, g, b } = await pixel(files[0]);
+
+        expect(r).toBeLessThan(60);
+        expect(g).toBeGreaterThan(190);
+        expect(b).toBeGreaterThan(190);
+    });
+
+    it('warms a cold image up for sepia and names it so', async () => {
+        const buffer = await sharp({
+            create: { width: 20, height: 20, channels: 3, background: { r: 20, g: 60, b: 220 } },
+        })
+            .png()
+            .toBuffer();
+        const file = new File([new Uint8Array(buffer)], 'old.png', { type: 'image/png' });
+        const { files } = expectSuccess(await filterImage(form([file], { effect: 'sepia' })));
+        const { r, g, b } = await pixel(files[0]);
+
+        expect(files[0].filename).toBe('old-sepia.png');
+        expect(r).toBeGreaterThan(g);
+        expect(g).toBeGreaterThan(b);
+    });
+
+    it('moves brightness both ways, under a generic name', async () => {
+        const buffer = await sharp({
+            create: { width: 20, height: 20, channels: 3, background: { r: 120, g: 120, b: 120 } },
+        })
+            .png()
+            .toBuffer();
+        const file = new File([new Uint8Array(buffer)], 'dim.png', { type: 'image/png' });
+        const brighter = expectSuccess(await filterImage(form([file], { brightness: '150' })));
+        const darker = expectSuccess(await filterImage(form([file], { brightness: '50' })));
+
+        expect(brighter.files[0].filename).toBe('dim-filtered.png');
+        expect((await pixel(brighter.files[0])).r).toBeGreaterThan(120);
+        expect((await pixel(darker.files[0])).r).toBeLessThan(120);
+    });
+
+    it('refuses a request that would change nothing', async () => {
+        const source = await image('png');
+
+        expect(expectFailure(await filterImage(form([source.file], {})))).toMatchObject({
+            code: 'nothing_to_do',
+            error: expect.stringContaining('Nothing to do'),
+        });
+    });
+
+    it('rejects a dial outside its range', async () => {
+        const source = await image('png');
+
+        expect(
+            expectFailure(await filterImage(form([source.file], { saturation: '500' })))
+        ).toMatchObject({
+            code: 'invalid_settings',
+            error: expect.stringContaining('Saturation must be between'),
+        });
+    });
+
+    it('keeps a transparent background transparent when inverting', async () => {
+        const buffer = await sharp({
+            create: {
+                width: 20,
+                height: 20,
+                channels: 4,
+                background: { r: 10, g: 20, b: 30, alpha: 0 },
+            },
+        })
+            .png()
+            .toBuffer();
+        const file = new File([new Uint8Array(buffer)], 'clear.png', { type: 'image/png' });
+        const { files } = expectSuccess(await filterImage(form([file], { effect: 'invert' })));
+        const { data, info } = await sharp(Buffer.from(files[0].data))
+            .raw()
+            .toBuffer({ resolveWithObject: true });
+
+        expect(info.channels).toBe(4);
+        expect(data[3]).toBe(0);
     });
 });
 

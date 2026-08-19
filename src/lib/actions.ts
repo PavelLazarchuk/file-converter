@@ -9,6 +9,7 @@ import {
     DEFAULT_ICO_SIZES,
     DEFAULT_QUALITY,
     DEFAULT_TARGET_KB,
+    FILTER_DEFAULTS,
     FORMAT_KEYS,
     MAX_BATCH_BYTES,
     MAX_BATCH_FILES,
@@ -17,6 +18,7 @@ import {
     PDF_MIME_TYPE,
     WATERMARK_DEFAULTS,
     convertSourceFromSharpFormat,
+    filtersChangeNothing,
     stripExtension,
     uniqueFilenames,
     type ConvertSource,
@@ -43,6 +45,7 @@ import {
     type SourceImage,
 } from './pipelines/core';
 import { cropPipeline } from './pipelines/crop';
+import { filterPipeline } from './pipelines/filter';
 import { inspectPipeline, stripPipeline } from './pipelines/inspect';
 import { placeholderPipeline } from './pipelines/placeholder';
 import { resizePipeline } from './pipelines/resize';
@@ -55,6 +58,7 @@ import {
     compressSchema,
     convertSchema,
     cropSchema,
+    filterSchema,
     icoOptionsSchema,
     imageToPdfSchema,
     outputSizeSchema,
@@ -84,6 +88,7 @@ type ToolName =
     | 'compress'
     | 'compare'
     | 'convert'
+    | 'filters'
     | 'pdf'
     | 'merge-pdf'
     | 'placeholder'
@@ -602,6 +607,28 @@ export async function rotateImage(formData: FormData): Promise<ActionResult> {
         }
 
         return eachFile(batch, source => rotatePipeline(source, params));
+    });
+}
+
+export async function filterImage(formData: FormData): Promise<ActionResult> {
+    return runFiles('filters', formData, FORMAT_KEYS, async batch => {
+        const parsed = filterSchema.safeParse({
+            effect: formData.get('effect') || FILTER_DEFAULTS.effect,
+            brightness: formData.get('brightness') || FILTER_DEFAULTS.brightness,
+            saturation: formData.get('saturation') || FILTER_DEFAULTS.saturation,
+            hue: formData.get('hue') || FILTER_DEFAULTS.hue,
+            blur: formData.get('blur') || FILTER_DEFAULTS.blur,
+        });
+
+        if (!parsed.success) throw invalid(parsed.error);
+
+        const params = { ...parsed.data, sharpen: flag(formData, 'sharpen') };
+
+        if (filtersChangeNothing(params)) throw fail({ code: 'nothing_to_do' });
+
+        return eachFile(batch, source =>
+            filterPipeline(source, { ...params, keepMetadata: keepMetadataRequested(formData) })
+        );
     });
 }
 

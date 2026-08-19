@@ -2,13 +2,17 @@ import { z } from 'zod';
 
 import { fieldMessage, type FieldLabel } from './form-messages';
 import {
+    BLUR_LIMITS,
+    BRIGHTNESS_LIMITS,
     COMPRESS_MODES,
     CONVERT_TARGET_KEYS,
     CROP_RATIO_KEYS,
     CROP_SHAPE_KEYS,
     DIMENSION_LIMITS,
+    FILTER_EFFECT_KEYS,
     FORMAT_KEYS,
     HEX_COLOR_PATTERN,
+    HUE_LIMITS,
     ICO_SIZE_OPTIONS,
     PDF_PAGE_SIZE_KEYS,
     PLACEHOLDER_TEXT_MAX_LENGTH,
@@ -16,6 +20,7 @@ import {
     RESIZE_FIT_KEYS,
     ROTATE_ANGLE_LIMITS,
     ROTATION_KEYS,
+    SATURATION_LIMITS,
     TARGET_SIZE_LIMITS,
     WATERMARK_MARGIN_LIMITS,
     WATERMARK_MODE_KEYS,
@@ -80,6 +85,14 @@ export const outputSizeSchema = z
 export const rotateSchema = z.object({
     angle: integerInRange(ROTATE_ANGLE_LIMITS.min, ROTATE_ANGLE_LIMITS.max, 'angle'),
     background: hexColor('background'),
+});
+
+export const filterSchema = z.object({
+    effect: z.enum(FILTER_EFFECT_KEYS, { error: fieldMessage({ k: 'chooseEffect' }) }),
+    brightness: integerInRange(BRIGHTNESS_LIMITS.min, BRIGHTNESS_LIMITS.max, 'brightness'),
+    saturation: integerInRange(SATURATION_LIMITS.min, SATURATION_LIMITS.max, 'saturation'),
+    hue: integerInRange(HUE_LIMITS.min, HUE_LIMITS.max, 'hue'),
+    blur: integerInRange(BLUR_LIMITS.min, BLUR_LIMITS.max, 'blur'),
 });
 
 export const watermarkSchema = z
@@ -186,6 +199,8 @@ export type PlaceholderInput = z.input<typeof placeholderSchema>;
 export type PlaceholderValues = z.output<typeof placeholderSchema>;
 export type ImageToPdfInput = z.input<typeof imageToPdfSchema>;
 export type ImageToPdfValues = z.output<typeof imageToPdfSchema>;
+export type FilterInput = z.input<typeof filterSchema>;
+export type FilterValues = z.output<typeof filterSchema>;
 export type RotateInput = z.input<typeof rotateSchema>;
 export type RotateValues = z.output<typeof rotateSchema>;
 export type WatermarkInput = z.input<typeof watermarkSchema>;

@@ -30,6 +30,11 @@ import {
     placeholderLabel,
     rotateFillsCorners,
     rotateSuffix,
+    filterCss,
+    filterSuffix,
+    filtersChangeNothing,
+    FILTER_PRESETS,
+    type FilterOptions,
     rotationSwapsDimensions,
     sizeChange,
     sizePreset,
@@ -228,6 +233,48 @@ describe('placeholder text', () => {
             placeholderFontSize(600, 400, 'x')
         );
         expect(placeholderFontSize(10, 10, 'x'.repeat(60))).toBeGreaterThanOrEqual(4);
+    });
+});
+
+describe('filters', () => {
+    const neutral: FilterOptions = {
+        effect: 'none',
+        brightness: 100,
+        saturation: 100,
+        hue: 0,
+        blur: 0,
+        sharpen: false,
+    };
+
+    it('treats every dial at its neutral value as a no-op', () => {
+        expect(filtersChangeNothing(neutral)).toBe(true);
+        expect(filtersChangeNothing({ ...neutral, effect: 'sepia' })).toBe(false);
+        expect(filtersChangeNothing({ ...neutral, brightness: 101 })).toBe(false);
+        expect(filtersChangeNothing({ ...neutral, saturation: 99 })).toBe(false);
+        expect(filtersChangeNothing({ ...neutral, hue: 1 })).toBe(false);
+        expect(filtersChangeNothing({ ...neutral, blur: 1 })).toBe(false);
+        expect(filtersChangeNothing({ ...neutral, sharpen: true })).toBe(false);
+    });
+
+    it('names the output after the effect, or generically without one', () => {
+        expect(filterSuffix({ ...neutral, effect: 'grayscale' })).toBe('grayscale');
+        expect(filterSuffix({ ...neutral, brightness: 130 })).toBe('filtered');
+    });
+
+    it('builds a CSS filter that lists only the dials that moved', () => {
+        expect(filterCss(neutral)).toBe('none');
+        expect(filterCss({ ...neutral, effect: 'invert', brightness: 120 })).toBe(
+            'invert(1) brightness(1.2)'
+        );
+        expect(filterCss({ ...neutral, saturation: 0, hue: 180, blur: 3 })).toBe(
+            'saturate(0) hue-rotate(180deg) blur(3px)'
+        );
+    });
+
+    it('ships presets that all do something', () => {
+        for (const preset of Object.values(FILTER_PRESETS)) {
+            expect(filtersChangeNothing(preset)).toBe(false);
+        }
     });
 });
 

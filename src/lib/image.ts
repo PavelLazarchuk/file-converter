@@ -123,6 +123,74 @@ export function rotateSuffix({ angle, flipHorizontal, flipVertical }: RotateOpti
     return parts.length ? parts.join('-') : 'rotated';
 }
 
+export const FILTER_EFFECT_KEYS = ['none', 'grayscale', 'sepia', 'invert'] as const;
+
+export type FilterEffect = (typeof FILTER_EFFECT_KEYS)[number];
+
+export const BRIGHTNESS_LIMITS = { min: 10, max: 300 } as const;
+export const SATURATION_LIMITS = { min: 0, max: 300 } as const;
+export const HUE_LIMITS = { min: 0, max: 360 } as const;
+
+export const BLUR_LIMITS = { min: 0, max: 20 } as const;
+
+export const FILTER_DEFAULTS = {
+    effect: 'none',
+    brightness: '100',
+    saturation: '100',
+    hue: '0',
+    blur: '0',
+} as const;
+
+export type FilterOptions = {
+    effect: FilterEffect;
+    brightness: number;
+    saturation: number;
+    hue: number;
+    blur: number;
+    sharpen: boolean;
+};
+
+export const FILTER_PRESET_KEYS = ['bw', 'vintage', 'vivid', 'cool', 'soft'] as const;
+
+export type FilterPresetKey = (typeof FILTER_PRESET_KEYS)[number];
+
+export const FILTER_PRESETS: Record<FilterPresetKey, FilterOptions> = {
+    bw: { effect: 'grayscale', brightness: 105, saturation: 100, hue: 0, blur: 0, sharpen: true },
+    vintage: { effect: 'sepia', brightness: 105, saturation: 90, hue: 0, blur: 0, sharpen: false },
+    vivid: { effect: 'none', brightness: 105, saturation: 160, hue: 0, blur: 0, sharpen: true },
+    cool: { effect: 'none', brightness: 100, saturation: 110, hue: 200, blur: 0, sharpen: false },
+    soft: { effect: 'none', brightness: 105, saturation: 95, hue: 0, blur: 3, sharpen: false },
+};
+
+export function filtersChangeNothing(options: FilterOptions): boolean {
+    return (
+        options.effect === 'none' &&
+        options.brightness === 100 &&
+        options.saturation === 100 &&
+        options.hue === 0 &&
+        options.blur === 0 &&
+        !options.sharpen
+    );
+}
+
+export function filterSuffix(options: FilterOptions): string {
+    return options.effect === 'none' ? 'filtered' : options.effect;
+}
+
+export function filterCss({ effect, brightness, saturation, hue, blur }: FilterOptions): string {
+    const parts = [
+        ...(effect === 'grayscale' ? ['grayscale(1)'] : []),
+        ...(effect === 'sepia' ? ['sepia(1)'] : []),
+        ...(effect === 'invert' ? ['invert(1)'] : []),
+        ...(brightness === 100 ? [] : [`brightness(${brightness / 100})`]),
+        ...(saturation === 100 ? [] : [`saturate(${saturation / 100})`]),
+        ...(hue === 0 ? [] : [`hue-rotate(${hue}deg)`]),
+        ...(blur === 0 ? [] : [`blur(${blur}px)`]),
+    ];
+
+    return parts.length ? parts.join(' ') : 'none';
+}
+
 export const RESIZE_FIT_KEYS = ['contain', 'cover', 'fill', 'inside'] as const;
 
 export type ResizeFit = (typeof RESIZE_FIT_KEYS)[number];

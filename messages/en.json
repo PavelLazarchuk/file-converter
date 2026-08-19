@@ -39,6 +39,10 @@
             "title": "Watermark",
             "description": "Stamp text or a logo onto a batch — nine positions, adjustable size, margin and opacity."
         },
+        "filters": {
+            "title": "Filters",
+            "description": "Turn a batch black & white or sepia, invert it, or dial brightness, saturation, hue and blur by hand."
+        },
         "metadata": {
             "title": "Metadata",
             "description": "See the EXIF, camera, GPS location and color profile hiding in a photo — and download a clean copy without it."
@@ -195,6 +199,19 @@
             "a4Hint": "Standard A4 page, image centered and scaled to fit with a margin.",
             "letter": "US Letter",
             "letterHint": "Standard Letter page, image centered and scaled to fit with a margin."
+        },
+        "effects": {
+            "none": "None — adjustments only",
+            "grayscale": "Black & white",
+            "sepia": "Sepia",
+            "invert": "Invert colors"
+        },
+        "filterPresets": {
+            "bw": "B&W",
+            "vintage": "Vintage",
+            "vivid": "Vivid",
+            "cool": "Cool",
+            "soft": "Soft focus"
         }
     },
     "Uploads": {
@@ -415,6 +432,28 @@
         "submit": "Add watermark",
         "submitDownload": "Add watermark & download"
     },
+    "Filters": {
+        "metaTitle": "Apply photo filters",
+        "metaDescription": "Make JPEG, PNG, WEBP or AVIF images black & white or sepia, invert them, or adjust brightness, saturation, hue and blur — up to 20 at a time.",
+        "heading": "Filters & Adjustments",
+        "intro": "Start from a preset or set every dial yourself. The effect is applied first, then the adjustments, then blur and sharpening — exactly the order the preview shows.",
+        "presets": "Presets",
+        "reset": "Reset",
+        "effect": "Effect",
+        "adjustments": "Adjustments",
+        "brightness": "Brightness ({min}–{max}%)",
+        "saturation": "Saturation ({min}–{max}%)",
+        "hue": "Hue rotation ({min}–{max}°)",
+        "blur": "Blur ({min}–{max}, 0 turns it off)",
+        "sharpen": "Sharpen",
+        "sharpenHint": "A light unsharp mask, applied last — useful after a resize or to give a black & white photo more bite.",
+        "preview": "Preview",
+        "previewHint": "Approximate preview of the first image, rendered by your browser. Blur is the one place it can differ: the download uses a Gaussian sigma, not a pixel radius.",
+        "pending": "Applying…",
+        "nothingToDo": "Pick an effect or move a dial",
+        "submit": "Apply filters",
+        "submitDownload": "Apply & download"
+    },
     "Placeholder": {
         "metaTitle": "Generate a placeholder image",
         "metaDescription": "Generate solid-color placeholder images with custom dimensions, colors and text as JPEG, PNG, WEBP or AVIF.",
@@ -624,8 +663,13 @@
             "size": "Size",
             "margin": "Margin",
             "bgColor": "Background color",
-            "textColor": "Text color"
-        }
+            "textColor": "Text color",
+            "brightness": "Brightness",
+            "saturation": "Saturation",
+            "hue": "Hue rotation",
+            "blur": "Blur"
+        },
+        "chooseEffect": "Choose an effect"
     },
     "Theme": {
         "group": "Theme",

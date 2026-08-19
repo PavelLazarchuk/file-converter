@@ -14,6 +14,7 @@ export async function toolMetadata(
         | 'Compress'
         | 'Convert'
         | 'Watermark'
+        | 'Filters'
         | 'MetadataTool'
         | 'Placeholder'
         | 'MergePdf'

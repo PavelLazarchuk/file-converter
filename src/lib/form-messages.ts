@@ -14,6 +14,10 @@ export const FIELD_LABELS = [
     'margin',
     'bgColor',
     'textColor',
+    'brightness',
+    'saturation',
+    'hue',
+    'blur',
 ] as const;
 
 export type FieldLabel = (typeof FIELD_LABELS)[number];
@@ -34,6 +38,7 @@ export type FieldMessage =
     | { k: 'chooseTargetFormat' }
     | { k: 'chooseOutputFormat' }
     | { k: 'choosePageSize' }
+    | { k: 'chooseEffect' }
     | { k: 'watermarkTextRequired' }
     | { k: 'outputSizeInvalid' }
     | { k: 'outputSizePattern' }
