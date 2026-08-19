@@ -1,13 +1,17 @@
 import { ViewTransition } from 'react';
-import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
+import { getTranslations } from 'next-intl/server';
 
+import { Link } from '@/i18n/navigation';
 import { TOOLS, toolTransitionName } from '@/lib/site';
 
 const enter =
     'animate-in fade-in fill-mode-backwards duration-500 ease-out motion-reduce:animate-none';
 
-export function Landing() {
+export async function Landing() {
+    const t = await getTranslations('Landing');
+    const tools = await getTranslations('Tools');
+
     return (
         <main className="relative flex-1 overflow-hidden">
             <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
@@ -17,22 +21,21 @@ export function Landing() {
             <div className="mx-auto w-full max-w-5xl px-4 py-20 sm:py-28">
                 <div className={`${enter} slide-in-from-bottom-4 text-center`}>
                     <span className="inline-flex items-center rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
-                        Fast · No sign-up · Files never stored
+                        {t('badge')}
                     </span>
                     <h1 className="mx-auto mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-                        Your images, exactly how you need them
+                        {t('headline')}
                     </h1>
                     <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground text-balance">
-                        {TOOLS.length} focused tools for everyday image work. Upload, tweak,
-                        download — done in seconds.
+                        {t('subline', { count: TOOLS.length })}
                     </p>
                     <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-                        Images are processed on the server, in memory, and never stored.{' '}
+                        {t('privacyNote')}{' '}
                         <Link
                             href="/privacy"
                             className="underline underline-offset-4 hover:text-foreground"
                         >
-                            How it works
+                            {t('privacyLink')}
                         </Link>
                         .
                     </p>
@@ -63,13 +66,15 @@ export function Landing() {
                                     name={toolTransitionName('title', tool.href)}
                                     share="morph"
                                 >
-                                    <h2 className="mt-5 text-lg font-semibold">{tool.title}</h2>
+                                    <h2 className="mt-5 text-lg font-semibold">
+                                        {tools(`${tool.key}.title`)}
+                                    </h2>
                                 </ViewTransition>
                                 <p className="mt-1.5 flex-1 text-sm leading-relaxed text-muted-foreground">
-                                    {tool.description}
+                                    {tools(`${tool.key}.description`)}
                                 </p>
                                 <span className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-primary">
-                                    Open tool
+                                    {t('openTool')}
                                     <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" />
                                 </span>
                             </Link>

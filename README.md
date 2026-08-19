@@ -26,6 +26,19 @@ All processing happens server-side in Server Actions via [sharp](https://sharp.p
 
 The uploaded format is detected from the file's own bytes (`sharp.metadata()`), not from the browser-supplied MIME type, so a mislabelled or type-less upload gets a real error message instead of a generic failure.
 
+## Languages
+
+The UI ships in English and is fully translated through [next-intl](https://next-intl.dev). Every user-facing string — form labels, dropzone copy, error messages, page titles and the JSON-LD — lives in `messages/en.json`; no component holds prose of its own. The default locale is served unprefixed (`/compress`), any other one is prefixed (`/de/compress`), and `src/proxy.ts` rewrites between the two.
+
+Adding a language is two edits:
+
+1. copy `messages/en.json` to `messages/<locale>.json` and translate it;
+2. add the locale to `routing.locales` in `src/i18n/routing.ts`.
+
+Keys are never collected by hand after that: `npm run i18n:sync` copies every key English has into the other catalogs, prefixing untranslated values with `TODO: ` and dropping stray ones (`npm run i18n:check` does the same as a CI gate). Nothing can drift silently either — `messages/en.json` types the message shape, so an unknown key fails `npm run typecheck`, and `src/lib/messages.test.ts` fails on any key mismatch between catalogs.
+
+Routing, `hreflang`, the sitemap, `<html lang>`, number formatting and plural rules follow automatically. A language switcher is not built yet; `usePathname`/`useRouter` from `src/i18n/navigation.ts` are already in place for one.
+
 The theme follows the OS by default and can be pinned to light or dark from the header; the choice lives in `localStorage` and is applied before first paint by a small inline script (`src/lib/theme.ts`).
 
 ## Setup
@@ -48,13 +61,13 @@ Set `NEXT_PUBLIC_SITE_URL` to override the canonical origin used by the sitemap,
 
 `src/app/` generates them from `src/lib/site.ts`, which is also the single source of truth for the tool list shown on the landing page and in the footer:
 
-| Route                   | Source                |
-| ----------------------- | --------------------- |
-| `/sitemap.xml`          | `sitemap.ts`          |
-| `/robots.txt`           | `robots.ts`           |
-| `/manifest.webmanifest` | `manifest.ts`         |
-| `/opengraph-image`      | `opengraph-image.tsx` |
-| `/icon.svg`             | `icon.svg`            |
-| `/apple-icon.png`       | `apple-icon.png`      |
+| Route                   | Source                         |
+| ----------------------- | ------------------------------ |
+| `/sitemap.xml`          | `sitemap.ts`                   |
+| `/robots.txt`           | `robots.ts`                    |
+| `/manifest.webmanifest` | `manifest.ts`                  |
+| `/opengraph-image`      | `[locale]/opengraph-image.tsx` |
+| `/icon.svg`             | `icon.svg`                     |
+| `/apple-icon.png`       | `apple-icon.png`               |
 
 PWA icons live in `public/` (`icon-192.png`, `icon-512.png`, `icon-512-maskable.png`) and are generated from `src/app/icon.svg`.

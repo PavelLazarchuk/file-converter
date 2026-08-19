@@ -127,17 +127,19 @@ describe('acceptUploads', () => {
     });
 });
 
+const more = (first: string, extra: number) => `${first} (+${extra} more)`;
+
 describe('uploadProblemSummary', () => {
     it('is null when nothing was rejected', () => {
-        expect(uploadProblemSummary([])).toBeNull();
+        expect(uploadProblemSummary([], more)).toBeNull();
     });
 
     it('passes a lone problem through', () => {
-        expect(uploadProblemSummary(['just this'])).toBe('just this');
+        expect(uploadProblemSummary(['just this'], more)).toBe('just this');
     });
 
     it('collapses several into one line', () => {
-        expect(uploadProblemSummary(['first', 'second', 'third'])).toBe('first (+2 more)');
+        expect(uploadProblemSummary(['first', 'second', 'third'], more)).toBe('first (+2 more)');
     });
 });
 

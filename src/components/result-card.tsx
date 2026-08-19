@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
 import { Download, FileCheck2, TriangleAlert, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { usePathname } from '@/i18n/navigation';
 import { useAutoDownload } from '@/hooks/use-auto-download';
 import { useFilenameTemplate } from '@/hooks/use-filename-template';
 import { useSendToTool } from '@/hooks/use-handoff';
@@ -18,10 +19,11 @@ import {
     type ActionOutcome,
     type OutcomeFile,
 } from '@/hooks/use-file-action';
+import { useActionMessage, useFileSize, useWarningMessage } from '@/hooks/use-messages';
 import { FILENAME_TEMPLATE_MAX_LENGTH, FILENAME_TOKENS } from '@/lib/filename-template';
 import { handoffTargets } from '@/lib/handoff';
-import { countLabel, formatFileSize, sizeChange } from '@/lib/image';
-import { TOOLS } from '@/lib/site';
+import { sizeChange } from '@/lib/image';
+import { toolByHref } from '@/lib/site';
 import { cn } from '@/lib/utils';
 
 const CHECKERBOARD: React.CSSProperties = {
@@ -33,6 +35,7 @@ const ROW_STAGGER_MS = 60;
 
 function Preview({ entry, className }: { entry: OutcomeFile; className?: string }) {
     const [decoded, setDecoded] = useState(false);
+    const noPreview = useTranslations('Result')('noPreview');
 
     return (
         <div
@@ -61,7 +64,7 @@ function Preview({ entry, className }: { entry: OutcomeFile; className?: string 
                 />
             ) : (
                 <span className="px-2 text-center font-mono text-xs text-muted-foreground">
-                    No preview
+                    {noPreview}
                 </span>
             )}
         </div>
@@ -69,6 +72,8 @@ function Preview({ entry, className }: { entry: OutcomeFile; className?: string 
 }
 
 function SizeLine({ entry }: { entry: OutcomeFile }) {
+    const t = useTranslations('Result');
+    const fileSize = useFileSize();
     const { originalSize } = entry.file;
     const size = entry.file.data.byteLength;
     const change = originalSize > 0 ? sizeChange(originalSize, size) : null;
@@ -76,11 +81,11 @@ function SizeLine({ entry }: { entry: OutcomeFile }) {
     return (
         <>
             {entry.width && entry.height && `${entry.width} × ${entry.height} · `}
-            {formatFileSize(size)}
+            {fileSize(size)}
             {change && (
                 <>
-                    {' · was '}
-                    {formatFileSize(originalSize)}{' '}
+                    {' · '}
+                    {t('was', { size: fileSize(originalSize) })}{' '}
                     <span
                         className={cn(
                             'inline-block animate-delta-pop font-medium motion-reduce:animate-none',
@@ -89,7 +94,9 @@ function SizeLine({ entry }: { entry: OutcomeFile }) {
                             change.direction === 'larger' && 'text-amber-600 dark:text-amber-400'
                         )}
                     >
-                        {change.label}
+                        {change.direction === 'same'
+                            ? t('noChange')
+                            : t(change.direction, { percent: change.percent })}
                     </span>
                 </>
             )}
@@ -113,18 +120,21 @@ function Warning({ children }: { children: React.ReactNode }) {
 function SendToTools({ files, names }: { files: OutcomeFile[]; names: string[] }) {
     const pathname = usePathname();
     const sendToTool = useSendToTool();
+    const t = useTranslations('Result');
+    const tools = useTranslations('Tools');
     const targets = handoffTargets(
         files.map(entry => entry.file.mimeType),
         pathname
     );
+    const current = toolByHref(pathname);
 
     if (!targets.length) return null;
 
-    const from = TOOLS.find(tool => tool.href === pathname)?.title ?? 'the last step';
+    const from = current ? tools(`${current.key}.title`) : t('lastStep');
 
     return (
         <div className="space-y-2 border-t pt-4">
-            <p className="text-sm font-medium">Keep going</p>
+            <p className="text-sm font-medium">{t('keepGoing')}</p>
             <div className="flex flex-wrap gap-2">
                 {targets.map(tool => (
                     <Button
@@ -145,14 +155,12 @@ function SendToTools({ files, names }: { files: OutcomeFile[]; names: string[] }
                         }
                     >
                         <tool.icon />
-                        {tool.title}
+                        {tools(`${tool.key}.title`)}
                     </Button>
                 ))}
             </div>
             <p className="text-sm text-muted-foreground">
-                Opens the tool with{' '}
-                {files.length === 1 ? 'this result' : `these ${files.length} results`} already
-                loaded — no need to download and upload again.
+                {t('handoffHint', { count: files.length })}
             </p>
         </div>
     );
@@ -168,6 +176,10 @@ type ResultCardProps = {
 export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: ResultCardProps) {
     const { autoDownload, setAutoDownload } = useAutoDownload();
     const { template, setTemplate } = useFilenameTemplate();
+    const t = useTranslations('Result');
+    const common = useTranslations('Common');
+    const message = useActionMessage();
+    const warningMessage = useWarningMessage();
     const { files, failures } = outcome;
     const single = files.length === 1 ? files[0] : null;
     const names = outcomeNames(files, template);
@@ -184,7 +196,9 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
             <div className="flex items-start gap-2.5">
                 <FileCheck2 className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                 <p className="text-sm font-medium">
-                    {single ? 'Result ready' : `${countLabel(files.length, 'result')} ready`}
+                    {single
+                        ? t('ready')
+                        : t('readyCount', { files: common('results', { count: files.length }) })}
                 </p>
             </div>
 
@@ -214,7 +228,7 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
                                 </p>
                                 {entry.file.warning && (
                                     <p className="text-xs text-amber-600 dark:text-amber-400">
-                                        {entry.file.warning}
+                                        {warningMessage(entry.file.warning)}
                                     </p>
                                 )}
                             </div>
@@ -222,8 +236,17 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                aria-label={`Download ${names[index]}`}
-                                onClick={() => downloadResult(entry.file, names[index])}
+                                aria-label={t('downloadOne', { name: names[index] })}
+                                onClick={() =>
+                                    downloadResult(entry.file, names[index], {
+                                        one: name => t('downloading', { name }),
+                                        many: (count, name) =>
+                                            t('downloadingZip', {
+                                                files: common('files', { count }),
+                                                name,
+                                            }),
+                                    })
+                                }
                             >
                                 <Download />
                             </Button>
@@ -232,18 +255,18 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
                 </ul>
             )}
 
-            {single?.file.warning && <Warning>{single.file.warning}</Warning>}
+            {single?.file.warning && <Warning>{warningMessage(single.file.warning)}</Warning>}
 
             {failures.length > 0 && (
                 <Warning>
                     <p className="font-medium">
-                        {countLabel(failures.length, 'file')} could not be processed
+                        {t('failed', { files: common('files', { count: failures.length }) })}
                     </p>
                     <ul className="mt-1 space-y-0.5">
                         {failures.map(problem => (
                             <li key={problem.filename} className="break-words">
                                 <span className="font-medium">{problem.filename}</span> —{' '}
-                                {problem.error}
+                                {message(problem.detail)}
                             </li>
                         ))}
                     </ul>
@@ -255,13 +278,13 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
                     <Download />
                     {single
                         ? single.file.warning
-                            ? 'Download it anyway'
-                            : 'Download'
-                        : 'Download all (.zip)'}
+                            ? t('downloadAnyway')
+                            : t('download')
+                        : t('downloadAll')}
                 </Button>
                 <Button type="button" variant="outline" onClick={onDismiss}>
                     <X />
-                    Discard
+                    {t('discard')}
                 </Button>
             </div>
 
@@ -269,7 +292,7 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
 
             <div className="space-y-4 border-t pt-4">
                 <div className="space-y-1.5">
-                    <Label htmlFor="filename-template">Rename on download</Label>
+                    <Label htmlFor="filename-template">{t('rename')}</Label>
                     <Input
                         id="filename-template"
                         value={template}
@@ -280,16 +303,20 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
                         onChange={event => setTemplate(event.target.value)}
                     />
                     <p className="text-sm text-muted-foreground">
-                        Leave empty to keep the names above. Available:{' '}
-                        {FILENAME_TOKENS.map((token, index) => (
-                            <span key={token}>
-                                {index > 0 && ', '}
-                                <code className="rounded bg-muted px-1 py-0.5 text-xs">
-                                    {`{${token}}`}
-                                </code>
-                            </span>
-                        ))}
-                        . The extension is added for you.
+                        {t.rich('renameHint', {
+                            tokens: () => (
+                                <>
+                                    {FILENAME_TOKENS.map((token, index) => (
+                                        <span key={token}>
+                                            {index > 0 && ', '}
+                                            <code className="rounded bg-muted px-1 py-0.5 text-xs">
+                                                {`{${token}}`}
+                                            </code>
+                                        </span>
+                                    ))}
+                                </>
+                            ),
+                        })}
                     </p>
                 </div>
 
@@ -300,12 +327,10 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
                             checked={autoDownload}
                             onCheckedChange={setAutoDownload}
                         />
-                        <Label htmlFor="auto-download">Download automatically</Label>
+                        <Label htmlFor="auto-download">{t('autoDownload')}</Label>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                        {autoDownload
-                            ? 'Results are saved as soon as they are ready, and still shown here.'
-                            : 'Results stay here until you download them. The preference is remembered on this device.'}
+                        {autoDownload ? t('autoDownloadOn') : t('autoDownloadOff')}
                     </p>
                 </div>
             </div>

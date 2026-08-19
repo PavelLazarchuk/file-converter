@@ -1,4 +1,6 @@
-import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+
+import { render, renderHook } from '@/test/intl';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -102,7 +104,7 @@ describe('the empty dropzone', () => {
         setup();
 
         expect(screen.getByText(/drag & drop an image/i)).toBeInTheDocument();
-        expect(screen.getByText(/JPEG, PNG, WEBP or AVIF · up to 20MB/)).toBeInTheDocument();
+        expect(screen.getByText(/JPEG, PNG, WEBP, or AVIF · up to 20MB/)).toBeInTheDocument();
     });
 
     it('advertises the batch limits when the tool takes many', () => {

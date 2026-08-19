@@ -8,7 +8,7 @@ export async function inspectPipeline(source: SourceImage<ImageFormat>): Promise
         {
             filename: source.name,
             size: source.size,
-            format: IMAGE_FORMATS[source.format].label,
+            format: source.format,
         },
         source.metadata
     );

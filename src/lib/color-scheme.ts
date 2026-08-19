@@ -6,13 +6,6 @@ export const DEFAULT_COLOR_SCHEME: ColorScheme = 'violet';
 
 export const COLOR_SCHEME_STORAGE_KEY = 'color-scheme';
 
-export const COLOR_SCHEME_LABELS: Record<ColorScheme, string> = {
-    violet: 'Violet accent',
-    blue: 'Blue accent',
-    green: 'Green accent',
-    rose: 'Rose accent',
-};
-
 export const COLOR_SCHEME_SWATCH: Record<ColorScheme, string> = {
     violet: 'oklch(0.54 0.22 277)',
     blue: 'oklch(0.54 0.22 235)',

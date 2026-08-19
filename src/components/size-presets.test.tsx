@@ -1,4 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+
+import { render, translator } from '@/test/intl';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -20,6 +22,8 @@ function setup(activeKey: string | null = null, disabled = false) {
     return { onSelect, user: userEvent.setup() };
 }
 
+const labels = translator('Labels');
+
 describe('SizePresets', () => {
     it('offers every preset with its pixel size', () => {
         setup();
@@ -28,7 +32,7 @@ describe('SizePresets', () => {
 
         for (const preset of SIZE_PRESETS) {
             const button = screen.getByRole('button', {
-                name: `${preset.label}${preset.width}×${preset.height}`,
+                name: `${labels(`presets.${preset.key}`)}${preset.width}×${preset.height}`,
             });
 
             expect(button).toHaveAttribute('aria-pressed', 'false');

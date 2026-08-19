@@ -1,7 +1,14 @@
 import type { Metadata } from 'sharp';
 
-import { formatFileSize } from './image';
-import type { MetadataGroup, MetadataReport, MetadataRow } from './metadata';
+import type {
+    MetadataGroup,
+    MetadataGroupKey,
+    MetadataReport,
+    MetadataRow,
+    MetadataRowKey,
+    MetadataValue,
+    MetadataValueKey,
+} from './metadata';
 
 type Tiff = { buffer: Buffer; little: boolean; start: number };
 
@@ -134,82 +141,88 @@ function trim(value: number, places = 1): string {
     return Number(value.toFixed(places)).toString();
 }
 
-type Read = (tiff: Tiff, entry: Entry) => string;
+type Read = (tiff: Tiff, entry: Entry) => MetadataValue | null;
 
-const asText: Read = (tiff, entry) => text(tiff, entry);
+function textValue(value: string): MetadataValue | null {
+    return value ? { text: value } : null;
+}
+
+const asText: Read = (tiff, entry) => textValue(text(tiff, entry));
 
 const asNumber: Read = (tiff, entry) => {
     const [value] = numbers(tiff, entry);
 
-    return value === undefined ? '' : trim(value, 2);
+    return value === undefined ? null : { text: trim(value, 2) };
 };
 
 /** EXIF dates are `2024:01:02 03:04:05`; only the date half uses colons as separators. */
 const asDate: Read = (tiff, entry) => {
     const value = text(tiff, entry);
 
-    return /^\d{4}:\d{2}:\d{2}/.test(value)
-        ? `${value.slice(0, 10).replaceAll(':', '-')}${value.slice(10)}`
-        : value;
+    return textValue(
+        /^\d{4}:\d{2}:\d{2}/.test(value)
+            ? `${value.slice(0, 10).replaceAll(':', '-')}${value.slice(10)}`
+            : value
+    );
 };
 
 const asExposure: Read = (tiff, entry) => {
     const [value] = numbers(tiff, entry);
 
-    if (!value) return '';
+    if (!value) return null;
 
-    return value >= 1 ? `${trim(value)} s` : `1/${Math.round(1 / value)} s`;
+    return { text: value >= 1 ? `${trim(value)} s` : `1/${Math.round(1 / value)} s` };
 };
 
 const asAperture: Read = (tiff, entry) => {
     const [value] = numbers(tiff, entry);
 
-    return value ? `f/${trim(value)}` : '';
+    return value ? { text: `f/${trim(value)}` } : null;
 };
 
 const asFocalLength: Read = (tiff, entry) => {
     const [value] = numbers(tiff, entry);
 
-    return value ? `${trim(value)} mm` : '';
+    return value ? { text: `${trim(value)} mm` } : null;
 };
 
 const asFlash: Read = (tiff, entry) => {
     const [value] = numbers(tiff, entry);
 
-    return value === undefined ? '' : value & 1 ? 'Fired' : 'Did not fire';
+    return value === undefined ? null : { message: value & 1 ? 'flashFired' : 'flashOff' };
 };
 
 const asBias: Read = (tiff, entry) => {
     const [value] = numbers(tiff, entry);
 
-    return value === undefined ? '' : `${value > 0 ? '+' : ''}${trim(value)} EV`;
+    return value === undefined ? null : { text: `${value > 0 ? '+' : ''}${trim(value)} EV` };
 };
 
-const IFD0_TAGS: Record<number, { label: string; read: Read }> = {
-    0x010f: { label: 'Camera make', read: asText },
-    0x0110: { label: 'Camera model', read: asText },
-    0x0131: { label: 'Software', read: asText },
-    0x013b: { label: 'Artist', read: asText },
-    0x8298: { label: 'Copyright', read: asText },
-    0x0132: { label: 'Modified', read: asDate },
+const IFD0_TAGS: Record<number, { key: MetadataRowKey; read: Read }> = {
+    0x010f: { key: 'cameraMake', read: asText },
+    0x0110: { key: 'cameraModel', read: asText },
+    0x0131: { key: 'software', read: asText },
+    0x013b: { key: 'artist', read: asText },
+    0x8298: { key: 'copyright', read: asText },
+    0x0132: { key: 'modified', read: asDate },
 };
 
-const EXIF_TAGS: Record<number, { label: string; read: Read }> = {
-    0x9003: { label: 'Taken', read: asDate },
-    0x829a: { label: 'Exposure', read: asExposure },
-    0x829d: { label: 'Aperture', read: asAperture },
-    0x8827: { label: 'ISO', read: asNumber },
-    0x920a: { label: 'Focal length', read: asFocalLength },
-    0xa405: { label: 'Focal length (35mm)', read: asFocalLength },
-    0x9204: { label: 'Exposure bias', read: asBias },
-    0x9209: { label: 'Flash', read: asFlash },
-    0xa434: { label: 'Lens', read: asText },
+const EXIF_TAGS: Record<number, { key: MetadataRowKey; read: Read }> = {
+    0x9003: { key: 'taken', read: asDate },
+    0x829a: { key: 'exposure', read: asExposure },
+    0x829d: { key: 'aperture', read: asAperture },
+    0x8827: { key: 'iso', read: asNumber },
+    0x920a: { key: 'focalLength', read: asFocalLength },
+    0xa405: { key: 'focalLength35', read: asFocalLength },
+    0x9204: { key: 'exposureBias', read: asBias },
+    0x9209: { key: 'flash', read: asFlash },
+    0xa434: { key: 'lens', read: asText },
 };
 
 function rowsFrom(
     tiff: Tiff,
     entries: Entry[],
-    tags: Record<number, { label: string; read: Read }>
+    tags: Record<number, { key: MetadataRowKey; read: Read }>
 ): MetadataRow[] {
     const rows: MetadataRow[] = [];
 
@@ -220,7 +233,7 @@ function rowsFrom(
 
         const value = tag.read(tiff, entry);
 
-        if (value) rows.push({ label: tag.label, value });
+        if (value) rows.push({ key: tag.key, value });
     }
 
     return rows;
@@ -262,7 +275,7 @@ function gpsRows(
 
         if (lat !== null && lon !== null) {
             coordinates = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
-            rows.push({ label: 'Coordinates', value: coordinates });
+            rows.push({ key: 'coordinates', value: { text: coordinates } });
         }
     }
 
@@ -274,7 +287,10 @@ function gpsRows(
         const below = altitudeRef ? numbers(tiff, altitudeRef)[0] === 1 : false;
 
         if (value !== undefined) {
-            rows.push({ label: 'Altitude', value: `${below ? '−' : ''}${trim(value)} m` });
+            rows.push({
+                key: 'altitude',
+                value: { text: `${below ? '−' : ''}${trim(value)} m` },
+            });
         }
     }
 
@@ -308,15 +324,15 @@ export function readExif(exif: Buffer): ExifData {
     }
 }
 
-const ORIENTATIONS: Record<number, string> = {
-    1: 'Normal',
-    2: 'Mirrored horizontally',
-    3: 'Rotated 180°',
-    4: 'Mirrored vertically',
-    5: 'Mirrored and rotated 90° counter-clockwise',
-    6: 'Rotated 90° clockwise',
-    7: 'Mirrored and rotated 90° clockwise',
-    8: 'Rotated 90° counter-clockwise',
+const ORIENTATIONS: Record<number, MetadataValueKey> = {
+    1: 'orientations.1',
+    2: 'orientations.2',
+    3: 'orientations.3',
+    4: 'orientations.4',
+    5: 'orientations.5',
+    6: 'orientations.6',
+    7: 'orientations.7',
+    8: 'orientations.8',
 };
 
 const BIT_DEPTHS: Record<string, number> = {
@@ -330,12 +346,12 @@ const BIT_DEPTHS: Record<string, number> = {
     double: 64,
 };
 
-function bitDepth(depth: string | undefined): string | null {
+function bitDepth(depth: string | undefined): MetadataValue | null {
     if (!depth) return null;
 
     const bits = BIT_DEPTHS[depth];
 
-    return bits ? `${bits} bits per channel` : depth;
+    return bits ? { message: 'bitsPerChannel', params: { bits } } : { text: depth };
 }
 
 const COLOR_SPACES: Record<string, string> = {
@@ -347,24 +363,25 @@ const COLOR_SPACES: Record<string, string> = {
     grey16: 'Greyscale (16-bit)',
 };
 
-function group(title: string, rows: (MetadataRow | null)[]): MetadataGroup | null {
-    const kept = rows.filter((row): row is MetadataRow => row !== null && row.value !== '');
+function group(key: MetadataGroupKey, rows: (MetadataRow | null)[]): MetadataGroup | null {
+    const kept = rows.filter((row): row is MetadataRow => row !== null);
 
-    return kept.length ? { title, rows: kept } : null;
+    return kept.length ? { key, rows: kept } : null;
 }
 
-function row(label: string, value: string | number | undefined | null): MetadataRow | null {
-    return value === undefined || value === null || value === ''
-        ? null
-        : { label, value: `${value}` };
+function row(
+    key: MetadataRowKey,
+    value: MetadataValue | string | number | undefined | null
+): MetadataRow | null {
+    if (value === undefined || value === null || value === '') return null;
+
+    return {
+        key,
+        value: typeof value === 'object' ? value : { text: `${value}` },
+    };
 }
 
-const BLOCKS = [
-    { key: 'exif', label: 'EXIF' },
-    { key: 'icc', label: 'ICC color profile' },
-    { key: 'iptc', label: 'IPTC' },
-    { key: 'xmp', label: 'XMP' },
-] as const;
+const BLOCK_KEYS = ['exif', 'icc', 'iptc', 'xmp'] as const;
 
 export function describeMetadata(
     source: { filename: string; size: number; format: string },
@@ -375,47 +392,59 @@ export function describeMetadata(
     const width = (swapped ? metadata.height : metadata.width) ?? null;
     const height = (swapped ? metadata.width : metadata.height) ?? null;
     const pixels = width && height ? width * height : 0;
-    const present = BLOCKS.filter(block => {
-        const value = metadata[block.key];
+    const present = BLOCK_KEYS.filter(key => {
+        const value = metadata[key];
 
         return value instanceof Buffer && value.length > 0;
     });
     const groups = [
-        group('File', [
-            row('Name', source.filename),
-            row('Format', source.format),
-            row('File size', formatFileSize(source.size)),
-            row('Dimensions', width && height ? `${width} × ${height} px` : null),
-            row('Megapixels', pixels ? `${trim(pixels / 1_000_000, 1)} MP` : null),
-        ]),
-        group('Image', [
+        group('file', [
+            row('name', source.filename),
+            row('format', { format: source.format }),
+            row('fileSize', { bytes: source.size }),
             row(
-                'Color space',
-                metadata.space ? (COLOR_SPACES[metadata.space] ?? metadata.space) : null
+                'dimensions',
+                width && height ? { message: 'dimensions', params: { width, height } } : null
             ),
-            row('Channels', metadata.channels),
-            row('Bit depth', bitDepth(metadata.depth)),
-            row('Alpha channel', metadata.hasAlpha ? 'Yes' : 'No'),
-            row('Resolution', metadata.density ? `${metadata.density} dpi` : null),
-            row('Chroma subsampling', metadata.chromaSubsampling),
-            row('Progressive', metadata.isProgressive ? 'Yes' : null),
             row(
-                'Orientation tag',
-                metadata.orientation
-                    ? `${metadata.orientation} — ${ORIENTATIONS[metadata.orientation] ?? 'Unknown'}`
+                'megapixels',
+                pixels
+                    ? { message: 'megapixels', params: { mp: trim(pixels / 1_000_000, 1) } }
                     : null
             ),
-            row('Frames', metadata.pages && metadata.pages > 1 ? metadata.pages : null),
         ]),
-        group('Camera', exif.camera),
-        group('Location', exif.location),
+        group('image', [
+            row(
+                'colorSpace',
+                metadata.space ? (COLOR_SPACES[metadata.space] ?? metadata.space) : null
+            ),
+            row('channels', metadata.channels),
+            row('bitDepth', bitDepth(metadata.depth)),
+            row('alpha', { message: metadata.hasAlpha ? 'yes' : 'no' }),
+            row(
+                'resolution',
+                metadata.density ? { message: 'dpi', params: { dpi: metadata.density } } : null
+            ),
+            row('chroma', metadata.chromaSubsampling),
+            row('progressive', metadata.isProgressive ? { message: 'yes' } : null),
+            row(
+                'orientationTag',
+                metadata.orientation
+                    ? {
+                          message: ORIENTATIONS[metadata.orientation] ?? 'orientations.unknown',
+                          params: { value: metadata.orientation },
+                      }
+                    : null
+            ),
+            row('frames', metadata.pages && metadata.pages > 1 ? metadata.pages : null),
+        ]),
+        group('camera', exif.camera),
+        group('location', exif.location),
         group(
-            'Embedded blocks',
+            'blocks',
             present.length
-                ? present.map(block =>
-                      row(block.label, formatFileSize((metadata[block.key] as Buffer).length))
-                  )
-                : [row('Embedded metadata', 'None')]
+                ? present.map(key => row(key, { bytes: (metadata[key] as Buffer).length }))
+                : [row('embedded', { message: 'none' })]
         ),
     ].filter((entry): entry is MetadataGroup => entry !== null);
 
@@ -426,7 +455,7 @@ export function describeMetadata(
         width,
         height,
         coordinates: exif.coordinates,
-        removable: present.map(block => block.label),
+        removable: [...present],
         groups,
     };
 }

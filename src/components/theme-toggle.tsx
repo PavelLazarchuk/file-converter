@@ -1,6 +1,7 @@
 'use client';
 
 import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 import { useTheme } from '@/components/theme-provider';
 import { THEME_KEYS, type Theme } from '@/lib/theme';
@@ -12,19 +13,14 @@ const ICONS: Record<Theme, LucideIcon> = {
     system: Monitor,
 };
 
-const LABELS: Record<Theme, string> = {
-    light: 'Light theme',
-    dark: 'Dark theme',
-    system: 'Match system theme',
-};
-
 export function ThemeToggle() {
     const { theme, setTheme } = useTheme();
+    const t = useTranslations('Theme');
 
     return (
         <div
             role="group"
-            aria-label="Theme"
+            aria-label={t('group')}
             className="flex items-center gap-0.5 rounded-full border bg-card p-0.5"
         >
             {THEME_KEYS.map(key => {
@@ -35,8 +31,8 @@ export function ThemeToggle() {
                     <button
                         key={key}
                         type="button"
-                        title={LABELS[key]}
-                        aria-label={LABELS[key]}
+                        title={t(key)}
+                        aria-label={t(key)}
                         aria-pressed={active}
                         onClick={() => setTheme(key)}
                         className={cn(

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { translator } from '@/test/messages';
+import { parseFieldMessage } from './form-messages';
+import { fieldMessageText } from './messages';
 import {
     DIMENSION_LIMITS,
     PLACEHOLDER_TEXT_MAX_LENGTH,
@@ -20,7 +23,10 @@ import {
 } from './schemas';
 
 function firstError(result: { success: boolean; error?: { issues: { message: string }[] } }) {
-    return result.error?.issues[0]?.message;
+    const raw = result.error?.issues[0]?.message;
+    const field = parseFieldMessage(raw);
+
+    return field ? fieldMessageText(field, translator('Form')) : raw;
 }
 
 describe('resizeSchema', () => {

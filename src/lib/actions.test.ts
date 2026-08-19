@@ -18,6 +18,7 @@ import {
     type ActionFile,
     type ActionResult,
 } from './actions';
+import { errorText, warningText } from '@/test/messages';
 import type { ActionErrorCode } from './errors';
 import { MAX_BATCH_BYTES, MAX_BATCH_FILES, MAX_FILE_SIZE } from './image';
 
@@ -61,7 +62,7 @@ function form(files: File[], fields: Record<string, string> = {}): FormData {
 }
 
 function expectSuccess(result: ActionResult): Extract<ActionResult, { success: true }> {
-    if (!result.success) throw new Error(`expected success, got: ${result.error}`);
+    if (!result.success) throw new Error(`expected success, got: ${errorText(result.detail)}`);
 
     return result;
 }
@@ -69,7 +70,15 @@ function expectSuccess(result: ActionResult): Extract<ActionResult, { success: t
 function expectFailure(result: ActionResult): { code: ActionErrorCode; error: string } {
     if (result.success) throw new Error('expected a failure');
 
-    return { code: result.code, error: result.error };
+    return { code: result.detail.code, error: errorText(result.detail) };
+}
+
+function failuresOf(result: Extract<ActionResult, { success: true }>) {
+    return (result.failures ?? []).map(failure => ({
+        filename: failure.filename,
+        code: failure.detail.code,
+        error: errorText(failure.detail),
+    }));
 }
 
 async function pdfFile(name: string, pages: number, title?: string): Promise<File> {
@@ -156,7 +165,7 @@ describe('resizeImage', () => {
         );
 
         expect(result.files.map(file => file.filename)).toEqual(['good-10x10.png']);
-        expect(result.failures).toEqual([
+        expect(failuresOf(result)).toEqual([
             {
                 filename: 'broken.png',
                 code: 'unreadable_image',
@@ -379,7 +388,8 @@ describe('compressImage', () => {
             await compressImage(form([file], { mode: 'size', targetKb: '1' }))
         );
 
-        expect(files[0].warning).toContain("Couldn't reach");
+        expect(files[0].warning?.code).toBe('target_missed');
+        expect(warningText(files[0].warning!)).toContain("Couldn't reach");
         expect(files[0].data.byteLength).toBeGreaterThan(1024);
     });
 
@@ -441,7 +451,7 @@ describe('convertImage', () => {
         );
 
         expect(result.files.map(file => file.filename)).toEqual(['photo.png']);
-        expect(result.failures).toEqual([
+        expect(failuresOf(result)).toEqual([
             {
                 filename: 'already.png',
                 code: 'same_format',
@@ -643,7 +653,7 @@ describe('imageToPdf', () => {
 
         expect(pdf.getPageCount()).toBe(1);
         expect(result.files[0].filename).toBe('good.pdf');
-        expect(result.failures).toHaveLength(1);
+        expect(failuresOf(result)).toHaveLength(1);
     });
 
     it('validates the page size', async () => {
@@ -956,11 +966,11 @@ describe('inspectImage', () => {
         expect(files[0].mimeType).toBe('application/json');
         expect(report).toMatchObject({
             filename: 'holiday.jpg',
-            format: 'JPEG',
+            format: 'jpeg',
             width: 64,
             height: 48,
         });
-        expect(report.groups.map((group: { title: string }) => group.title)).toContain('File');
+        expect(report.groups.map((group: { key: string }) => group.key)).toContain('file');
     });
 
     it('lists the metadata a photo carries', async () => {
@@ -969,7 +979,7 @@ describe('inspectImage', () => {
         const { files } = expectSuccess(await inspectImage(form([withExif.file, bare.file])));
         const [first, second] = files.map(file => JSON.parse(new TextDecoder().decode(file.data)));
 
-        expect(first.removable).toContain('EXIF');
+        expect(first.removable).toContain('exif');
         expect(second.removable).toEqual([]);
     });
 });
@@ -990,7 +1000,7 @@ describe('stripImageMetadata', () => {
         const result = expectSuccess(await stripImageMetadata(form([clean.file, tagged.file])));
 
         expect(result.files.map(file => file.filename)).toEqual(['tagged-clean.jpg']);
-        expect(result.failures).toEqual([
+        expect(failuresOf(result)).toEqual([
             {
                 filename: 'clean.png',
                 code: 'no_metadata',
@@ -1047,7 +1057,7 @@ describe('upload limits', () => {
         );
 
         expect(result.files.map(file => file.filename)).toEqual(['small.webp']);
-        expect(result.failures).toEqual([
+        expect(failuresOf(result)).toEqual([
             {
                 filename: 'huge.png',
                 code: 'file_too_large',
@@ -1116,7 +1126,7 @@ describe('mergePdf', () => {
         );
 
         expect(result.files).toHaveLength(1);
-        expect(result.failures?.[0]).toMatchObject({
+        expect(failuresOf(result)[0]).toMatchObject({
             filename: 'fake.pdf',
             code: 'unreadable_pdf',
         });

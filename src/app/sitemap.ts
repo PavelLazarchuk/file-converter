@@ -1,23 +1,24 @@
 import type { MetadataRoute } from 'next';
 
-import { SITE, TOOLS } from '@/lib/site';
+import { routing } from '@/i18n/routing';
+import { TOOLS, languageAlternates, localeUrl } from '@/lib/site';
+
+const ROUTES = [
+    { path: '/', priority: 1 },
+    ...TOOLS.map(tool => ({ path: tool.href, priority: 0.8 })),
+    { path: '/privacy', priority: 0.3 },
+] as const;
 
 export default function sitemap(): MetadataRoute.Sitemap {
     const lastModified = new Date();
 
-    return [
-        { url: SITE.url, lastModified, changeFrequency: 'monthly', priority: 1 },
-        ...TOOLS.map(tool => ({
-            url: `${SITE.url}${tool.href}`,
+    return routing.locales.flatMap(locale =>
+        ROUTES.map(({ path, priority }) => ({
+            url: localeUrl(locale, path),
             lastModified,
             changeFrequency: 'monthly' as const,
-            priority: 0.8,
-        })),
-        {
-            url: `${SITE.url}/privacy`,
-            lastModified,
-            changeFrequency: 'yearly' as const,
-            priority: 0.3,
-        },
-    ];
+            priority,
+            alternates: { languages: languageAlternates(path) },
+        }))
+    );
 }

@@ -2,8 +2,7 @@
 
 import type { Metadata } from 'sharp';
 
-import type { ActionErrorCode, ActionErrorDetail } from './errors';
-import { actionErrorMessage } from './errors';
+import type { ActionErrorDetail, ActionWarningDetail } from './errors';
 import {
     COMPARE_FORMAT_KEYS,
     CONVERT_SOURCE_KEYS,
@@ -11,14 +10,12 @@ import {
     DEFAULT_QUALITY,
     DEFAULT_TARGET_KB,
     FORMAT_KEYS,
-    IMAGE_FORMATS,
     MAX_BATCH_BYTES,
     MAX_BATCH_FILES,
     MAX_FILE_SIZE,
     MAX_PDF_PAGES,
     PDF_MIME_TYPE,
     WATERMARK_DEFAULTS,
-    acceptedFormatsLabel,
     convertSourceFromSharpFormat,
     stripExtension,
     uniqueFilenames,
@@ -72,14 +69,14 @@ export type ActionFile = {
     filename: string;
     mimeType: string;
     originalSize: number;
-    warning?: string;
+    warning?: ActionWarningDetail;
 };
 
-export type ActionFailure = { filename: string; code: ActionErrorCode; error: string };
+export type ActionFailure = { filename: string; detail: ActionErrorDetail };
 
 export type ActionResult =
     | { success: true; files: ActionFile[]; failures?: ActionFailure[] }
-    | { success: false; code: ActionErrorCode; error: string };
+    | { success: false; detail: ActionErrorDetail };
 
 type ToolName =
     | 'resize'
@@ -115,20 +112,13 @@ async function readSource<Format extends ConvertSource>(
     if (threat) throw fail({ code: 'unsafe_svg', threat });
 
     const metadata = await inspectMetadata(buffer);
-    const accepted = acceptedFormatsLabel(formats);
 
-    if (!metadata) throw fail({ code: 'unreadable_image', formats: accepted });
+    if (!metadata) throw fail({ code: 'unreadable_image', formats });
 
     const detected = convertSourceFromSharpFormat(metadata.format);
     const format = formats.find(key => key === detected);
 
-    if (!format) {
-        throw fail({
-            code: 'unsupported_format',
-            formats: accepted,
-            detected: detected ? IMAGE_FORMATS[detected].label : null,
-        });
-    }
+    if (!format) throw fail({ code: 'unsupported_format', formats, detected });
 
     return {
         buffer,
@@ -164,11 +154,7 @@ async function readImageFiles<Format extends ConvertSource>(
     const usable = files.filter(file => {
         if (file.size <= MAX_FILE_SIZE) return true;
 
-        failures.push({
-            filename: file.name,
-            code: 'file_too_large',
-            error: actionErrorMessage({ code: 'file_too_large' }),
-        });
+        failures.push({ filename: file.name, detail: { code: 'file_too_large' } });
 
         return false;
     });
@@ -187,7 +173,7 @@ async function readImageFiles<Format extends ConvertSource>(
     if (!sources.length) {
         const first = failures[0];
 
-        throw first ? new ProcessingError(first.code, first.error) : fail({ code: 'no_file' });
+        throw first ? new ProcessingError(first.detail) : fail({ code: 'no_file' });
     }
 
     return { tool, sources, failures };
@@ -220,15 +206,13 @@ function imageContext(source: SourceImage): LogContext {
     };
 }
 
-type Triaged = { code: ActionErrorCode; message: string };
-
 const UNKNOWN: ActionErrorDetail = { code: 'unknown' };
 
-function triage(error: unknown): Triaged | null {
-    if (error instanceof ProcessingError) return { code: error.code, message: error.message };
+function triage(error: unknown): ActionErrorDetail | null {
+    if (error instanceof ProcessingError) return error.detail;
 
     if (error instanceof Error && error.message.includes('pixel limit')) {
-        return { code: 'pixel_limit', message: actionErrorMessage({ code: 'pixel_limit' }) };
+        return { code: 'pixel_limit' };
     }
 
     return null;
@@ -239,20 +223,18 @@ function describeFailure(filename: string, error: unknown, context: LogContext):
 
     if (!known) Logger.error('image.failed', { ...context, code: UNKNOWN.code, error });
 
-    const { code, message } = known ?? { code: UNKNOWN.code, message: actionErrorMessage(UNKNOWN) };
-
-    return { filename, code, error: message };
+    return { filename, detail: known ?? UNKNOWN };
 }
 
 function failed(detail: ActionErrorDetail): ActionResult {
-    return { success: false, code: detail.code, error: actionErrorMessage(detail) };
+    return { success: false, detail };
 }
 
 function collect(files: ActionFile[], failures: ActionFailure[]): ActionResult {
     if (!files.length) {
         const first = failures[0];
 
-        return first ? { success: false, code: first.code, error: first.error } : failed(UNKNOWN);
+        return failed(first ? first.detail : UNKNOWN);
     }
 
     const names = uniqueFilenames(files.map(file => file.filename));
@@ -291,13 +273,9 @@ async function run(
     } catch (error) {
         const known = triage(error);
 
-        if (!known) {
-            Logger.error('action.failed', { tool, cost, code: UNKNOWN.code, error });
+        if (!known) Logger.error('action.failed', { tool, cost, code: UNKNOWN.code, error });
 
-            return failed(UNKNOWN);
-        }
-
-        return { success: false, code: known.code, error: known.message };
+        return failed(known ?? UNKNOWN);
     }
 }
 
@@ -342,7 +320,7 @@ export async function resizeImage(formData: FormData): Promise<ActionResult> {
             fit: formData.get('fit') || 'contain',
         });
 
-        if (!parsed.success) throw invalid(parsed.error, 'Invalid dimensions.');
+        if (!parsed.success) throw invalid(parsed.error);
 
         const params = {
             ...parsed.data,
@@ -365,13 +343,12 @@ export async function cropImage(formData: FormData): Promise<ActionResult> {
             height: formData.get('height'),
         });
 
-        if (!parsed.success) throw invalid(parsed.error, 'Invalid crop settings.');
+        if (!parsed.success) throw invalid(parsed.error);
 
         const requestedSize = formData.get('resizeTo');
         const outputSize = requestedSize ? outputSizeSchema.safeParse(requestedSize) : null;
 
-        if (outputSize && !outputSize.success)
-            throw invalid(outputSize.error, 'Invalid output size.');
+        if (outputSize && !outputSize.success) throw invalid(outputSize.error);
 
         const params = {
             ...parsed.data,
@@ -391,7 +368,7 @@ export async function compressImage(formData: FormData): Promise<ActionResult> {
             targetKb: formData.get('targetKb') || String(DEFAULT_TARGET_KB),
         });
 
-        if (!parsed.success) throw invalid(parsed.error, 'Invalid settings.');
+        if (!parsed.success) throw invalid(parsed.error);
 
         return eachFile(batch, source => compressPipeline(source, parsed.data));
     });
@@ -407,7 +384,7 @@ export async function compareFormats(formData: FormData): Promise<ActionResult> 
                 quality: formData.get('quality') || String(DEFAULT_QUALITY),
             });
 
-            if (!parsed.success) throw invalid(parsed.error, 'Invalid quality.');
+            if (!parsed.success) throw invalid(parsed.error);
 
             const [source] = sources;
             const produced = await comparePipeline(source, COMPARE_FORMAT_KEYS, parsed.data);
@@ -432,7 +409,7 @@ export async function convertImage(formData: FormData): Promise<ActionResult> {
     return runFiles('convert', formData, CONVERT_SOURCE_KEYS, async batch => {
         const parsed = convertSchema.safeParse({ format: formData.get('format') });
 
-        if (!parsed.success) throw invalid(parsed.error, 'Invalid target format.');
+        if (!parsed.success) throw invalid(parsed.error);
 
         const target = parsed.data.format;
         const icoOptions =
@@ -444,7 +421,7 @@ export async function convertImage(formData: FormData): Promise<ActionResult> {
                 : null;
 
         if (icoOptions && !icoOptions.success) {
-            throw invalid(icoOptions.error, 'Invalid favicon settings.');
+            throw invalid(icoOptions.error);
         }
 
         const params = {
@@ -461,7 +438,7 @@ export async function imageToPdf(formData: FormData): Promise<ActionResult> {
     return runFiles('pdf', formData, CONVERT_SOURCE_KEYS, async ({ tool, sources, failures }) => {
         const parsed = imageToPdfSchema.safeParse({ pageSize: formData.get('pageSize') });
 
-        if (!parsed.success) throw invalid(parsed.error, 'Invalid page size.');
+        if (!parsed.success) throw invalid(parsed.error);
 
         const { pageSize } = parsed.data;
         const pdfDoc = await createPdfDocument();
@@ -508,11 +485,7 @@ async function readPdfFiles(tool: ToolName, formData: FormData): Promise<PdfBatc
     const usable = files.filter(file => {
         if (file.size <= MAX_FILE_SIZE) return true;
 
-        failures.push({
-            filename: file.name,
-            code: 'file_too_large',
-            error: actionErrorMessage({ code: 'file_too_large' }),
-        });
+        failures.push({ filename: file.name, detail: { code: 'file_too_large' } });
 
         return false;
     });
@@ -542,7 +515,7 @@ async function readPdfFiles(tool: ToolName, formData: FormData): Promise<PdfBatc
     if (!sources.length) {
         const first = failures[0];
 
-        throw first ? new ProcessingError(first.code, first.error) : fail({ code: 'no_file' });
+        throw first ? new ProcessingError(first.detail) : fail({ code: 'no_file' });
     }
 
     return { sources, failures };
@@ -601,7 +574,7 @@ export async function generatePlaceholder(formData: FormData): Promise<ActionRes
             format: formData.get('format'),
         });
 
-        if (!parsed.success) throw invalid(parsed.error, 'Invalid settings.');
+        if (!parsed.success) throw invalid(parsed.error);
 
         return collect([toActionFile({ size: 0 }, await placeholderPipeline(parsed.data))], []);
     });
@@ -614,7 +587,7 @@ export async function rotateImage(formData: FormData): Promise<ActionResult> {
             background: formData.get('background') || '#ffffff',
         });
 
-        if (!parsed.success) throw invalid(parsed.error, 'Invalid rotation.');
+        if (!parsed.success) throw invalid(parsed.error);
 
         const params = {
             ...parsed.data,
@@ -656,7 +629,7 @@ export async function watermarkImage(formData: FormData): Promise<ActionResult> 
             margin: formData.get('margin') || WATERMARK_DEFAULTS.margin,
         });
 
-        if (!parsed.success) throw invalid(parsed.error, 'Invalid watermark settings.');
+        if (!parsed.success) throw invalid(parsed.error);
 
         const uploaded = batch.sources.reduce((sum, source) => sum + source.size, 0);
         const params = {

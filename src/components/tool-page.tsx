@@ -1,9 +1,10 @@
 import { ViewTransition } from 'react';
-import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { getLocale, getTranslations } from 'next-intl/server';
 
 import { JsonLd } from '@/components/json-ld';
-import { TOOLS, breadcrumbJsonLd, toolJsonLd, toolTransitionName } from '@/lib/site';
+import { Link } from '@/i18n/navigation';
+import { breadcrumbJsonLd, toolByHref, toolJsonLd, toolTransitionName } from '@/lib/site';
 
 const enter =
     'animate-in fade-in fill-mode-backwards duration-500 ease-out motion-reduce:animate-none';
@@ -15,18 +16,30 @@ type ToolPageProps = {
     children: React.ReactNode;
 };
 
-export function ToolPage({ href, title, description, children }: ToolPageProps) {
-    const tool = TOOLS.find(entry => entry.href === href);
+export async function ToolPage({ href, title, description, children }: ToolPageProps) {
+    const tool = toolByHref(href);
+    const locale = await getLocale();
+    const t = await getTranslations('Tools');
+    const copy = tool
+        ? { title: t(`${tool.key}.title`), description: t(`${tool.key}.description`) }
+        : null;
 
     return (
         <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:py-16">
-            {tool && <JsonLd data={[toolJsonLd(tool), breadcrumbJsonLd(tool)]} />}
+            {tool && copy && (
+                <JsonLd
+                    data={[
+                        toolJsonLd(tool, copy, locale),
+                        breadcrumbJsonLd(tool, { ...copy, root: t('allTools') }, locale),
+                    ]}
+                />
+            )}
             <Link
                 href="/"
                 className={`${enter} slide-in-from-left-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground`}
             >
                 <ArrowLeft className="size-4" />
-                All tools
+                {t('allTools')}
             </Link>
 
             <div className="mt-6 flex items-center gap-4">

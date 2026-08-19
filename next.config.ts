@@ -1,7 +1,8 @@
 import type { NextConfig } from 'next';
+import createNextIntlPlugin from 'next-intl/plugin';
 
 import {
-    CROSS_ORIGIN_ASSET_PATH,
+    CROSS_ORIGIN_ASSET_PATHS,
     crossOriginAssetHeaders,
     securityHeaders,
 } from './src/lib/security-headers';
@@ -17,13 +18,19 @@ const nextConfig: NextConfig = {
             bodySizeLimit: '25mb',
         },
         viewTransition: true,
+        rootParams: true,
     },
     async headers() {
         return [
             { source: '/:path*', headers: securityHeaders(isDev) },
-            { source: CROSS_ORIGIN_ASSET_PATH, headers: crossOriginAssetHeaders() },
+            ...CROSS_ORIGIN_ASSET_PATHS.map(source => ({
+                source,
+                headers: crossOriginAssetHeaders(),
+            })),
         ];
     },
 };
 
-export default nextConfig;
+const withNextIntl = createNextIntlPlugin();
+
+export default withNextIntl(nextConfig);

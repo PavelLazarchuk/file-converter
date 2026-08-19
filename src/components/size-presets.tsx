@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { SIZE_PRESETS, outputSizeLabel, type SizePreset } from '@/lib/image';
@@ -12,9 +14,12 @@ type SizePresetsProps = {
 };
 
 export function SizePresets({ activeKey, disabled, hint, onSelect }: SizePresetsProps) {
+    const t = useTranslations('Presets');
+    const labels = useTranslations('Labels');
+
     return (
         <div className="space-y-2">
-            <Label>Social &amp; web presets</Label>
+            <Label>{t('title')}</Label>
             <div className="flex flex-wrap gap-2">
                 {SIZE_PRESETS.map(preset => {
                     const active = preset.key === activeKey;
@@ -30,7 +35,7 @@ export function SizePresets({ activeKey, disabled, hint, onSelect }: SizePresets
                             onClick={() => onSelect(preset)}
                             className="font-normal"
                         >
-                            {preset.label}
+                            {labels(`presets.${preset.key}`)}
                             <span className="text-xs text-muted-foreground group-data-[variant=default]/button:text-primary-foreground/80">
                                 {outputSizeLabel(preset)}
                             </span>

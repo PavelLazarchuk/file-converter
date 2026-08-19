@@ -1,7 +1,7 @@
 import type { Metadata, Sharp } from 'sharp';
 import sharp from 'sharp';
 
-import { IMAGE_FORMATS, QUALITY_LIMITS, formatFileSize, type ImageFormat } from '../image';
+import { IMAGE_FORMATS, QUALITY_LIMITS, type ImageFormat } from '../image';
 import { Logger } from '../logger';
 import type { CompressValues } from '../schemas';
 import { decode, fail, type PipelineOutput, type SourceImage } from './core';
@@ -90,9 +90,11 @@ async function compressToTarget(
         data: smallest,
         filename,
         mimeType,
-        warning:
-            `Couldn't reach ${formatFileSize(targetBytes)} at these dimensions — the smallest ` +
-            `this image compresses to is ${formatFileSize(smallest.length)}. Resize it first for anything smaller.`,
+        warning: {
+            code: 'target_missed',
+            targetBytes,
+            smallestBytes: smallest.length,
+        },
     };
 }
 

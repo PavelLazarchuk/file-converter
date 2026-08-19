@@ -3,6 +3,7 @@
 import { useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { ImageIcon, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 
 import {
@@ -13,15 +14,13 @@ import {
 } from '@/components/dropzone-shell';
 import { Button } from '@/components/ui/button';
 import { useHandoffIntake } from '@/hooks/use-handoff';
+import { useFileSize, useFormatsLabel } from '@/hooks/use-messages';
 import { useUploads } from '@/hooks/use-uploads';
 import {
     FORMAT_KEYS,
     IMAGE_FORMATS,
     MAX_BATCH_SIZE_LABEL,
     MAX_FILE_SIZE_LABEL,
-    acceptedFormatsLabel,
-    countLabel,
-    formatFileSize,
     type ConvertSource,
 } from '@/lib/image';
 import { acceptUploads, totalUploadBytes, uploadProblemSummary } from '@/lib/uploads';
@@ -90,6 +89,10 @@ export function ImageDropzone({
     const inputRef = useRef<HTMLInputElement>(null);
     const loadTokenRef = useRef(0);
     const single = max === 1;
+    const t = useTranslations('Uploads');
+    const count = useTranslations('Common');
+    const fileSize = useFileSize();
+    const formatsLabel = useFormatsLabel();
 
     async function loadFiles(incoming: File[]) {
         if (disabled || !incoming.length) return;
@@ -101,16 +104,16 @@ export function ImageDropzone({
             currentBytes: totalUploadBytes(images),
             accepts: file => formats.some(format => IMAGE_FORMATS[format].mimeType === file.type),
             copy: {
-                full: limit => `You can process up to ${countLabel(limit, 'image')} at a time.`,
-                noRoom: room =>
-                    `There is room for ${countLabel(room, 'more image')} — skipped the rest.`,
-                unsupported: name => `${name}: unsupported file type.`,
-                tooLarge: name => `${name}: larger than ${MAX_FILE_SIZE_LABEL}.`,
-                overBudget: name =>
-                    `${name}: the batch has to stay under ${MAX_BATCH_SIZE_LABEL} in total.`,
+                full: limit => t('fullImages', { count: count('images', { count: limit }) }),
+                noRoom: room => t('noRoomImages', { count: count('moreImages', { count: room }) }),
+                unsupported: name => t('unsupported', { name }),
+                tooLarge: name => t('tooLarge', { name, max: MAX_FILE_SIZE_LABEL }),
+                overBudget: name => t('overBudget', { name, max: MAX_BATCH_SIZE_LABEL }),
             },
         });
-        const summary = uploadProblemSummary(problems);
+        const summary = uploadProblemSummary(problems, (first, extra) =>
+            t('moreProblems', { first, count: extra })
+        );
 
         if (summary) toast.error(summary);
         if (!accepted.length) return;
@@ -127,7 +130,7 @@ export function ImageDropzone({
         const usable = loaded.filter((image): image is LoadedImage => image !== null);
 
         if (usable.length < accepted.length) {
-            toast.error('Could not read some images. The files may be corrupted.');
+            toast.error(t('unreadable'));
         }
         if (usable.length) onAdd(usable);
     }
@@ -172,7 +175,7 @@ export function ImageDropzone({
                 <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{image.file.name}</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        {image.width} × {image.height} · {formatFileSize(image.file.size)}
+                        {image.width} × {image.height} · {fileSize(image.file.size)}
                     </p>
                     <Button
                         type="button"
@@ -182,14 +185,14 @@ export function ImageDropzone({
                         disabled={disabled}
                         onClick={() => inputRef.current?.click()}
                     >
-                        Choose a different file
+                        {t('chooseDifferent')}
                     </Button>
                 </div>
                 <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    aria-label="Remove file"
+                    aria-label={t('removeFile')}
                     disabled={disabled}
                     onClick={onClear}
                 >
@@ -205,11 +208,11 @@ export function ImageDropzone({
             <div className="space-y-3 rounded-xl border bg-card p-4">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <p className="text-sm font-medium">
-                        {countLabel(images.length, 'image')} ·{' '}
-                        {formatFileSize(totalUploadBytes(images))}
+                        {count('images', { count: images.length })} ·{' '}
+                        {fileSize(totalUploadBytes(images))}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                        up to {max} · {MAX_BATCH_SIZE_LABEL} in total
+                        {t('limitLine', { max, maxBatch: MAX_BATCH_SIZE_LABEL })}
                     </p>
                 </div>
 
@@ -228,8 +231,7 @@ export function ImageDropzone({
                             <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-medium">{image.file.name}</p>
                                 <p className="text-xs text-muted-foreground">
-                                    {image.width} × {image.height} ·{' '}
-                                    {formatFileSize(image.file.size)}
+                                    {image.width} × {image.height} · {fileSize(image.file.size)}
                                 </p>
                             </div>
                             {onMove && (
@@ -258,7 +260,7 @@ export function ImageDropzone({
                         disabled={disabled || images.length >= max}
                         onClick={() => inputRef.current?.click()}
                     >
-                        Add more
+                        {t('addMore')}
                     </Button>
                     <Button
                         type="button"
@@ -267,7 +269,7 @@ export function ImageDropzone({
                         disabled={disabled}
                         onClick={onClear}
                     >
-                        Remove all
+                        {t('removeAll')}
                     </Button>
                 </div>
                 {hiddenInput}
@@ -282,15 +284,19 @@ export function ImageDropzone({
             disabled={disabled}
             onFiles={files => void loadFiles(files)}
             dragIcon={<ImageIcon className="size-6 text-primary" />}
-            idleLabel={`Drag & drop ${single ? 'an image' : 'images'}, click to browse, or paste with Ctrl/⌘ + V`}
-            dragLabel={`Drop the ${single ? 'image' : 'images'} here`}
+            idleLabel={single ? t('idleImage') : t('idleImages')}
+            dragLabel={single ? t('dragImage') : t('dragImages')}
             hint={
-                <>
-                    {acceptedFormatsLabel(formats)} ·{' '}
-                    {single
-                        ? `up to ${MAX_FILE_SIZE_LABEL}`
-                        : `up to ${max} at a time, ${MAX_BATCH_SIZE_LABEL} in total`}
-                </>
+                single
+                    ? t('hintSingle', {
+                          formats: formatsLabel(formats),
+                          maxFile: MAX_FILE_SIZE_LABEL,
+                      })
+                    : t('hintBatch', {
+                          formats: formatsLabel(formats),
+                          max,
+                          maxBatch: MAX_BATCH_SIZE_LABEL,
+                      })
             }
         />
     );

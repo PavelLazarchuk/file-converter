@@ -139,7 +139,7 @@ export async function convertPipeline(
     }
 
     if (target === 'ico') {
-        if (!ico) throw fail({ code: 'invalid_settings', detail: 'Invalid favicon settings.' });
+        if (!ico) throw fail({ code: 'invalid_settings' });
 
         if (ico.pack === 'false') {
             const icon = await buildIco(buffer, ico.sizes);

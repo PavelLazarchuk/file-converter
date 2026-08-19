@@ -27,19 +27,16 @@ export const CONVERT_TARGET_KEYS = [...FORMAT_KEYS, 'gif', 'tiff', 'svg', 'ico',
 
 export type ConvertTarget = (typeof CONVERT_TARGET_KEYS)[number];
 
-export const IMAGE_FORMATS: Record<
-    ConvertTarget,
-    { label: string; mimeType: string; extension: string }
-> = {
-    jpeg: { label: 'JPEG', mimeType: 'image/jpeg', extension: 'jpg' },
-    png: { label: 'PNG', mimeType: 'image/png', extension: 'png' },
-    webp: { label: 'WEBP', mimeType: 'image/webp', extension: 'webp' },
-    avif: { label: 'AVIF', mimeType: 'image/avif', extension: 'avif' },
-    gif: { label: 'GIF', mimeType: 'image/gif', extension: 'gif' },
-    tiff: { label: 'TIFF', mimeType: 'image/tiff', extension: 'tiff' },
-    svg: { label: 'SVG', mimeType: 'image/svg+xml', extension: 'svg' },
-    ico: { label: 'ICO (favicon)', mimeType: 'image/x-icon', extension: 'ico' },
-    base64: { label: 'Base64 data URI', mimeType: 'text/plain', extension: 'txt' },
+export const IMAGE_FORMATS: Record<ConvertTarget, { mimeType: string; extension: string }> = {
+    jpeg: { mimeType: 'image/jpeg', extension: 'jpg' },
+    png: { mimeType: 'image/png', extension: 'png' },
+    webp: { mimeType: 'image/webp', extension: 'webp' },
+    avif: { mimeType: 'image/avif', extension: 'avif' },
+    gif: { mimeType: 'image/gif', extension: 'gif' },
+    tiff: { mimeType: 'image/tiff', extension: 'tiff' },
+    svg: { mimeType: 'image/svg+xml', extension: 'svg' },
+    ico: { mimeType: 'image/x-icon', extension: 'ico' },
+    base64: { mimeType: 'text/plain', extension: 'txt' },
 };
 
 export const STRIP_QUALITY: Record<ImageFormat, number> = {
@@ -79,10 +76,10 @@ export const BASE64_OUTPUT_KEYS = ['uri', 'img', 'css'] as const;
 
 export type Base64Output = (typeof BASE64_OUTPUT_KEYS)[number];
 
-export const BASE64_OUTPUTS: Record<Base64Output, { label: string; extension: string }> = {
-    uri: { label: 'Plain data URI', extension: 'txt' },
-    img: { label: 'HTML <img> tag', extension: 'html' },
-    css: { label: 'CSS background-image', extension: 'css' },
+export const BASE64_OUTPUTS: Record<Base64Output, { extension: string }> = {
+    uri: { extension: 'txt' },
+    img: { extension: 'html' },
+    css: { extension: 'css' },
 };
 
 export function formatBase64Output(kind: Base64Output, dataUri: string, alt: string): string {
@@ -99,13 +96,6 @@ export function formatBase64Output(kind: Base64Output, dataUri: string, alt: str
 export const ROTATION_KEYS = ['0', '90', '180', '270'] as const;
 
 export type Rotation = (typeof ROTATION_KEYS)[number];
-
-export const ROTATIONS: Record<Rotation, { label: string }> = {
-    '0': { label: 'No rotation' },
-    '90': { label: '90° clockwise' },
-    '180': { label: '180°' },
-    '270': { label: '90° counter-clockwise' },
-};
 
 export function rotationSwapsDimensions(rotation: Rotation): boolean {
     return rotation === '90' || rotation === '270';
@@ -137,28 +127,6 @@ export const RESIZE_FIT_KEYS = ['contain', 'cover', 'fill', 'inside'] as const;
 
 export type ResizeFit = (typeof RESIZE_FIT_KEYS)[number];
 
-export const RESIZE_FITS: Record<ResizeFit, { label: string; description: string }> = {
-    contain: {
-        label: 'Contain — fit inside, pad the rest',
-        description:
-            'The whole image fits inside the box; leftover space is padded (transparent, or white for JPEG).',
-    },
-    cover: {
-        label: 'Cover — fill the box, crop the overflow',
-        description:
-            'The box is filled edge to edge and whatever sticks out is cropped away, centered.',
-    },
-    fill: {
-        label: 'Fill — stretch to the exact size',
-        description: 'Both dimensions are forced to match, so the image is stretched or squashed.',
-    },
-    inside: {
-        label: 'Inside — shrink to fit, keep the ratio',
-        description:
-            'Scales down until both sides fit inside the box. The output can be smaller than the numbers above.',
-    },
-};
-
 export function fitPads(fit: ResizeFit): boolean {
     return fit === 'contain';
 }
@@ -183,24 +151,19 @@ export const ASPECT_RATIO_KEYS = ['1:1', '4:3', '3:2', '16:9', '3:4', '2:3', '9:
 
 export type AspectRatio = (typeof ASPECT_RATIO_KEYS)[number];
 
-export const ASPECT_RATIOS: Record<AspectRatio, { label: string; width: number; height: number }> =
-    {
-        '1:1': { label: 'Square (1:1)', width: 1, height: 1 },
-        '4:3': { label: 'Landscape (4:3)', width: 4, height: 3 },
-        '3:2': { label: 'Landscape (3:2)', width: 3, height: 2 },
-        '16:9': { label: 'Widescreen (16:9)', width: 16, height: 9 },
-        '3:4': { label: 'Portrait (3:4)', width: 3, height: 4 },
-        '2:3': { label: 'Portrait (2:3)', width: 2, height: 3 },
-        '9:16': { label: 'Vertical (9:16)', width: 9, height: 16 },
-    };
+export const ASPECT_RATIOS: Record<AspectRatio, { width: number; height: number }> = {
+    '1:1': { width: 1, height: 1 },
+    '4:3': { width: 4, height: 3 },
+    '3:2': { width: 3, height: 2 },
+    '16:9': { width: 16, height: 9 },
+    '3:4': { width: 3, height: 4 },
+    '2:3': { width: 2, height: 3 },
+    '9:16': { width: 9, height: 16 },
+};
 
 export const CROP_RATIO_KEYS = ['free', ...ASPECT_RATIO_KEYS] as const;
 
 export type CropRatio = (typeof CROP_RATIO_KEYS)[number];
-
-export function cropRatioLabel(ratio: CropRatio): string {
-    return ratio === 'free' ? 'Free — any size' : ASPECT_RATIOS[ratio].label;
-}
 
 export function cropRatioSize(ratio: CropRatio): { width: number; height: number } | null {
     return ratio === 'free' ? null : ASPECT_RATIOS[ratio];
@@ -223,11 +186,6 @@ export function cropRatioForSize({ width, height }: { width: number; height: num
 export const CROP_SHAPE_KEYS = ['rectangle', 'circle'] as const;
 
 export type CropShape = (typeof CROP_SHAPE_KEYS)[number];
-
-export const CROP_SHAPES: Record<CropShape, { label: string }> = {
-    rectangle: { label: 'Rectangle' },
-    circle: { label: 'Circle / ellipse (transparent corners)' },
-};
 
 export function circleOutputFormat(format: ImageFormat): ImageFormat {
     return format === 'jpeg' ? 'png' : format;
@@ -290,19 +248,34 @@ export function defaultFreeCrop(srcWidth: number, srcHeight: number): CropBox {
     );
 }
 
-export type SizePreset = { key: string; label: string; width: number; height: number };
+export const SIZE_PRESET_KEYS = [
+    'instagram-post',
+    'instagram-portrait',
+    'instagram-story',
+    'x-post',
+    'x-header',
+    'facebook-cover',
+    'linkedin-banner',
+    'youtube-thumbnail',
+    'og-image',
+    'avatar',
+] as const;
+
+export type SizePresetKey = (typeof SIZE_PRESET_KEYS)[number];
+
+export type SizePreset = { key: SizePresetKey; width: number; height: number };
 
 export const SIZE_PRESETS: readonly SizePreset[] = [
-    { key: 'instagram-post', label: 'Instagram post', width: 1080, height: 1080 },
-    { key: 'instagram-portrait', label: 'Instagram portrait', width: 1080, height: 1350 },
-    { key: 'instagram-story', label: 'Instagram story / Reel', width: 1080, height: 1920 },
-    { key: 'x-post', label: 'X post', width: 1600, height: 900 },
-    { key: 'x-header', label: 'X header', width: 1500, height: 500 },
-    { key: 'facebook-cover', label: 'Facebook cover', width: 820, height: 312 },
-    { key: 'linkedin-banner', label: 'LinkedIn banner', width: 1584, height: 396 },
-    { key: 'youtube-thumbnail', label: 'YouTube thumbnail', width: 1280, height: 720 },
-    { key: 'og-image', label: 'OG preview image', width: 1200, height: 630 },
-    { key: 'avatar', label: 'Avatar', width: 400, height: 400 },
+    { key: 'instagram-post', width: 1080, height: 1080 },
+    { key: 'instagram-portrait', width: 1080, height: 1350 },
+    { key: 'instagram-story', width: 1080, height: 1920 },
+    { key: 'x-post', width: 1600, height: 900 },
+    { key: 'x-header', width: 1500, height: 500 },
+    { key: 'facebook-cover', width: 820, height: 312 },
+    { key: 'linkedin-banner', width: 1584, height: 396 },
+    { key: 'youtube-thumbnail', width: 1280, height: 720 },
+    { key: 'og-image', width: 1200, height: 630 },
+    { key: 'avatar', width: 400, height: 400 },
 ] as const;
 
 export function sizePreset(key: string | null): SizePreset | null {
@@ -316,11 +289,6 @@ export function outputSizeLabel({ width, height }: { width: number; height: numb
 export const WATERMARK_MODE_KEYS = ['text', 'image'] as const;
 
 export type WatermarkMode = (typeof WATERMARK_MODE_KEYS)[number];
-
-export const WATERMARK_MODES: Record<WatermarkMode, { label: string }> = {
-    text: { label: 'Text' },
-    image: { label: 'Logo image' },
-};
 
 export const WATERMARK_POSITION_KEYS = [
     'top-left',
@@ -336,19 +304,16 @@ export const WATERMARK_POSITION_KEYS = [
 
 export type WatermarkPosition = (typeof WATERMARK_POSITION_KEYS)[number];
 
-export const WATERMARK_POSITIONS: Record<
-    WatermarkPosition,
-    { label: string; x: number; y: number }
-> = {
-    'top-left': { label: 'Top left', x: 0, y: 0 },
-    top: { label: 'Top center', x: 0.5, y: 0 },
-    'top-right': { label: 'Top right', x: 1, y: 0 },
-    left: { label: 'Middle left', x: 0, y: 0.5 },
-    center: { label: 'Center', x: 0.5, y: 0.5 },
-    right: { label: 'Middle right', x: 1, y: 0.5 },
-    'bottom-left': { label: 'Bottom left', x: 0, y: 1 },
-    bottom: { label: 'Bottom center', x: 0.5, y: 1 },
-    'bottom-right': { label: 'Bottom right', x: 1, y: 1 },
+export const WATERMARK_POSITIONS: Record<WatermarkPosition, { x: number; y: number }> = {
+    'top-left': { x: 0, y: 0 },
+    top: { x: 0.5, y: 0 },
+    'top-right': { x: 1, y: 0 },
+    left: { x: 0, y: 0.5 },
+    center: { x: 0.5, y: 0.5 },
+    right: { x: 1, y: 0.5 },
+    'bottom-left': { x: 0, y: 1 },
+    bottom: { x: 0.5, y: 1 },
+    'bottom-right': { x: 1, y: 1 },
 };
 
 export const WATERMARK_OPACITY_LIMITS = { min: 1, max: 100 } as const;
@@ -490,10 +455,6 @@ export function uniqueFilenames(filenames: readonly string[]): string[] {
     });
 }
 
-export function countLabel(count: number, noun: string): string {
-    return `${count} ${noun}${count === 1 ? '' : 's'}`;
-}
-
 export function formatFromMimeType(mimeType: string): ImageFormat | null {
     const key = FORMAT_KEYS.find(format => IMAGE_FORMATS[format].mimeType === mimeType);
 
@@ -510,13 +471,6 @@ export function conversionTargets(sourceMimeTypes: readonly string[]): ConvertTa
     const sources = sourceMimeTypes.map(convertSourceFromMimeType);
 
     return CONVERT_TARGET_KEYS.filter(format => sources.some(source => format !== source));
-}
-
-export function acceptedFormatsLabel(formats: readonly ConvertSource[]): string {
-    const labels = formats.map(format => IMAGE_FORMATS[format].label);
-    return labels.length > 1
-        ? `${labels.slice(0, -1).join(', ')} or ${labels[labels.length - 1]}`
-        : (labels[0] ?? '');
 }
 
 export const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
@@ -544,21 +498,6 @@ export const PDF_PAGE_SIZE_KEYS = ['fit', 'a4', 'letter'] as const;
 
 export type PdfPageSize = (typeof PDF_PAGE_SIZE_KEYS)[number];
 
-export const PDF_PAGE_SIZES: Record<PdfPageSize, { label: string; description: string }> = {
-    fit: {
-        label: 'Fit to image',
-        description: 'One page sized exactly to the image, no margins.',
-    },
-    a4: {
-        label: 'A4',
-        description: 'Standard A4 page, image centered and scaled to fit with a margin.',
-    },
-    letter: {
-        label: 'US Letter',
-        description: 'Standard Letter page, image centered and scaled to fit with a margin.',
-    },
-};
-
 // Points (1/72in), portrait orientation.
 export const PDF_PAGE_DIMENSIONS: Record<Exclude<PdfPageSize, 'fit'>, [number, number]> = {
     a4: [595.28, 841.89],
@@ -571,24 +510,30 @@ export const PDF_MIME_TYPE = 'application/pdf';
 
 export const MAX_PDF_PAGES = 500;
 
-export function formatFileSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+export function formatFileSize(bytes: number, locale = 'en'): string {
+    const format = (value: number, digits: number) =>
+        new Intl.NumberFormat(locale, {
+            minimumFractionDigits: digits,
+            maximumFractionDigits: digits,
+        }).format(value);
 
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    if (bytes < 1024) return `${format(bytes, 0)} B`;
+    if (bytes < 1024 * 1024) return `${format(bytes / 1024, 1)} KB`;
+
+    return `${format(bytes / (1024 * 1024), 1)} MB`;
 }
 
-export type SizeChange = { direction: 'smaller' | 'larger' | 'same'; label: string };
+export type SizeChange = { direction: 'smaller' | 'larger' | 'same'; percent: number };
 
 export function sizeChange(before: number, after: number): SizeChange {
-    if (before <= 0 || before === after) return { direction: 'same', label: 'no change' };
+    if (before <= 0 || before === after) return { direction: 'same', percent: 0 };
 
     const percent = (Math.abs(after - before) / before) * 100;
     const rounded = percent < 1 ? Math.round(percent * 10) / 10 : Math.round(percent);
 
-    if (rounded === 0) return { direction: 'same', label: 'no change' };
+    if (rounded === 0) return { direction: 'same', percent: 0 };
 
     return after < before
-        ? { direction: 'smaller', label: `−${rounded}%` }
-        : { direction: 'larger', label: `+${rounded}%` };
+        ? { direction: 'smaller', percent: rounded }
+        : { direction: 'larger', percent: rounded };
 }

@@ -1,26 +1,30 @@
 import sharp, { type Metadata } from 'sharp';
 
-import { actionErrorMessage, type ActionErrorCode, type ActionErrorDetail } from '../errors';
+import type { ActionErrorCode, ActionErrorDetail, ActionWarningDetail } from '../errors';
+import { parseFieldMessage } from '../form-messages';
 import { MAX_INPUT_PIXELS, type ConvertSource, type Size } from '../image';
 
 export class ProcessingError extends Error {
-    constructor(
-        readonly code: ActionErrorCode,
-        message: string
-    ) {
-        super(message);
+    constructor(readonly detail: ActionErrorDetail) {
+        super(detail.code);
         this.name = 'ProcessingError';
+    }
+
+    get code(): ActionErrorCode {
+        return this.detail.code;
     }
 }
 
 export function fail(detail: ActionErrorDetail): ProcessingError {
-    return new ProcessingError(detail.code, actionErrorMessage(detail));
+    return new ProcessingError(detail);
 }
 
 type IssueList = { issues: readonly { message: string }[] };
 
-export function invalid(error: IssueList, fallback: string): ProcessingError {
-    return fail({ code: 'invalid_settings', detail: error.issues[0]?.message ?? fallback });
+export function invalid(error: IssueList): ProcessingError {
+    const field = parseFieldMessage(error.issues[0]?.message);
+
+    return fail({ code: 'invalid_settings', ...(field ? { field } : {}) });
 }
 
 export type SourceImage<Format extends ConvertSource = ConvertSource> = {
@@ -36,7 +40,7 @@ export type PipelineOutput = {
     data: Buffer | Uint8Array;
     filename: string;
     mimeType: string;
-    warning?: string;
+    warning?: ActionWarningDetail;
 };
 
 export function decode(buffer: Buffer) {

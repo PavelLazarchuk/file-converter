@@ -1,16 +1,19 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+
 import { useColorScheme } from '@/components/color-scheme-provider';
-import { COLOR_SCHEME_KEYS, COLOR_SCHEME_LABELS, COLOR_SCHEME_SWATCH } from '@/lib/color-scheme';
+import { COLOR_SCHEME_KEYS, COLOR_SCHEME_SWATCH } from '@/lib/color-scheme';
 import { cn } from '@/lib/utils';
 
 export function ColorSchemeToggle() {
     const { colorScheme, setColorScheme } = useColorScheme();
+    const t = useTranslations('Theme');
 
     return (
         <div
             role="group"
-            aria-label="Color scheme"
+            aria-label={t('schemeGroup')}
             className="flex items-center gap-0.5 rounded-full border bg-card p-0.5"
         >
             {COLOR_SCHEME_KEYS.map(key => {
@@ -20,8 +23,8 @@ export function ColorSchemeToggle() {
                     <button
                         key={key}
                         type="button"
-                        title={COLOR_SCHEME_LABELS[key]}
-                        aria-label={COLOR_SCHEME_LABELS[key]}
+                        title={t(key)}
+                        aria-label={t(key)}
                         aria-pressed={active}
                         onClick={() => setColorScheme(key)}
                         className={cn(

@@ -61,10 +61,13 @@ export function acceptUploads(incoming: readonly File[], rules: UploadRules): Up
     return { accepted, problems };
 }
 
-export function uploadProblemSummary(problems: readonly string[]): string | null {
+export function uploadProblemSummary(
+    problems: readonly string[],
+    more: (first: string, extra: number) => string
+): string | null {
     if (!problems.length) return null;
 
-    return problems.length === 1 ? problems[0] : `${problems[0]} (+${problems.length - 1} more)`;
+    return problems.length === 1 ? problems[0] : more(problems[0], problems.length - 1);
 }
 
 export function totalUploadBytes(files: readonly { file: File }[]): number {

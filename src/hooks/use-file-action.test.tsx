@@ -1,4 +1,6 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, waitFor } from '@testing-library/react';
+
+import { errorText, renderHook } from '@/test/intl';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LoadedImage } from '@/components/image-dropzone';
@@ -81,13 +83,16 @@ describe('running an action', () => {
     it('toasts the error and keeps the previous result cleared when the action fails', async () => {
         const action = actionReturning({
             success: false,
-            code: 'rate_limited',
-            error: 'Too many requests',
+            detail: { code: 'rate_limited', retryAfterSeconds: 12, limit: 40 },
         });
         const { result } = renderHook(() => useFileAction(action));
 
         act(() => result.current.run([upload()], {}));
-        await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Too many requests'));
+        await waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith(
+                errorText({ code: 'rate_limited', retryAfterSeconds: 12, limit: 40 })
+            )
+        );
 
         expect(result.current.outcome).toBeNull();
     });
@@ -97,7 +102,7 @@ describe('running an action', () => {
             success: true,
             files: [resultFile()],
             failures: [
-                { filename: 'broken.png', code: 'unreadable_image', error: 'not a readable image' },
+                { filename: 'broken.png', detail: { code: 'unreadable_image', formats: ['png'] } },
             ],
         });
         const { result } = renderHook(() => useFileAction(action));
@@ -106,7 +111,9 @@ describe('running an action', () => {
         await waitFor(() => expect(result.current.outcome).not.toBeNull());
 
         expect(result.current.outcome?.failures).toHaveLength(1);
-        expect(toast.error).toHaveBeenCalledWith('broken.png: not a readable image');
+        expect(toast.error).toHaveBeenCalledWith(
+            `broken.png: ${errorText({ code: 'unreadable_image', formats: ['png'] })}`
+        );
     });
 
     it('hands the raw files to onResult and skips the result card when handled', async () => {
@@ -194,8 +201,7 @@ describe('batching', () => {
             })
             .mockResolvedValue({
                 success: false,
-                code: 'rate_limited',
-                error: 'Too many requests',
+                detail: { code: 'rate_limited', retryAfterSeconds: 12, limit: 40 },
             });
         const { result } = renderHook(() => useFileAction(action, 'out.zip', { chunkSize: 1 }));
 
@@ -213,13 +219,16 @@ describe('batching', () => {
     it('toasts and shows no card when the very first chunk fails', async () => {
         const action = actionReturning({
             success: false,
-            code: 'rate_limited',
-            error: 'Too many requests',
+            detail: { code: 'rate_limited', retryAfterSeconds: 12, limit: 40 },
         });
         const { result } = renderHook(() => useFileAction(action, 'out.zip', { chunkSize: 1 }));
 
         act(() => result.current.run(uploads(3), {}));
-        await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Too many requests'));
+        await waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith(
+                errorText({ code: 'rate_limited', retryAfterSeconds: 12, limit: 40 })
+            )
+        );
 
         expect(action).toHaveBeenCalledTimes(1);
         expect(result.current.outcome).toBeNull();
@@ -286,7 +295,15 @@ describe('automatic downloads', () => {
 
         const action = actionReturning({
             success: true,
-            files: [resultFile({ warning: "Couldn't reach 100 KB" })],
+            files: [
+                resultFile({
+                    warning: {
+                        code: 'target_missed',
+                        targetBytes: 100_000,
+                        smallestBytes: 250_000,
+                    },
+                }),
+            ],
         });
         const { result } = renderHook(() => useFileAction(action));
 
@@ -303,7 +320,7 @@ describe('automatic downloads', () => {
             success: true,
             files: [resultFile()],
             failures: [
-                { filename: 'broken.png', code: 'unreadable_image', error: 'not a readable image' },
+                { filename: 'broken.png', detail: { code: 'unreadable_image', formats: ['png'] } },
             ],
         });
         const { result } = renderHook(() => useFileAction(action));

@@ -12,16 +12,13 @@ import {
     MAX_BATCH_BYTES,
     MAX_BATCH_FILES,
     MAX_FILE_SIZE,
-    acceptedFormatsLabel,
     centeredCrop,
     circleOutputFormat,
     clampCropBox,
     conversionTargets,
     convertSourceFromMimeType,
     convertSourceFromSharpFormat,
-    countLabel,
     cropRatioForSize,
-    cropRatioLabel,
     cropRatioSize,
     defaultFreeCrop,
     fileExtension,
@@ -48,7 +45,6 @@ describe('format tables', () => {
     it('describes every convert target', () => {
         for (const key of CONVERT_TARGET_KEYS) {
             expect(IMAGE_FORMATS[key]).toMatchObject({
-                label: expect.any(String),
                 mimeType: expect.any(String),
                 extension: expect.any(String),
             });
@@ -93,14 +89,6 @@ describe('conversionTargets', () => {
 
     it('is empty without images', () => {
         expect(conversionTargets([])).toEqual([]);
-    });
-});
-
-describe('acceptedFormatsLabel', () => {
-    it('joins with a trailing "or"', () => {
-        expect(acceptedFormatsLabel(['jpeg', 'png', 'webp'])).toBe('JPEG, PNG or WEBP');
-        expect(acceptedFormatsLabel(['png'])).toBe('PNG');
-        expect(acceptedFormatsLabel([])).toBe('');
     });
 });
 
@@ -150,7 +138,6 @@ describe('crop geometry', () => {
         expect(CROP_RATIO_KEYS[0]).toBe('free');
         expect(cropRatioSize('free')).toBeNull();
         expect(cropRatioSize('16:9')).toEqual(ASPECT_RATIOS['16:9']);
-        expect(cropRatioLabel('free')).toBe('Free — any size');
     });
 
     it('exports circular JPEG crops as PNG so the corners stay transparent', () => {
@@ -210,18 +197,12 @@ describe('formatting', () => {
         expect(formatFileSize(5 * 1024 * 1024)).toBe('5.0 MB');
     });
 
-    it('pluralizes counts', () => {
-        expect(countLabel(1, 'image')).toBe('1 image');
-        expect(countLabel(3, 'result')).toBe('3 results');
-        expect(countLabel(0, 'file')).toBe('0 files');
-    });
-
     it('reports the size delta with a direction', () => {
-        expect(sizeChange(1000, 500)).toEqual({ direction: 'smaller', label: '−50%' });
-        expect(sizeChange(1000, 1500)).toEqual({ direction: 'larger', label: '+50%' });
-        expect(sizeChange(1000, 1000)).toEqual({ direction: 'same', label: 'no change' });
-        expect(sizeChange(0, 100)).toEqual({ direction: 'same', label: 'no change' });
-        expect(sizeChange(100_000, 99_999)).toEqual({ direction: 'same', label: 'no change' });
+        expect(sizeChange(1000, 500)).toEqual({ direction: 'smaller', percent: 50 });
+        expect(sizeChange(1000, 1500)).toEqual({ direction: 'larger', percent: 50 });
+        expect(sizeChange(1000, 1000)).toEqual({ direction: 'same', percent: 0 });
+        expect(sizeChange(0, 100)).toEqual({ direction: 'same', percent: 0 });
+        expect(sizeChange(100_000, 99_999)).toEqual({ direction: 'same', percent: 0 });
     });
 });
 
@@ -283,7 +264,7 @@ describe('size presets', () => {
             expect(preset.width).toBeGreaterThan(0);
             expect(preset.width).toBeLessThanOrEqual(DIMENSION_LIMITS.max);
             expect(preset.height).toBeLessThanOrEqual(DIMENSION_LIMITS.max);
-            expect(preset.label.length).toBeGreaterThan(0);
+            expect(preset.height).toBeGreaterThan(0);
         }
     });
 

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { actionErrorMessage, type ActionErrorCode, type ActionErrorDetail } from './errors';
+import { errorText, warningText } from '@/test/messages';
+import type {
+    ActionErrorCode,
+    ActionErrorDetail,
+    ActionWarningCode,
+    ActionWarningDetail,
+} from './errors';
 import { MAX_BATCH_FILES, formatFileSize } from './image';
 
 const SAMPLES: { [Code in ActionErrorCode]: Extract<ActionErrorDetail, { code: Code }> } = {
@@ -8,11 +14,11 @@ const SAMPLES: { [Code in ActionErrorCode]: Extract<ActionErrorDetail, { code: C
     too_many_files: { code: 'too_many_files' },
     file_too_large: { code: 'file_too_large' },
     batch_too_large: { code: 'batch_too_large', totalBytes: 34_000_000 },
-    unreadable_image: { code: 'unreadable_image', formats: 'JPEG, PNG or WEBP' },
+    unreadable_image: { code: 'unreadable_image', formats: ['jpeg', 'png', 'webp'] },
     unsupported_format: {
         code: 'unsupported_format',
-        formats: 'JPEG, PNG or WEBP',
-        detected: 'GIF',
+        formats: ['jpeg', 'png', 'webp'],
+        detected: 'gif',
     },
     unreadable_dimensions: { code: 'unreadable_dimensions' },
     pixel_limit: { code: 'pixel_limit' },
@@ -33,11 +39,15 @@ const SAMPLES: { [Code in ActionErrorCode]: Extract<ActionErrorDetail, { code: C
     unknown: { code: 'unknown' },
 };
 
+const WARNINGS: { [Code in ActionWarningCode]: Extract<ActionWarningDetail, { code: Code }> } = {
+    target_missed: { code: 'target_missed', targetBytes: 500_000, smallestBytes: 900_000 },
+};
+
 const codes = Object.keys(SAMPLES) as ActionErrorCode[];
 
-describe('actionErrorMessage', () => {
+describe('the error catalog', () => {
     it.each(codes)('renders a sentence for %s', code => {
-        const message = actionErrorMessage(SAMPLES[code]);
+        const message = errorText(SAMPLES[code]);
 
         expect(message.length).toBeGreaterThan(0);
         expect(message).toMatch(/[.!?]$/);
@@ -45,38 +55,51 @@ describe('actionErrorMessage', () => {
     });
 
     it('never renders the same sentence for two codes', () => {
-        const messages = codes.map(code => actionErrorMessage(SAMPLES[code]));
+        const messages = codes.map(code => errorText(SAMPLES[code]));
 
         expect(new Set(messages).size).toBe(messages.length);
     });
 
     it('interpolates the numbers the caller passes', () => {
-        expect(actionErrorMessage(SAMPLES.batch_too_large)).toContain(
+        expect(errorText(SAMPLES.batch_too_large)).toContain(
             formatFileSize(SAMPLES.batch_too_large.totalBytes)
         );
-        expect(actionErrorMessage(SAMPLES.rate_limited)).toContain('12s');
-        expect(actionErrorMessage(SAMPLES.rate_limited)).toContain('40 images');
-        expect(actionErrorMessage(SAMPLES.too_many_files)).toContain(String(MAX_BATCH_FILES));
+        expect(errorText(SAMPLES.rate_limited)).toContain('12s');
+        expect(errorText(SAMPLES.rate_limited)).toContain('40 images');
+        expect(errorText(SAMPLES.too_many_files)).toContain(String(MAX_BATCH_FILES));
     });
 
-    it('prefers the zod issue over the generic settings sentence', () => {
+    it('renders the accepted formats as a localized list', () => {
+        expect(errorText(SAMPLES.unreadable_image)).toContain('JPEG, PNG, or WEBP');
+    });
+
+    it('prefers the field message over the generic settings sentence', () => {
         expect(
-            actionErrorMessage({
+            errorText({
                 code: 'invalid_settings',
-                detail: 'Width must be between 1 and 5',
+                field: { k: 'range', label: 'width', min: 1, max: 5 },
             })
         ).toBe('Width must be between 1 and 5');
-        expect(actionErrorMessage({ code: 'invalid_settings' })).toBe('Invalid settings.');
+        expect(errorText({ code: 'invalid_settings' })).toBe('Invalid settings.');
     });
 
     it('names the detected format when it recognised one', () => {
-        expect(actionErrorMessage(SAMPLES.unsupported_format)).toContain('GIF files are');
+        expect(errorText(SAMPLES.unsupported_format)).toContain('GIF files are');
         expect(
-            actionErrorMessage({
+            errorText({
                 code: 'unsupported_format',
-                formats: 'JPEG, PNG or WEBP',
+                formats: ['jpeg', 'png', 'webp'],
                 detected: null,
             })
         ).toContain('This format is');
+    });
+});
+
+describe('the warning catalog', () => {
+    it('renders both sizes of a missed compression target', () => {
+        const message = warningText(WARNINGS.target_missed);
+
+        expect(message).toContain(formatFileSize(WARNINGS.target_missed.targetBytes));
+        expect(message).toContain(formatFileSize(WARNINGS.target_missed.smallestBytes));
     });
 });

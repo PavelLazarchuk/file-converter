@@ -1,8 +1,8 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import Link from 'next/link';
 
+import { Link } from '@/i18n/navigation';
 import { ColorSchemeToggle } from '@/components/color-scheme-toggle';
 import { Logo } from '@/components/logo';
 import { ThemeToggle } from '@/components/theme-toggle';

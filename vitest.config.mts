@@ -3,7 +3,10 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
     resolve: {
-        alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+        alias: {
+            '@': fileURLToPath(new URL('./src', import.meta.url)),
+            'next/navigation': 'next/navigation.js',
+        },
     },
     test: {
         projects: [
@@ -23,6 +26,7 @@ export default defineConfig({
                     environment: 'jsdom',
                     include: ['src/**/*.test.tsx', 'src/**/*.dom.test.ts'],
                     setupFiles: ['./vitest.setup.ts'],
+                    server: { deps: { inline: ['next-intl'] } },
                 },
             },
         ],

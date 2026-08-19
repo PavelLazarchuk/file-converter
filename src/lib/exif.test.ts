@@ -2,6 +2,7 @@ import sharp, { type Sharp } from 'sharp';
 import { describe, expect, it } from 'vitest';
 
 import { describeMetadata, readExif } from './exif';
+import type { MetadataRow } from './metadata';
 
 type Field = { tag: number; type: number; values: number[] | string };
 
@@ -133,8 +134,15 @@ async function photo(exif?: Parameters<Sharp['withExif']>[0]) {
     return sharp(buffer).metadata();
 }
 
-function value(rows: { label: string; value: string }[], label: string) {
-    return rows.find(row => row.label === label)?.value;
+function value(rows: MetadataRow[], key: string) {
+    const found = rows.find(row => row.key === key)?.value;
+
+    if (!found) return undefined;
+    if ('text' in found) return found.text;
+    if ('bytes' in found) return String(found.bytes);
+    if ('format' in found) return found.format;
+
+    return found.message;
 }
 
 describe('readExif', () => {
@@ -144,10 +152,10 @@ describe('readExif', () => {
         });
         const { camera } = readExif(metadata.exif as Buffer);
 
-        expect(value(camera, 'Camera make')).toBe('ACME');
-        expect(value(camera, 'Camera model')).toBe('X100');
-        expect(value(camera, 'Software')).toBe('test-suite');
-        expect(value(camera, 'Copyright')).toBe('nobody');
+        expect(value(camera, 'cameraMake')).toBe('ACME');
+        expect(value(camera, 'cameraModel')).toBe('X100');
+        expect(value(camera, 'software')).toBe('test-suite');
+        expect(value(camera, 'copyright')).toBe('nobody');
     });
 
     it('formats the shooting settings out of the Exif sub-IFD', () => {
@@ -155,23 +163,23 @@ describe('readExif', () => {
             buildExif({ ifd0: [{ tag: 0x0110, type: 2, values: 'X100' }], exif: CAMERA_FIELDS })
         );
 
-        expect(value(camera, 'Camera model')).toBe('X100');
-        expect(value(camera, 'Taken')).toBe('2024-01-02 03:04:05');
-        expect(value(camera, 'Exposure')).toBe('1/125 s');
-        expect(value(camera, 'Aperture')).toBe('f/2.8');
-        expect(value(camera, 'ISO')).toBe('400');
-        expect(value(camera, 'Focal length')).toBe('35 mm');
-        expect(value(camera, 'Exposure bias')).toBe('-0.3 EV');
-        expect(value(camera, 'Flash')).toBe('Fired');
-        expect(value(camera, 'Lens')).toBe('35mm f/2');
+        expect(value(camera, 'cameraModel')).toBe('X100');
+        expect(value(camera, 'taken')).toBe('2024-01-02 03:04:05');
+        expect(value(camera, 'exposure')).toBe('1/125 s');
+        expect(value(camera, 'aperture')).toBe('f/2.8');
+        expect(value(camera, 'iso')).toBe('400');
+        expect(value(camera, 'focalLength')).toBe('35 mm');
+        expect(value(camera, 'exposureBias')).toBe('-0.3 EV');
+        expect(value(camera, 'flash')).toBe('flashFired');
+        expect(value(camera, 'lens')).toBe('35mm f/2');
     });
 
     it('turns GPS degrees, minutes and seconds into signed decimals', () => {
         const { location, coordinates } = readExif(buildExif({ gps: SYDNEY_GPS }));
 
         expect(coordinates).toBe('-33.865000, 151.210000');
-        expect(value(location, 'Coordinates')).toBe('-33.865000, 151.210000');
-        expect(value(location, 'Altitude')).toBe('58 m');
+        expect(value(location, 'coordinates')).toBe('-33.865000, 151.210000');
+        expect(value(location, 'altitude')).toBe('58 m');
     });
 
     it('reads a big-endian block the same way', () => {
@@ -203,34 +211,40 @@ describe('describeMetadata', () => {
     it('reports the file, the pixels and what can be stripped', async () => {
         const metadata = await photo({ IFD0: { Copyright: 'test-suite' } });
         const report = describeMetadata(
-            { filename: 'shot.jpg', size: 2048, format: 'JPEG' },
+            { filename: 'shot.jpg', size: 2048, format: 'jpeg' },
             metadata
         );
-        const titles = report.groups.map(group => group.title);
-        const file = report.groups.find(group => group.title === 'File');
+        const keys = report.groups.map(group => group.key);
+        const file = report.groups.find(group => group.key === 'file');
 
         expect(report).toMatchObject({ filename: 'shot.jpg', width: 24, height: 16 });
-        expect(report.removable).toContain('EXIF');
-        expect(titles).toEqual(expect.arrayContaining(['File', 'Image', 'Camera']));
-        expect(value(file?.rows ?? [], 'Format')).toBe('JPEG');
-        expect(value(file?.rows ?? [], 'Dimensions')).toBe('24 × 16 px');
-        expect(value(file?.rows ?? [], 'File size')).toBe('2.0 KB');
+        expect(report.removable).toContain('exif');
+        expect(keys).toEqual(expect.arrayContaining(['file', 'image', 'camera']));
+        expect(value(file?.rows ?? [], 'format')).toBe('jpeg');
+        expect(file?.rows.find(row => row.key === 'dimensions')?.value).toEqual({
+            message: 'dimensions',
+            params: { width: 24, height: 16 },
+        });
+        expect(file?.rows.find(row => row.key === 'fileSize')?.value).toEqual({ bytes: 2048 });
     });
 
     it('reports the bit depth in bits, not as sharp’s storage type', async () => {
         const metadata = await photo();
-        const report = describeMetadata({ filename: 'a.jpg', size: 10, format: 'JPEG' }, metadata);
-        const rows = report.groups.find(group => group.title === 'Image')?.rows ?? [];
+        const report = describeMetadata({ filename: 'a.jpg', size: 10, format: 'jpeg' }, metadata);
+        const rows = report.groups.find(group => group.key === 'image')?.rows ?? [];
 
         expect(metadata.depth).toBe('uchar');
-        expect(value(rows, 'Bit depth')).toBe('8 bits per channel');
-        expect(value(rows, 'Color space')).toBe('sRGB');
+        expect(rows.find(row => row.key === 'bitDepth')?.value).toEqual({
+            message: 'bitsPerChannel',
+            params: { bits: 8 },
+        });
+        expect(value(rows, 'colorSpace')).toBe('sRGB');
     });
 
     it('surfaces the coordinates separately so the form can warn about them', async () => {
         const metadata = await photo();
         const report = describeMetadata(
-            { filename: 'a.jpg', size: 10, format: 'JPEG' },
+            { filename: 'a.jpg', size: 10, format: 'jpeg' },
             {
                 ...metadata,
                 exif: buildExif({ gps: SYDNEY_GPS }),
@@ -238,13 +252,13 @@ describe('describeMetadata', () => {
         );
 
         expect(report.coordinates).toBe('-33.865000, 151.210000');
-        expect(report.groups.map(group => group.title)).toContain('Location');
+        expect(report.groups.map(group => group.key)).toContain('location');
     });
 
     it('reports the displayed dimensions for a sideways orientation tag', async () => {
         const metadata = await photo();
         const report = describeMetadata(
-            { filename: 'a.jpg', size: 10, format: 'JPEG' },
+            { filename: 'a.jpg', size: 10, format: 'jpeg' },
             {
                 ...metadata,
                 width: 24,
@@ -259,13 +273,13 @@ describe('describeMetadata', () => {
     it('says so when there is nothing embedded', async () => {
         const metadata = await photo();
         const report = describeMetadata(
-            { filename: 'bare.jpg', size: 10, format: 'JPEG' },
+            { filename: 'bare.jpg', size: 10, format: 'jpeg' },
             metadata
         );
-        const blocks = report.groups.find(group => group.title === 'Embedded blocks');
+        const blocks = report.groups.find(group => group.key === 'blocks');
 
         expect(report.removable).toEqual([]);
         expect(report.coordinates).toBeNull();
-        expect(value(blocks?.rows ?? [], 'Embedded metadata')).toBe('None');
+        expect(value(blocks?.rows ?? [], 'embedded')).toBe('none');
     });
 });

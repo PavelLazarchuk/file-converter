@@ -1,14 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 
 import { useAutoDownload } from '@/hooks/use-auto-download';
+import { useActionMessage } from '@/hooks/use-messages';
 import type { ActionFailure, ActionFile, ActionResult } from '@/lib/actions';
 import { downloadFile } from '@/lib/download';
 import { renameAll } from '@/lib/filename-template';
-import { actionErrorMessage } from '@/lib/errors';
-import { BATCH_CHUNK_SIZE, ZIP_MIME_TYPE, countLabel } from '@/lib/image';
+import { BATCH_CHUNK_SIZE, ZIP_MIME_TYPE } from '@/lib/image';
 import { Logger } from '@/lib/logger';
 import { useFilenameTemplate } from '@/hooks/use-filename-template';
 import { createZip } from '@/lib/zip';
@@ -27,9 +28,14 @@ export type ActionOutcome = {
     failures: ActionFailure[];
 };
 
-export function downloadResult(file: ActionFile, as = file.filename): void {
+export type DownloadCopy = {
+    one: (name: string) => string;
+    many: (count: number, name: string) => string;
+};
+
+export function downloadResult(file: ActionFile, as: string, copy: DownloadCopy): void {
     downloadFile(file.data, as, file.mimeType);
-    toast.success(`Downloading ${as}`);
+    toast.success(copy.one(as));
 }
 
 export function outcomeNames(files: readonly OutcomeFile[], template: string): string[] {
@@ -43,13 +49,18 @@ export function outcomeNames(files: readonly OutcomeFile[], template: string): s
     );
 }
 
-export function downloadResults(files: OutcomeFile[], zipName: string, template = ''): void {
+export function downloadResults(
+    files: OutcomeFile[],
+    zipName: string,
+    template: string,
+    copy: DownloadCopy
+): void {
     if (files.length === 0) return;
 
     const names = outcomeNames(files, template);
 
     if (files.length === 1) {
-        downloadResult(files[0].file, names[0]);
+        downloadResult(files[0].file, names[0], copy);
 
         return;
     }
@@ -59,7 +70,7 @@ export function downloadResults(files: OutcomeFile[], zipName: string, template 
     );
 
     downloadFile(zip, zipName, ZIP_MIME_TYPE);
-    toast.success(`Downloading ${countLabel(files.length, 'file')} as ${zipName}`);
+    toast.success(copy.many(files.length, zipName));
 }
 
 function describe(file: ActionFile): Promise<OutcomeFile> {
@@ -115,8 +126,14 @@ export function chunk<Item>(items: Item[], size: number): Item[][] {
     return groups;
 }
 
-export function pendingLabel(verb: string, progress: BatchProgress | null): string {
-    return progress ? `${verb} ${progress.done}/${progress.total}` : verb;
+export function usePendingLabel() {
+    const t = useTranslations('Common');
+
+    return useCallback(
+        (verb: string, progress: BatchProgress | null) =>
+            progress ? t('progress', { verb, done: progress.done, total: progress.total }) : verb,
+        [t]
+    );
 }
 
 const EXIT_DURATION = 200;
@@ -142,6 +159,19 @@ export function useFileAction(
     const mountedRef = useRef(true);
     const { autoDownload } = useAutoDownload();
     const { template } = useFilenameTemplate();
+    const message = useActionMessage();
+    const result = useTranslations('Result');
+    const common = useTranslations('Common');
+    const downloadCopy: DownloadCopy = {
+        one: name => result('downloading', { name }),
+        many: (count, name) =>
+            result('downloadingZip', { files: common('files', { count }), name }),
+    };
+    const copyRef = useRef(downloadCopy);
+
+    useEffect(() => {
+        copyRef.current = downloadCopy;
+    });
 
     const cancelExit = useCallback(() => {
         if (exitRef.current === null) return;
@@ -194,7 +224,7 @@ export function useFileAction(
     }, [setOutcome]);
 
     const downloadAll = useCallback(() => {
-        downloadResults(currentRef.current?.files ?? [], zipName, template);
+        downloadResults(currentRef.current?.files ?? [], zipName, template, copyRef.current);
     }, [zipName, template]);
 
     const reportProgress = useCallback((next: BatchProgress | null) => {
@@ -213,11 +243,7 @@ export function useFileAction(
         return action(formData).catch((error: unknown): ActionResult => {
             Logger.error('action.transport_failed', { files: group.length, error });
 
-            return {
-                success: false,
-                code: 'transport_failed',
-                error: actionErrorMessage({ code: 'transport_failed' }),
-            };
+            return { success: false, detail: { code: 'transport_failed' } };
         });
     }
 
@@ -235,29 +261,25 @@ export function useFileAction(
             reportProgress(groups.length > 1 ? { done, total: images.length } : null);
 
             for (const [index, group] of groups.entries()) {
-                const result = await send(group, params);
+                const outcome = await send(group, params);
 
-                if (!result.success) {
+                if (!outcome.success) {
                     if (!files.length) {
-                        toast.error(result.error);
+                        toast.error(message(outcome.detail));
                         reportProgress(null);
 
                         return;
                     }
 
                     for (const image of groups.slice(index).flat()) {
-                        failures.push({
-                            filename: image.file.name,
-                            code: result.code,
-                            error: result.error,
-                        });
+                        failures.push({ filename: image.file.name, detail: outcome.detail });
                     }
 
                     break;
                 }
 
-                files.push(...result.files);
-                failures.push(...(result.failures ?? []));
+                files.push(...outcome.files);
+                failures.push(...(outcome.failures ?? []));
                 done += group.length;
 
                 if (groups.length > 1) reportProgress({ done, total: images.length });
@@ -268,10 +290,16 @@ export function useFileAction(
             const [first] = failures;
 
             if (first) {
+                const error = message(first.detail);
+
                 toast.error(
                     failures.length === 1
-                        ? `${first.filename}: ${first.error}`
-                        : `${countLabel(failures.length, 'file')} could not be processed — ${first.filename}: ${first.error}`
+                        ? result('failedToast', { name: first.filename, error })
+                        : result('failedToastMany', {
+                              files: common('files', { count: failures.length }),
+                              name: first.filename,
+                              error,
+                          })
                 );
             }
 
@@ -283,7 +311,9 @@ export function useFileAction(
 
             const settled = failures.length === 0 && files.every(file => !file.warning);
 
-            if (autoDownload && settled) downloadResults(described, zipName, template);
+            if (autoDownload && settled) {
+                downloadResults(described, zipName, template, copyRef.current);
+            }
         });
     }
 

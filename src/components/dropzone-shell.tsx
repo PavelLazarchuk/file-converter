@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, UploadCloud, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -132,6 +133,8 @@ export type ReorderControlsProps = {
 };
 
 export function ReorderControls({ label, index, count, disabled, onMove }: ReorderControlsProps) {
+    const t = useTranslations('Uploads');
+
     return (
         <div className="flex shrink-0 flex-col">
             <Button
@@ -139,7 +142,7 @@ export function ReorderControls({ label, index, count, disabled, onMove }: Reord
                 variant="ghost"
                 size="icon"
                 className="size-6"
-                aria-label={`Move ${label} up`}
+                aria-label={t('moveUp', { name: label })}
                 disabled={disabled || index === 0}
                 onClick={() => onMove(index, index - 1)}
             >
@@ -150,7 +153,7 @@ export function ReorderControls({ label, index, count, disabled, onMove }: Reord
                 variant="ghost"
                 size="icon"
                 className="size-6"
-                aria-label={`Move ${label} down`}
+                aria-label={t('moveDown', { name: label })}
                 disabled={disabled || index === count - 1}
                 onClick={() => onMove(index, index + 1)}
             >
@@ -167,12 +170,14 @@ export type RemoveButtonProps = {
 };
 
 export function RemoveButton({ label, disabled, onClick }: RemoveButtonProps) {
+    const t = useTranslations('Uploads');
+
     return (
         <Button
             type="button"
             variant="ghost"
             size="icon"
-            aria-label={`Remove ${label}`}
+            aria-label={t('remove', { name: label })}
             disabled={disabled}
             onClick={onClick}
         >

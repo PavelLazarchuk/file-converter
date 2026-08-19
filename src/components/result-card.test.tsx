@@ -1,4 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+
+import { render } from '@/test/intl';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,7 +13,7 @@ import type { ActionOutcome, OutcomeFile } from '@/hooks/use-file-action';
 const push = vi.fn();
 let pathname = '/compress';
 
-vi.mock('next/navigation', () => ({
+vi.mock('@/i18n/navigation', () => ({
     useRouter: () => ({ push }),
     usePathname: () => pathname,
 }));
@@ -80,10 +82,18 @@ describe('a single result', () => {
 
     it('asks for confirmation when the result carries a warning', async () => {
         const { onDownloadAll, user } = setup(
-            outcome([entry({ warning: "Couldn't reach 100 KB at these dimensions" })])
+            outcome([
+                entry({
+                    warning: {
+                        code: 'target_missed',
+                        targetBytes: 100_000,
+                        smallestBytes: 250_000,
+                    },
+                }),
+            ])
         );
 
-        expect(screen.getByText(/Couldn't reach 100 KB/)).toBeInTheDocument();
+        expect(screen.getByText(/Couldn't reach 97.7 KB/)).toBeInTheDocument();
 
         await user.click(screen.getByRole('button', { name: /download it anyway/i }));
 
@@ -130,11 +140,18 @@ describe('several results', () => {
         setup(
             outcome([
                 entry({ filename: 'a.png' }),
-                entry({ filename: 'b.png', warning: 'too big' }),
+                entry({
+                    filename: 'b.png',
+                    warning: {
+                        code: 'target_missed',
+                        targetBytes: 100_000,
+                        smallestBytes: 250_000,
+                    },
+                }),
             ])
         );
 
-        expect(screen.getByText('too big')).toBeInTheDocument();
+        expect(screen.getByText(/Couldn't reach 97.7 KB/)).toBeInTheDocument();
     });
 });
 
@@ -146,20 +163,18 @@ describe('partial failures', () => {
                 [
                     {
                         filename: 'broken.png',
-                        code: 'unreadable_image' as const,
-                        error: 'not a readable image',
+                        detail: { code: 'unreadable_image' as const, formats: ['png' as const] },
                     },
                     {
                         filename: 'huge.png',
-                        code: 'file_too_large' as const,
-                        error: 'File is too large.',
+                        detail: { code: 'file_too_large' as const },
                     },
                 ]
             )
         );
 
         expect(screen.getByText('2 files could not be processed')).toBeInTheDocument();
-        expect(screen.getByText(/not a readable image/)).toBeInTheDocument();
+        expect(screen.getByText(/isn't a readable image/)).toBeInTheDocument();
         expect(screen.getByText(/File is too large/)).toBeInTheDocument();
     });
 });

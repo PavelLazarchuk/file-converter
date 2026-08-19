@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-    CROSS_ORIGIN_ASSET_PATH,
+    CROSS_ORIGIN_ASSET_PATHS,
     contentSecurityPolicy,
     crossOriginAssetHeaders,
     securityHeaders,
@@ -97,7 +97,7 @@ describe('crossOriginAssetHeaders', () => {
         expect(crossOriginAssetHeaders()).toEqual([
             { key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' },
         ]);
-        expect(CROSS_ORIGIN_ASSET_PATH).toBe('/opengraph-image');
+        expect(CROSS_ORIGIN_ASSET_PATHS).toEqual(['/opengraph-image', '/:locale/opengraph-image']);
     });
 
     it('overrides the key the site-wide rule sets, so the last rule wins', () => {
