@@ -9,6 +9,8 @@ import { MergePdfForm } from './merge-pdf-form';
 
 const PATH = '/merge-pdf';
 
+export const maxDuration = 60;
+
 export async function generateMetadata({ params }: PageProps<'/[locale]/merge-pdf'>) {
     const { locale } = await params;
 

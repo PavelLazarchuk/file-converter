@@ -103,6 +103,7 @@ export function PdfForm() {
                                 id="pageSize"
                                 className="w-full"
                                 aria-invalid={!!errors.pageSize}
+                                aria-describedby={errors.pageSize ? 'pageSize-error' : undefined}
                             >
                                 <SelectValue placeholder={form('choosePageSize')} />
                             </SelectTrigger>
@@ -119,7 +120,7 @@ export function PdfForm() {
                 <p className="text-sm text-muted-foreground">
                     {labels(`pageSizes.${pageSize}Hint`)}
                 </p>
-                <FieldError error={errors.pageSize} />
+                <FieldError id="pageSize-error" error={errors.pageSize} />
             </div>
 
             {outcome && (

@@ -9,6 +9,8 @@ import { CompressForm } from './compress-form';
 
 const PATH = '/compress';
 
+export const maxDuration = 60;
+
 export async function generateMetadata({ params }: PageProps<'/[locale]/compress'>) {
     const { locale } = await params;
 

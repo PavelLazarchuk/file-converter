@@ -9,6 +9,8 @@ import { ResizeForm } from './resize-form';
 
 const PATH = '/resize';
 
+export const maxDuration = 60;
+
 export async function generateMetadata({ params }: PageProps<'/[locale]/resize'>) {
     const { locale } = await params;
 

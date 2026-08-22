@@ -9,6 +9,8 @@ import { PlaceholderForm } from './placeholder-form';
 
 const PATH = '/placeholder';
 
+export const maxDuration = 60;
+
 export async function generateMetadata({ params }: PageProps<'/[locale]/placeholder'>) {
     const { locale } = await params;
 

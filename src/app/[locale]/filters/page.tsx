@@ -9,6 +9,8 @@ import { FiltersForm } from './filters-form';
 
 const PATH = '/filters';
 
+export const maxDuration = 60;
+
 export async function generateMetadata({ params }: PageProps<'/[locale]/filters'>) {
     const { locale } = await params;
 

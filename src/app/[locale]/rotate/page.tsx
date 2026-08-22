@@ -9,6 +9,8 @@ import { RotateForm } from './rotate-form';
 
 const PATH = '/rotate';
 
+export const maxDuration = 60;
+
 export async function generateMetadata({ params }: PageProps<'/[locale]/rotate'>) {
     const { locale } = await params;
 

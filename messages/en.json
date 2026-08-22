@@ -7,7 +7,8 @@
         "footerTools": "Tools",
         "footerAbout": "About",
         "footerPrivacy": "Privacy",
-        "copyright": "© {year} {name}."
+        "copyright": "© {year} {name}.",
+        "skipToContent": "Skip to content"
     },
     "Tools": {
         "allTools": "All tools",
@@ -372,7 +373,9 @@
         },
         "pending": "Cropping…",
         "submit": "Crop",
-        "submitDownload": "Crop & download"
+        "submitDownload": "Crop & download",
+        "frameLabel": "Crop frame, {width} by {height} pixels, {left} pixels from the left and {top} from the top",
+        "keyboardHint": "With the frame focused, arrow keys move it, Shift moves further, and Alt with an arrow resizes it."
     },
     "Convert": {
         "metaTitle": "Convert an image",

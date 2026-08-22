@@ -13,7 +13,7 @@ export async function Landing() {
     const tools = await getTranslations('Tools');
 
     return (
-        <main className="relative flex-1 overflow-hidden">
+        <main id="main" className="relative flex-1 overflow-hidden">
             <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
                 <div className="glow-parallax absolute -top-40 left-1/2 h-130 w-225 -translate-x-1/2 rounded-full bg-gradient-to-r from-sky-500/25 via-violet-500/25 to-emerald-500/25 blur-3xl" />
             </div>

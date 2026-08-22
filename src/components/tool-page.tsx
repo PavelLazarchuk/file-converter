@@ -25,7 +25,7 @@ export async function ToolPage({ href, title, description, children }: ToolPageP
         : null;
 
     return (
-        <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:py-16">
+        <main id="main" className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:py-16">
             {tool && copy && (
                 <JsonLd
                     data={[

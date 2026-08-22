@@ -2,6 +2,7 @@
 
 import { useRef } from 'react';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 
 import type { LoadedImage } from '@/components/image-dropzone';
 import { clampCropBox, type CropBox, type CropShape } from '@/lib/image';
@@ -36,6 +37,16 @@ const ALL_HANDLES = Object.keys(HANDLES) as Handle[];
 
 const MIN_CROP_PX = 16;
 
+const KEY_STEP = 1;
+const KEY_STEP_FAST = 10;
+
+const ARROWS: Record<string, { x: number; y: number }> = {
+    ArrowLeft: { x: -1, y: 0 },
+    ArrowRight: { x: 1, y: 0 },
+    ArrowUp: { x: 0, y: -1 },
+    ArrowDown: { x: 0, y: 1 },
+};
+
 type CropAreaProps = {
     image: LoadedImage;
     ratio: { width: number; height: number } | null;
@@ -48,6 +59,7 @@ type CropAreaProps = {
 export function CropArea({ image, ratio, box, shape, onChange, disabled }: CropAreaProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const dragRef = useRef<DragState | null>(null);
+    const t = useTranslations('Crop');
 
     function startDrag(event: React.PointerEvent<HTMLDivElement>) {
         if (disabled) return;
@@ -156,6 +168,28 @@ export function CropArea({ image, ratio, box, shape, onChange, disabled }: CropA
         return clampCropBox(next, image.width, image.height);
     }
 
+    function nudge(event: React.KeyboardEvent<HTMLDivElement>) {
+        const arrow = ARROWS[event.key];
+
+        if (disabled || !arrow) return;
+
+        event.preventDefault();
+
+        const step = event.shiftKey ? KEY_STEP_FAST : KEY_STEP;
+        const dx = arrow.x * step;
+        const dy = arrow.y * step;
+
+        if (!event.altKey) {
+            onChange(moveBox(box, dx, dy));
+
+            return;
+        }
+
+        onChange(
+            ratio ? resizeLockedBox(box, 'se', dx, dy, ratio) : resizeFreeBox(box, 'se', dx, dy)
+        );
+    }
+
     const toPercent = (value: number, total: number) => `${(value / total) * 100}%`;
     const handles = ratio ? CORNER_HANDLES : ALL_HANDLES;
 
@@ -174,9 +208,17 @@ export function CropArea({ image, ratio, box, shape, onChange, disabled }: CropA
                 className="block h-auto max-h-96 w-auto max-w-full"
             />
             <div
-                role="presentation"
+                role="group"
+                tabIndex={disabled ? -1 : 0}
+                aria-label={t('frameLabel', {
+                    width: Math.round(box.width),
+                    height: Math.round(box.height),
+                    left: Math.round(box.left),
+                    top: Math.round(box.top),
+                })}
+                onKeyDown={nudge}
                 className={cn(
-                    'absolute border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]',
+                    'absolute border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.55)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                     shape === 'circle' && 'rounded-full',
                     !disabled && 'cursor-move'
                 )}

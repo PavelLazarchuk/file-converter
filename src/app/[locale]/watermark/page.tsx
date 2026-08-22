@@ -9,6 +9,8 @@ import { WatermarkForm } from './watermark-form';
 
 const PATH = '/watermark';
 
+export const maxDuration = 60;
+
 export async function generateMetadata({ params }: PageProps<'/[locale]/watermark'>) {
     const { locale } = await params;
 

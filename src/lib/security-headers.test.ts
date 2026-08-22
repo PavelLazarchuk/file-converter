@@ -93,11 +93,11 @@ describe('securityHeaders', () => {
 });
 
 describe('crossOriginAssetHeaders', () => {
-    it('re-opens CORP for the opengraph image only', () => {
+    it('re-opens CORP for the opengraph images only', () => {
         expect(crossOriginAssetHeaders()).toEqual([
             { key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' },
         ]);
-        expect(CROSS_ORIGIN_ASSET_PATHS).toEqual(['/opengraph-image', '/:locale/opengraph-image']);
+        expect(CROSS_ORIGIN_ASSET_PATHS).toEqual(['/opengraph-image', '/:path*/opengraph-image']);
     });
 
     it('overrides the key the site-wide rule sets, so the last rule wins', () => {

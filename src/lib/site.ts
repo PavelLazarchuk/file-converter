@@ -61,6 +61,7 @@ export type Tool = {
     href: string;
     icon: LucideIcon;
     gradient: string;
+    accent: readonly [string, string];
     intake?: ToolIntake;
 };
 
@@ -94,6 +95,7 @@ export const TOOLS: readonly Tool[] = [
         href: '/resize',
         icon: Scaling,
         gradient: 'from-sky-500 to-blue-600',
+        accent: ['#0ea5e9', '#2563eb'],
         intake: RASTER_INTAKE,
     },
     {
@@ -101,6 +103,7 @@ export const TOOLS: readonly Tool[] = [
         href: '/crop',
         icon: Crop,
         gradient: 'from-amber-500 to-orange-600',
+        accent: ['#f59e0b', '#ea580c'],
         intake: SINGLE_RASTER_INTAKE,
     },
     {
@@ -108,6 +111,7 @@ export const TOOLS: readonly Tool[] = [
         href: '/rotate',
         icon: RotateCw,
         gradient: 'from-lime-500 to-green-600',
+        accent: ['#84cc16', '#16a34a'],
         intake: RASTER_INTAKE,
     },
     {
@@ -115,6 +119,7 @@ export const TOOLS: readonly Tool[] = [
         href: '/compare',
         icon: Scale,
         gradient: 'from-fuchsia-500 to-purple-600',
+        accent: ['#d946ef', '#9333ea'],
         intake: SINGLE_RASTER_INTAKE,
     },
     {
@@ -122,6 +127,7 @@ export const TOOLS: readonly Tool[] = [
         href: '/compress',
         icon: Gauge,
         gradient: 'from-violet-500 to-purple-600',
+        accent: ['#8b5cf6', '#9333ea'],
         intake: RASTER_INTAKE,
     },
     {
@@ -129,6 +135,7 @@ export const TOOLS: readonly Tool[] = [
         href: '/convert',
         icon: RefreshCw,
         gradient: 'from-emerald-500 to-teal-600',
+        accent: ['#10b981', '#0d9488'],
         intake: CONVERT_INTAKE,
     },
     {
@@ -136,6 +143,7 @@ export const TOOLS: readonly Tool[] = [
         href: '/watermark',
         icon: Stamp,
         gradient: 'from-cyan-500 to-sky-600',
+        accent: ['#06b6d4', '#0284c7'],
         intake: RASTER_INTAKE,
     },
     {
@@ -143,6 +151,7 @@ export const TOOLS: readonly Tool[] = [
         href: '/filters',
         icon: Palette,
         gradient: 'from-yellow-500 to-amber-600',
+        accent: ['#eab308', '#d97706'],
         intake: RASTER_INTAKE,
     },
     {
@@ -150,6 +159,7 @@ export const TOOLS: readonly Tool[] = [
         href: '/metadata',
         icon: ScanSearch,
         gradient: 'from-indigo-500 to-blue-700',
+        accent: ['#6366f1', '#1d4ed8'],
         intake: RASTER_INTAKE,
     },
     {
@@ -157,12 +167,14 @@ export const TOOLS: readonly Tool[] = [
         href: '/placeholder',
         icon: ImagePlus,
         gradient: 'from-pink-500 to-rose-600',
+        accent: ['#ec4899', '#e11d48'],
     },
     {
         key: 'mergePdf',
         href: '/merge-pdf',
         icon: Combine,
         gradient: 'from-slate-500 to-slate-700',
+        accent: ['#64748b', '#334155'],
         intake: PDF_INTAKE,
     },
     {
@@ -170,6 +182,7 @@ export const TOOLS: readonly Tool[] = [
         href: '/pdf',
         icon: FileText,
         gradient: 'from-red-500 to-rose-600',
+        accent: ['#ef4444', '#e11d48'],
         intake: CONVERT_INTAKE,
     },
 ] as const;

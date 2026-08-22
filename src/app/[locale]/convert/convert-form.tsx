@@ -222,6 +222,7 @@ export function ConvertForm() {
                                 id="format"
                                 className="w-full"
                                 aria-invalid={!!errors.format}
+                                aria-describedby={errors.format ? 'format-error' : undefined}
                             >
                                 <SelectValue placeholder={form('chooseTargetFormat')} />
                             </SelectTrigger>
@@ -263,7 +264,7 @@ export function ConvertForm() {
                 {target === 'tiff' && (
                     <p className="text-sm text-muted-foreground">{t('tiffNote')}</p>
                 )}
-                <FieldError error={errors.format} />
+                <FieldError id="format-error" error={errors.format} />
             </div>
 
             {target === 'ico' && (

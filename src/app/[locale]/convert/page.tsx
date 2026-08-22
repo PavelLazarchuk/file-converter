@@ -9,6 +9,8 @@ import { ConvertForm } from './convert-form';
 
 const PATH = '/convert';
 
+export const maxDuration = 60;
+
 export async function generateMetadata({ params }: PageProps<'/[locale]/convert'>) {
     const { locale } = await params;
 

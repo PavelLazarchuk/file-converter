@@ -151,6 +151,7 @@ export function CropForm() {
                                 id="ratio"
                                 className="w-full"
                                 aria-invalid={!!errors.ratio}
+                                aria-describedby={errors.ratio ? 'ratio-error' : undefined}
                             >
                                 <SelectValue placeholder={form('chooseRatio')} />
                             </SelectTrigger>
@@ -164,7 +165,7 @@ export function CropForm() {
                         </Select>
                     )}
                 />
-                <FieldError error={errors.ratio} />
+                <FieldError id="ratio-error" error={errors.ratio} />
             </div>
 
             <div className="space-y-2">
@@ -182,6 +183,7 @@ export function CropForm() {
                                 id="shape"
                                 className="w-full"
                                 aria-invalid={!!errors.shape}
+                                aria-describedby={errors.shape ? 'shape-error' : undefined}
                             >
                                 <SelectValue placeholder={form('chooseShape')} />
                             </SelectTrigger>
@@ -198,7 +200,7 @@ export function CropForm() {
                 {shape === 'circle' && (
                     <p className="text-sm text-muted-foreground">{t('circleHint')}</p>
                 )}
-                <FieldError error={errors.shape} />
+                <FieldError id="shape-error" error={errors.shape} />
             </div>
 
             {image && box && (
@@ -225,7 +227,7 @@ export function CropForm() {
                                       height: box.height,
                                   })}`
                                 : ''}{' '}
-                            {ratio ? t('dragCorner') : t('dragEdge')}
+                            {ratio ? t('dragCorner') : t('dragEdge')} {t('keyboardHint')}
                         </p>
                     </div>
                     <CropFields

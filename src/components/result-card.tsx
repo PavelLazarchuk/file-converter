@@ -104,9 +104,12 @@ function SizeLine({ entry }: { entry: OutcomeFile }) {
     );
 }
 
-function Warning({ children }: { children: React.ReactNode }) {
+function Warning({ children, alert }: { children: React.ReactNode; alert?: boolean }) {
     return (
-        <div className="grid grid-rows-[1fr] rounded-lg border border-amber-500/50 bg-amber-500/10 opacity-100 transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none starting:grid-rows-[0fr] starting:opacity-0">
+        <div
+            role={alert ? 'alert' : undefined}
+            className="grid grid-rows-[1fr] rounded-lg border border-amber-500/50 bg-amber-500/10 opacity-100 transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none starting:grid-rows-[0fr] starting:opacity-0"
+        >
             <div className="overflow-hidden">
                 <div className="flex items-start gap-2.5 p-3 text-sm">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
@@ -193,7 +196,7 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
                     : 'animate-in duration-300 ease-out fade-in-0 zoom-in-95 slide-in-from-bottom-3'
             )}
         >
-            <div className="flex items-start gap-2.5">
+            <div role="status" className="flex items-start gap-2.5">
                 <FileCheck2 className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                 <p className="text-sm font-medium">
                     {single
@@ -258,7 +261,7 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
             {single?.file.warning && <Warning>{warningMessage(single.file.warning)}</Warning>}
 
             {failures.length > 0 && (
-                <Warning>
+                <Warning alert>
                     <p className="font-medium">
                         {t('failed', { files: common('files', { count: failures.length }) })}
                     </p>

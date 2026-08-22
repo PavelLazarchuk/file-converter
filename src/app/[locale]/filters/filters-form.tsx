@@ -185,6 +185,7 @@ export function FiltersForm() {
                                 id="effect"
                                 className="w-full"
                                 aria-invalid={!!errors.effect}
+                                aria-describedby={errors.effect ? 'effect-error' : undefined}
                             >
                                 <SelectValue placeholder={form('chooseEffect')} />
                             </SelectTrigger>
@@ -198,7 +199,7 @@ export function FiltersForm() {
                         </Select>
                     )}
                 />
-                <FieldError error={errors.effect} />
+                <FieldError id="effect-error" error={errors.effect} />
             </div>
 
             <div className="space-y-4 rounded-xl border bg-card p-4">
@@ -213,9 +214,10 @@ export function FiltersForm() {
                             max={BRIGHTNESS_LIMITS.max}
                             disabled={!hasImages || isPending}
                             aria-invalid={!!errors.brightness}
+                            aria-describedby={errors.brightness ? 'brightness-error' : undefined}
                             {...register('brightness', { onChange: clearResult })}
                         />
-                        <FieldError error={errors.brightness} />
+                        <FieldError id="brightness-error" error={errors.brightness} />
                     </div>
 
                     <div className="space-y-2">
@@ -226,9 +228,10 @@ export function FiltersForm() {
                             max={SATURATION_LIMITS.max}
                             disabled={!hasImages || isPending}
                             aria-invalid={!!errors.saturation}
+                            aria-describedby={errors.saturation ? 'saturation-error' : undefined}
                             {...register('saturation', { onChange: clearResult })}
                         />
-                        <FieldError error={errors.saturation} />
+                        <FieldError id="saturation-error" error={errors.saturation} />
                     </div>
 
                     <div className="space-y-2">
@@ -239,9 +242,10 @@ export function FiltersForm() {
                             max={HUE_LIMITS.max}
                             disabled={!hasImages || isPending}
                             aria-invalid={!!errors.hue}
+                            aria-describedby={errors.hue ? 'hue-error' : undefined}
                             {...register('hue', { onChange: clearResult })}
                         />
-                        <FieldError error={errors.hue} />
+                        <FieldError id="hue-error" error={errors.hue} />
                     </div>
 
                     <div className="space-y-2">
@@ -252,9 +256,10 @@ export function FiltersForm() {
                             max={BLUR_LIMITS.max}
                             disabled={!hasImages || isPending}
                             aria-invalid={!!errors.blur}
+                            aria-describedby={errors.blur ? 'blur-error' : undefined}
                             {...register('blur', { onChange: clearResult })}
                         />
-                        <FieldError error={errors.blur} />
+                        <FieldError id="blur-error" error={errors.blur} />
                     </div>
                 </div>
 

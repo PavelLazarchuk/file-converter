@@ -68,6 +68,12 @@ describe('a single result', () => {
         expect(screen.getByText('−50%')).toBeInTheDocument();
     });
 
+    it('announces the ready line as a status region', () => {
+        setup(outcome([entry()]));
+
+        expect(screen.getByRole('status')).toHaveTextContent('Result ready');
+    });
+
     it('leaves out the comparison when there was no upload to compare against', () => {
         setup(outcome([entry({ originalSize: 0, filename: 'placeholder-320x200.png' })]));
 
@@ -176,6 +182,7 @@ describe('partial failures', () => {
         expect(screen.getByText('2 files could not be processed')).toBeInTheDocument();
         expect(screen.getByText(/isn't a readable image/)).toBeInTheDocument();
         expect(screen.getByText(/File is too large/)).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toHaveTextContent('2 files could not be processed');
     });
 });
 

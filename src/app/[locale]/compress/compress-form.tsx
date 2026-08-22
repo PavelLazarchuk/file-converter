@@ -142,10 +142,11 @@ export function CompressForm() {
                         placeholder={String(DEFAULT_QUALITY)}
                         disabled={!hasImages || isPending}
                         aria-invalid={!!errors.quality}
+                        aria-describedby={errors.quality ? 'quality-error' : undefined}
                         {...register('quality')}
                     />
                     <p className="text-sm text-muted-foreground">{t('qualityHint')}</p>
-                    <FieldError error={errors.quality} />
+                    <FieldError id="quality-error" error={errors.quality} />
                 </div>
             ) : (
                 <div className="space-y-2">
@@ -157,6 +158,7 @@ export function CompressForm() {
                         placeholder={String(DEFAULT_TARGET_KB)}
                         disabled={!hasImages || isPending}
                         aria-invalid={!!errors.targetKb}
+                        aria-describedby={errors.targetKb ? 'targetKb-error' : undefined}
                         {...register('targetKb')}
                     />
                     <div className="flex flex-wrap gap-2">
@@ -178,7 +180,7 @@ export function CompressForm() {
                         ))}
                     </div>
                     <p className="text-sm text-muted-foreground">{t('targetSizeHint')}</p>
-                    <FieldError error={errors.targetKb} />
+                    <FieldError id="targetKb-error" error={errors.targetKb} />
                 </div>
             )}
 

@@ -143,6 +143,7 @@ export function WatermarkForm() {
                                 id="mode"
                                 className="w-full"
                                 aria-invalid={!!errors.mode}
+                                aria-describedby={errors.mode ? 'mode-error' : undefined}
                             >
                                 <SelectValue placeholder={form('chooseWatermarkMode')} />
                             </SelectTrigger>
@@ -156,7 +157,7 @@ export function WatermarkForm() {
                         </Select>
                     )}
                 />
-                <FieldError error={errors.mode} />
+                <FieldError id="mode-error" error={errors.mode} />
             </div>
 
             {usesLogo ? (
@@ -200,9 +201,10 @@ export function WatermarkForm() {
                             maxLength={WATERMARK_TEXT_MAX_LENGTH}
                             disabled={!hasImages || isPending}
                             aria-invalid={!!errors.text}
+                            aria-describedby={errors.text ? 'text-error' : undefined}
                             {...register('text', { onChange: clearResult })}
                         />
-                        <FieldError error={errors.text} />
+                        <FieldError id="text-error" error={errors.text} />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="color">{t('color')}</Label>
@@ -212,8 +214,10 @@ export function WatermarkForm() {
                             className="h-9 w-full cursor-pointer p-1 sm:w-20"
                             disabled={!hasImages || isPending}
                             aria-invalid={!!errors.color}
+                            aria-describedby={errors.color ? 'color-error' : undefined}
                             {...register('color', { onChange: clearResult })}
                         />
+                        <FieldError id="color-error" error={errors.color} />
                     </div>
                 </div>
             )}
@@ -269,9 +273,10 @@ export function WatermarkForm() {
                         max={WATERMARK_SCALE_LIMITS.max}
                         disabled={!hasImages || isPending}
                         aria-invalid={!!errors.scale}
+                        aria-describedby={errors.scale ? 'scale-error' : undefined}
                         {...register('scale', { onChange: clearResult })}
                     />
-                    <FieldError error={errors.scale} />
+                    <FieldError id="scale-error" error={errors.scale} />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="opacity">{t('opacity')}</Label>
@@ -281,9 +286,10 @@ export function WatermarkForm() {
                         max={WATERMARK_OPACITY_LIMITS.max}
                         disabled={!hasImages || isPending}
                         aria-invalid={!!errors.opacity}
+                        aria-describedby={errors.opacity ? 'opacity-error' : undefined}
                         {...register('opacity', { onChange: clearResult })}
                     />
-                    <FieldError error={errors.opacity} />
+                    <FieldError id="opacity-error" error={errors.opacity} />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="margin">{t('margin')}</Label>
@@ -293,9 +299,10 @@ export function WatermarkForm() {
                         max={WATERMARK_MARGIN_LIMITS.max}
                         disabled={!hasImages || isPending}
                         aria-invalid={!!errors.margin}
+                        aria-describedby={errors.margin ? 'margin-error' : undefined}
                         {...register('margin', { onChange: clearResult })}
                     />
-                    <FieldError error={errors.margin} />
+                    <FieldError id="margin-error" error={errors.margin} />
                 </div>
             </div>
 

@@ -90,10 +90,11 @@ export function CompareForm() {
                     max={QUALITY_LIMITS.max}
                     disabled={!hasImage || isPending}
                     aria-invalid={!!errors.quality}
+                    aria-describedby={errors.quality ? 'quality-error' : undefined}
                     {...register('quality')}
                 />
                 <p className="text-sm text-muted-foreground">{t('qualityHint')}</p>
-                <FieldError error={errors.quality} />
+                <FieldError id="quality-error" error={errors.quality} />
             </div>
 
             {comparison && (

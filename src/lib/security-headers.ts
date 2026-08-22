@@ -30,7 +30,7 @@ export function contentSecurityPolicy(isDev: boolean): string {
     return policy.join('; ');
 }
 
-export const CROSS_ORIGIN_ASSET_PATHS = ['/opengraph-image', '/:locale/opengraph-image'] as const;
+export const CROSS_ORIGIN_ASSET_PATHS = ['/opengraph-image', '/:path*/opengraph-image'] as const;
 
 export function crossOriginAssetHeaders(): HeaderRule[] {
     return [{ key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' }];

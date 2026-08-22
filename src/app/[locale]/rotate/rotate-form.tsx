@@ -143,9 +143,10 @@ export function RotateForm() {
                     placeholder={t('anglePlaceholder')}
                     disabled={!hasImages || isPending}
                     aria-invalid={!!errors.angle}
+                    aria-describedby={errors.angle ? 'angle-error' : undefined}
                     {...register('angle', { onChange: clearResult })}
                 />
-                <FieldError error={errors.angle} />
+                <FieldError id="angle-error" error={errors.angle} />
             </div>
 
             <div className="space-y-3">
@@ -205,9 +206,10 @@ export function RotateForm() {
                             className="h-9 cursor-pointer p-1"
                             disabled={isPending}
                             aria-invalid={!!errors.background}
+                            aria-describedby={errors.background ? 'background-error' : undefined}
                             {...register('background', { onChange: clearResult })}
                         />
-                        <FieldError error={errors.background} />
+                        <FieldError id="background-error" error={errors.background} />
                     </div>
                 </div>
             )}

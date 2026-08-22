@@ -83,6 +83,8 @@ export default async function RootLayout({ children, params }: LayoutProps<'/[lo
 
     setRequestLocale(locale);
 
+    const t = await getTranslations({ locale, namespace: 'Site' });
+
     return (
         <html
             lang={locale}
@@ -97,6 +99,12 @@ export default async function RootLayout({ children, params }: LayoutProps<'/[lo
                 <NextIntlClientProvider>
                     <ThemeProvider>
                         <ColorSchemeProvider>
+                            <a
+                                href="#main"
+                                className="sr-only rounded-md bg-background px-4 py-2 text-sm font-medium ring-2 ring-ring focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50"
+                            >
+                                {t('skipToContent')}
+                            </a>
                             <SiteHeader />
                             {children}
                             <SiteFooter />

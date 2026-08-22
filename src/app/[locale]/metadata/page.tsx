@@ -9,6 +9,8 @@ import { MetadataForm } from './metadata-form';
 
 const PATH = '/metadata';
 
+export const maxDuration = 60;
+
 export async function generateMetadata({ params }: PageProps<'/[locale]/metadata'>) {
     const { locale } = await params;
 

@@ -9,6 +9,8 @@ import { PdfForm } from './pdf-form';
 
 const PATH = '/pdf';
 
+export const maxDuration = 60;
+
 export async function generateMetadata({ params }: PageProps<'/[locale]/pdf'>) {
     const { locale } = await params;
 

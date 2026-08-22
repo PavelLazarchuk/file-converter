@@ -7,6 +7,7 @@ export default async function Loading() {
 
     return (
         <main
+            id="main"
             aria-busy
             aria-label={t('loading')}
             className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:py-16"

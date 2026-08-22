@@ -9,6 +9,8 @@ import { CompareForm } from './compare-form';
 
 const PATH = '/compare';
 
+export const maxDuration = 60;
+
 export async function generateMetadata({ params }: PageProps<'/[locale]/compare'>) {
     const { locale } = await params;
 

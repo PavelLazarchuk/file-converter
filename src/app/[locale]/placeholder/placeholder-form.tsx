@@ -97,9 +97,10 @@ export function PlaceholderForm() {
                         placeholder={t('widthPlaceholder')}
                         disabled={isPending}
                         aria-invalid={!!errors.width}
+                        aria-describedby={errors.width ? 'width-error' : undefined}
                         {...register('width')}
                     />
-                    <FieldError error={errors.width} />
+                    <FieldError id="width-error" error={errors.width} />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="height">{t('height')}</Label>
@@ -110,9 +111,10 @@ export function PlaceholderForm() {
                         placeholder={t('heightPlaceholder')}
                         disabled={isPending}
                         aria-invalid={!!errors.height}
+                        aria-describedby={errors.height ? 'height-error' : undefined}
                         {...register('height')}
                     />
-                    <FieldError error={errors.height} />
+                    <FieldError id="height-error" error={errors.height} />
                 </div>
             </div>
 
@@ -125,9 +127,10 @@ export function PlaceholderForm() {
                         className="h-9 cursor-pointer p-1"
                         disabled={isPending}
                         aria-invalid={!!errors.bgColor}
+                        aria-describedby={errors.bgColor ? 'bgColor-error' : undefined}
                         {...register('bgColor')}
                     />
-                    <FieldError error={errors.bgColor} />
+                    <FieldError id="bgColor-error" error={errors.bgColor} />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="textColor">{t('textColor')}</Label>
@@ -137,9 +140,10 @@ export function PlaceholderForm() {
                         className="h-9 cursor-pointer p-1"
                         disabled={isPending}
                         aria-invalid={!!errors.textColor}
+                        aria-describedby={errors.textColor ? 'textColor-error' : undefined}
                         {...register('textColor')}
                     />
-                    <FieldError error={errors.textColor} />
+                    <FieldError id="textColor-error" error={errors.textColor} />
                 </div>
             </div>
 
@@ -151,9 +155,10 @@ export function PlaceholderForm() {
                     maxLength={PLACEHOLDER_TEXT_MAX_LENGTH}
                     disabled={isPending}
                     aria-invalid={!!errors.text}
+                    aria-describedby={errors.text ? 'text-error' : undefined}
                     {...register('text')}
                 />
-                <FieldError error={errors.text} />
+                <FieldError id="text-error" error={errors.text} />
             </div>
 
             <div className="space-y-2">
@@ -171,6 +176,7 @@ export function PlaceholderForm() {
                                 id="format"
                                 className="w-full"
                                 aria-invalid={!!errors.format}
+                                aria-describedby={errors.format ? 'format-error' : undefined}
                             >
                                 <SelectValue placeholder={form('chooseOutputFormat')} />
                             </SelectTrigger>
@@ -184,7 +190,7 @@ export function PlaceholderForm() {
                         </Select>
                     )}
                 />
-                <FieldError error={errors.format} />
+                <FieldError id="format-error" error={errors.format} />
             </div>
 
             {preview && (

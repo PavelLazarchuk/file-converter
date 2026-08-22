@@ -169,6 +169,7 @@ export function ResizeForm() {
                                 id="rotate"
                                 className="w-full"
                                 aria-invalid={!!errors.rotate}
+                                aria-describedby={errors.rotate ? 'rotate-error' : undefined}
                             >
                                 <SelectValue placeholder={form('chooseRotation')} />
                             </SelectTrigger>
@@ -182,7 +183,7 @@ export function ResizeForm() {
                         </Select>
                     )}
                 />
-                <FieldError error={errors.rotate} />
+                <FieldError id="rotate-error" error={errors.rotate} />
             </div>
 
             <SizePresets
@@ -209,11 +210,12 @@ export function ResizeForm() {
                         placeholder={t('widthPlaceholder')}
                         disabled={!hasImages || isPending}
                         aria-invalid={!!errors.width}
+                        aria-describedby={errors.width ? 'width-error' : undefined}
                         {...register('width', {
                             onChange: event => syncLinkedDimension('width', event.target.value),
                         })}
                     />
-                    <FieldError error={errors.width} />
+                    <FieldError id="width-error" error={errors.width} />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="height">{t('height')}</Label>
@@ -224,11 +226,12 @@ export function ResizeForm() {
                         placeholder={t('heightPlaceholder')}
                         disabled={!hasImages || isPending}
                         aria-invalid={!!errors.height}
+                        aria-describedby={errors.height ? 'height-error' : undefined}
                         {...register('height', {
                             onChange: event => syncLinkedDimension('height', event.target.value),
                         })}
                     />
-                    <FieldError error={errors.height} />
+                    <FieldError id="height-error" error={errors.height} />
                 </div>
             </div>
 
@@ -246,7 +249,12 @@ export function ResizeForm() {
                             }}
                             disabled={!hasImages || isPending}
                         >
-                            <SelectTrigger id="fit" className="w-full" aria-invalid={!!errors.fit}>
+                            <SelectTrigger
+                                id="fit"
+                                className="w-full"
+                                aria-invalid={!!errors.fit}
+                                aria-describedby={errors.fit ? 'fit-error' : undefined}
+                            >
                                 <SelectValue placeholder={form('chooseFit')} />
                             </SelectTrigger>
                             <SelectContent>
@@ -262,7 +270,7 @@ export function ResizeForm() {
                 <p className="text-sm text-muted-foreground">
                     {labels(`fits.${fit ?? 'contain'}Hint`)}
                 </p>
-                <FieldError error={errors.fit} />
+                <FieldError id="fit-error" error={errors.fit} />
             </div>
 
             <div className="flex items-center gap-3">
