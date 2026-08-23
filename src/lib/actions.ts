@@ -50,6 +50,7 @@ import { inspectPipeline, stripPipeline } from './pipelines/inspect';
 import { placeholderPipeline } from './pipelines/placeholder';
 import { resizePipeline } from './pipelines/resize';
 import { rotatePipeline } from './pipelines/rotate';
+import { splitPdfPipeline } from './pipelines/split-pdf';
 import { watermarkPipeline, type WatermarkLogo } from './pipelines/watermark';
 import { RATE_LIMIT, checkRateLimit } from './rate-limit';
 import { inspectSvg } from './svg-safety';
@@ -65,6 +66,7 @@ import {
     placeholderSchema,
     resizeSchema,
     rotateSchema,
+    splitPdfSchema,
     watermarkSchema,
 } from './schemas';
 
@@ -91,6 +93,7 @@ type ToolName =
     | 'filters'
     | 'pdf'
     | 'merge-pdf'
+    | 'split-pdf'
     | 'placeholder'
     | 'rotate'
     | 'watermark'
@@ -561,6 +564,42 @@ export async function mergePdf(formData: FormData): Promise<ActionResult> {
                         }
                     ),
                 ],
+                failures
+            );
+        },
+        uploadCount(formData)
+    );
+}
+
+export async function splitPdf(formData: FormData): Promise<ActionResult> {
+    return run(
+        'split-pdf',
+        async () => {
+            if (uploadCount(formData) > 1) throw fail({ code: 'single_pdf_only' });
+
+            const { sources, failures } = await readPdfFiles('split-pdf', formData);
+
+            const parsed = splitPdfSchema.safeParse({
+                mode: formData.get('mode') || 'separate',
+                pages: formData.get('pages') ?? '',
+            });
+
+            if (!parsed.success) throw invalid(parsed.error);
+
+            const [source] = sources;
+            const produced = await splitPdfPipeline(source, parsed.data);
+
+            Logger.info('pdf.split', {
+                tool: 'split-pdf',
+                mode: parsed.data.mode,
+                pages: source.pageCount,
+                files: produced.length,
+            });
+
+            const originalSize = parsed.data.mode === 'merged' ? source.size : 0;
+
+            return collect(
+                produced.map(output => toActionFile({ size: originalSize }, output)),
                 failures
             );
         },

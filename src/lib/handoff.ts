@@ -39,6 +39,7 @@ export function handoffTargets(mimeTypes: readonly string[], from?: string | nul
         tool =>
             tool.href !== from &&
             tool.intake &&
+            mimeTypes.length <= tool.intake.max &&
             mimeTypes.every(mimeType => tool.intake?.mimeTypes.includes(mimeType))
     );
 }

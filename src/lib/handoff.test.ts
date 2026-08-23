@@ -77,7 +77,14 @@ describe('choosing the tools worth offering', () => {
     it('keeps PDFs on the PDF path', () => {
         expect(handoffTargets([PDF_MIME_TYPE], '/pdf').map(tool => tool.href)).toEqual([
             '/merge-pdf',
+            '/split-pdf',
         ]);
+    });
+
+    it('offers splitting only while the result is a single PDF', () => {
+        expect(
+            handoffTargets([PDF_MIME_TYPE, PDF_MIME_TYPE], '/pdf').map(tool => tool.href)
+        ).toEqual(['/merge-pdf']);
     });
 });
 

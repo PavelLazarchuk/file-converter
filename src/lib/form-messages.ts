@@ -46,7 +46,10 @@ export type FieldMessage =
     | { k: 'icoSizesRequired' }
     | { k: 'icoSizesTooMany' }
     | { k: 'icoSizesInvalid'; sizes: string }
-    | { k: 'icoPackInvalid' };
+    | { k: 'icoPackInvalid' }
+    | { k: 'chooseSplitMode' }
+    | { k: 'pageRangeInvalid' }
+    | { k: 'pageRangeRequired' };
 
 export function fieldMessage(message: FieldMessage): string {
     return JSON.stringify(message);

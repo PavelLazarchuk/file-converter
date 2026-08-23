@@ -35,23 +35,26 @@ type PdfDropzoneProps = {
     documents: LoadedPdf[];
     onAdd: (documents: LoadedPdf[]) => void;
     onRemove: (index: number) => void;
-    onMove: (from: number, to: number) => void;
     onClear: () => void;
+    onMove?: (from: number, to: number) => void;
     disabled?: boolean;
     max: number;
+    receivesHandoff?: boolean;
 };
 
 export function PdfDropzone({
     documents,
     onAdd,
     onRemove,
-    onMove,
     onClear,
+    onMove,
     disabled,
     max,
+    receivesHandoff = true,
 }: PdfDropzoneProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const idRef = useRef(0);
+    const single = max === 1;
     const t = useTranslations('Uploads');
     const count = useTranslations('Common');
     const fileSize = useFileSize();
@@ -61,6 +64,7 @@ export function PdfDropzone({
 
         const { accepted, problems } = acceptUploads(incoming, {
             max,
+            single,
             currentCount: documents.length,
             currentBytes: totalUploadBytes(documents),
             accepts: isPdf,
@@ -82,13 +86,13 @@ export function PdfDropzone({
         onAdd(accepted.map(file => ({ file, id: `pdf-${(idRef.current += 1)}` })));
     }
 
-    useHandoffIntake(loadFiles);
+    useHandoffIntake(loadFiles, receivesHandoff);
 
     const hiddenInput = (
         <input
             ref={inputRef}
             type="file"
-            multiple
+            multiple={!single}
             accept="application/pdf,.pdf"
             className="sr-only"
             disabled={disabled}
@@ -107,9 +111,11 @@ export function PdfDropzone({
                         {count('pdfs', { count: documents.length })} ·{' '}
                         {fileSize(totalUploadBytes(documents))}
                     </p>
-                    <p className="text-sm text-muted-foreground">
-                        {t('limitLine', { max, maxBatch: MAX_BATCH_SIZE_LABEL })}
-                    </p>
+                    {!single && (
+                        <p className="text-sm text-muted-foreground">
+                            {t('limitLine', { max, maxBatch: MAX_BATCH_SIZE_LABEL })}
+                        </p>
+                    )}
                 </div>
 
                 <ol className="divide-y rounded-lg border">
@@ -121,17 +127,23 @@ export function PdfDropzone({
                             <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-medium">{entry.file.name}</p>
                                 <p className="text-xs text-muted-foreground">
-                                    {t('position', { index: index + 1, total: documents.length })} ·{' '}
-                                    {fileSize(entry.file.size)}
+                                    {single
+                                        ? fileSize(entry.file.size)
+                                        : `${t('position', {
+                                              index: index + 1,
+                                              total: documents.length,
+                                          })} · ${fileSize(entry.file.size)}`}
                                 </p>
                             </div>
-                            <ReorderControls
-                                label={entry.file.name}
-                                index={index}
-                                count={documents.length}
-                                disabled={disabled}
-                                onMove={onMove}
-                            />
+                            {onMove && (
+                                <ReorderControls
+                                    label={entry.file.name}
+                                    index={index}
+                                    count={documents.length}
+                                    disabled={disabled}
+                                    onMove={onMove}
+                                />
+                            )}
                             <RemoveButton
                                 label={entry.file.name}
                                 disabled={disabled}
@@ -146,20 +158,22 @@ export function PdfDropzone({
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={disabled || documents.length >= max}
+                        disabled={disabled || (!single && documents.length >= max)}
                         onClick={() => inputRef.current?.click()}
                     >
-                        {t('addMore')}
+                        {single ? t('chooseDifferent') : t('addMore')}
                     </Button>
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        disabled={disabled}
-                        onClick={onClear}
-                    >
-                        {t('removeAll')}
-                    </Button>
+                    {!single && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={disabled}
+                            onClick={onClear}
+                        >
+                            {t('removeAll')}
+                        </Button>
+                    )}
                 </div>
                 {hiddenInput}
             </div>
@@ -169,13 +183,17 @@ export function PdfDropzone({
     return (
         <DropzoneShell
             accept="application/pdf,.pdf"
-            multiple
+            multiple={!single}
             disabled={disabled}
             onFiles={loadFiles}
             dragIcon={<FileText className="size-6 text-primary" />}
-            idleLabel={t('idlePdf')}
-            dragLabel={t('dragPdf')}
-            hint={t('hintPdf', { max, maxBatch: MAX_BATCH_SIZE_LABEL })}
+            idleLabel={single ? t('idlePdfSingle') : t('idlePdf')}
+            dragLabel={single ? t('dragPdfSingle') : t('dragPdf')}
+            hint={
+                single
+                    ? t('hintPdfSingle', { maxFile: MAX_FILE_SIZE_LABEL })
+                    : t('hintPdf', { max, maxBatch: MAX_BATCH_SIZE_LABEL })
+            }
         />
     );
 }

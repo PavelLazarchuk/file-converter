@@ -56,6 +56,10 @@
             "title": "Merge PDFs",
             "description": "Combine several PDF files into one document, in the order you arrange them — up to 20 files at a time."
         },
+        "splitPdf": {
+            "title": "Split PDF",
+            "description": "Pull pages out of a PDF — one file per page, or a chosen range of pages as a single document."
+        },
         "imagesToPdf": {
             "title": "Images to PDF",
             "description": "Combine JPEG, PNG, WEBP, AVIF, GIF or SVG images into one PDF, a page each, fit to the image or a standard A4/Letter page."
@@ -201,6 +205,12 @@
             "letter": "US Letter",
             "letterHint": "Standard Letter page, image centered and scaled to fit with a margin."
         },
+        "splitModes": {
+            "separate": "One file per page",
+            "separateHint": "Every selected page becomes its own PDF, downloaded together as a zip.",
+            "merged": "One file with the selected pages",
+            "mergedHint": "The pages you list are extracted into a single new PDF, in the order you list them."
+        },
         "effects": {
             "none": "None — adjustments only",
             "grayscale": "Black & white",
@@ -243,6 +253,9 @@
         "idlePdf": "Drag & drop PDFs, or click to browse",
         "dragPdf": "Drop the PDFs here",
         "hintPdf": "PDF · up to {max} at a time, {maxBatch} in total",
+        "idlePdfSingle": "Drag & drop a PDF, or click to browse",
+        "dragPdfSingle": "Drop the PDF here",
+        "hintPdfSingle": "PDF · up to {maxFile}",
         "fullPdfs": "You can merge up to {count} at a time.",
         "noRoomFiles": "There is room for {count} — skipped the rest."
     },
@@ -499,6 +512,21 @@
         "submit": "Merge PDFs",
         "submitDownload": "Merge & download"
     },
+    "SplitPdf": {
+        "metaTitle": "Split PDF",
+        "metaDescription": "Split a PDF into single-page files, or extract a range of pages into one new document — the pages are rebuilt without the original title or author.",
+        "heading": "Split PDF",
+        "intro": "Take a PDF apart: one file per page, or a range of pages lifted out as a document of its own.",
+        "mode": "What to produce",
+        "pages": "Pages",
+        "pagesPlaceholder": "e.g. 1-3, 5, 8-10",
+        "pagesHintSeparate": "Leave empty to split every page. Ranges and single pages, separated by commas.",
+        "pagesHintMerged": "Type the pages to lift out, in the order you want them — ranges and single pages, separated by commas.",
+        "note": "The pages are rebuilt in a new document, so the original title and author are left behind.",
+        "pending": "Splitting…",
+        "submit": "Split PDF",
+        "submitDownload": "Split & download"
+    },
     "MetadataTool": {
         "metaTitle": "View and remove image metadata (EXIF)",
         "metaDescription": "Read the EXIF, camera, GPS location, color profile and dimensions stored inside JPEG, PNG, WEBP and AVIF images — then download a clean copy with all of it removed.",
@@ -611,8 +639,12 @@
         "unsafe_svg": "{threat, select, entity {This SVG declares XML entities, which can expand without bound while rendering. Re-save it without a DOCTYPE block.} other {This SVG pulls in an external file — an image, stylesheet or font. Embed it in the SVG itself and try again.}}",
         "unreadable_pdf": "This file isn't a readable PDF — its contents don't match the format.",
         "encrypted_pdf": "This PDF is password-protected. Remove the password and try again.",
-        "too_many_pages": "These files add up to {pages} pages. A merged PDF can hold up to {max}.",
+        "too_many_pages": "That comes to {pages} pages. A PDF built here can hold up to {max}.",
         "one_pdf_only": "Add a second PDF — merging needs at least two files.",
+        "single_pdf_only": "Splitting works on one PDF at a time.",
+        "page_out_of_range": "This PDF only has {pages, plural, one {# page} other {# pages}} — the range asks for more.",
+        "no_pages_selected": "Choose the pages to pull out — a range like 1-3, 5.",
+        "too_many_parts": "That would make {parts} files. Split up to {max} pages at a time.",
         "rate_limited": "Too many requests — this tool allows {limit} images per minute. Try again in {seconds}s.",
         "invalid_settings": "Invalid settings.",
         "same_format": "Target format must differ from the source format.",
@@ -643,6 +675,9 @@
         "chooseTargetFormat": "Choose a target format",
         "chooseOutputFormat": "Choose an output format",
         "choosePageSize": "Choose a page size",
+        "chooseSplitMode": "Choose what to produce",
+        "pageRangeInvalid": "Pages must look like 1-3, 5, 8-10",
+        "pageRangeRequired": "Choose the pages to pull out, like 1-3, 5",
         "watermarkTextRequired": "Watermark text is required",
         "outputSizeInvalid": "Invalid output size",
         "outputSizePattern": "Output size must look like 1080x1080",

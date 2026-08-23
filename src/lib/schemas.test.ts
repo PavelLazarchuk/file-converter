@@ -19,6 +19,7 @@ import {
     placeholderSchema,
     resizeSchema,
     rotateSchema,
+    splitPdfSchema,
     watermarkSchema,
 } from './schemas';
 
@@ -274,5 +275,35 @@ describe('watermarkSchema', () => {
         expect(watermarkSchema.safeParse({ ...valid, opacity: '0' }).success).toBe(false);
         expect(watermarkSchema.safeParse({ ...valid, scale: '101' }).success).toBe(false);
         expect(watermarkSchema.safeParse({ ...valid, position: 'middle' }).success).toBe(false);
+    });
+});
+
+describe('splitPdfSchema', () => {
+    it('parses a range string into ranges the pipeline can walk', () => {
+        expect(splitPdfSchema.safeParse({ mode: 'separate', pages: '1-3, 7' }).data).toEqual({
+            mode: 'separate',
+            pages: [
+                { from: 1, to: 3 },
+                { from: 7, to: 7 },
+            ],
+        });
+    });
+
+    it('reads an empty range as every page, but only when splitting them apart', () => {
+        expect(splitPdfSchema.safeParse({ mode: 'separate', pages: '' }).data).toEqual({
+            mode: 'separate',
+            pages: [],
+        });
+        expect(firstError(splitPdfSchema.safeParse({ mode: 'merged', pages: '' }))).toBe(
+            'Choose the pages to pull out, like 1-3, 5'
+        );
+    });
+
+    it('names the range syntax rather than a generic failure', () => {
+        expect(firstError(splitPdfSchema.safeParse({ mode: 'separate', pages: '1..3' }))).toBe(
+            'Pages must look like 1-3, 5, 8-10'
+        );
+        expect(splitPdfSchema.safeParse({ mode: 'separate', pages: '5-3' }).success).toBe(false);
+        expect(splitPdfSchema.safeParse({ mode: 'every-other', pages: '1' }).success).toBe(false);
     });
 });

@@ -578,6 +578,54 @@ export const PDF_MIME_TYPE = 'application/pdf';
 
 export const MAX_PDF_PAGES = 500;
 
+export const PDF_SPLIT_MODE_KEYS = ['separate', 'merged'] as const;
+
+export type PdfSplitMode = (typeof PDF_SPLIT_MODE_KEYS)[number];
+
+export const MAX_PDF_PARTS = MAX_BATCH_FILES;
+
+export const PAGE_RANGE_MAX_LENGTH = 200;
+
+const PAGE_RANGE_PATTERN = /^\d+(-\d+)?(\s*,\s*\d+(-\d+)?)*$/;
+
+export type PageRange = { from: number; to: number };
+
+export function parsePageRanges(input: string): PageRange[] | null {
+    const trimmed = input.trim();
+
+    if (!trimmed) return [];
+
+    if (trimmed.length > PAGE_RANGE_MAX_LENGTH || !PAGE_RANGE_PATTERN.test(trimmed)) return null;
+
+    const ranges: PageRange[] = [];
+
+    for (const part of trimmed.split(',')) {
+        const [from, to = from] = part.split('-').map(value => Number(value.trim()));
+
+        if (!from || from > to) return null;
+
+        ranges.push({ from, to });
+    }
+
+    return ranges;
+}
+
+export function lastPageRequested(ranges: readonly PageRange[]): number {
+    return ranges.reduce((highest, range) => Math.max(highest, range.to), 0);
+}
+
+export function pagesInRanges(ranges: readonly PageRange[], pageCount: number): number[] {
+    if (!ranges.length) return Array.from({ length: pageCount }, (_, index) => index + 1);
+
+    const pages = new Set<number>();
+
+    for (const { from, to } of ranges) {
+        for (let page = from; page <= to; page += 1) pages.add(page);
+    }
+
+    return [...pages];
+}
+
 export function formatFileSize(bytes: number, locale = 'en'): string {
     const format = (value: number, digits: number) =>
         new Intl.NumberFormat(locale, {

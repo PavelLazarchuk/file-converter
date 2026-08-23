@@ -9,7 +9,7 @@ import { useFileAction } from '@/hooks/use-file-action';
 import { mergePdf } from '@/lib/actions';
 import { MAX_BATCH_FILES, MAX_PDF_PAGES } from '@/lib/image';
 
-import { PdfDropzone, useLoadedPdfs } from './pdf-dropzone';
+import { PdfDropzone, useLoadedPdfs } from '@/components/pdf-dropzone';
 
 export function MergePdfForm() {
     const t = useTranslations('MergePdf');

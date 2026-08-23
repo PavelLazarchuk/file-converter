@@ -14,6 +14,7 @@ import {
     mergePdf,
     resizeImage,
     rotateImage,
+    splitPdf,
     stripImageMetadata,
     watermarkImage,
     type ActionFile,
@@ -1248,6 +1249,79 @@ describe('mergePdf', () => {
 
     it('rejects an empty request', async () => {
         expect(expectFailure(await mergePdf(form([]))).code).toBe('no_file');
+    });
+});
+
+describe('splitPdf', () => {
+    it('splits every page into its own file when no range is given', async () => {
+        const { files } = expectSuccess(
+            await splitPdf(form([await pdfFile('scan.pdf', 3)], { mode: 'separate', pages: '' }))
+        );
+
+        expect(files.map(file => file.filename)).toEqual([
+            'scan-page-1.pdf',
+            'scan-page-2.pdf',
+            'scan-page-3.pdf',
+        ]);
+        expect(files.every(file => file.mimeType === 'application/pdf')).toBe(true);
+    });
+
+    it('parses the range out of the form and extracts it into one document', async () => {
+        const source = await pdfFile('scan.pdf', 6);
+        const { files } = expectSuccess(
+            await splitPdf(form([source], { mode: 'merged', pages: '2-3, 6' }))
+        );
+        const extracted = await PDFDocument.load(Buffer.from(files[0].data));
+
+        expect(files).toHaveLength(1);
+        expect(files[0].filename).toBe('scan-pages.pdf');
+        expect(extracted.getPageCount()).toBe(3);
+        expect(files[0].originalSize).toBe(source.size);
+    });
+
+    it('leaves the delta off a single page, which is not a smaller version of the document', async () => {
+        const { files } = expectSuccess(
+            await splitPdf(form([await pdfFile('scan.pdf', 2)], { mode: 'separate', pages: '' }))
+        );
+
+        expect(files.every(file => file.originalSize === 0)).toBe(true);
+    });
+
+    it('rejects a range the document cannot satisfy', async () => {
+        expect(
+            expectFailure(
+                await splitPdf(
+                    form([await pdfFile('scan.pdf', 2)], { mode: 'separate', pages: '5' })
+                )
+            ).code
+        ).toBe('page_out_of_range');
+    });
+
+    it('turns a malformed range into a settings error, not a crash', async () => {
+        expect(
+            expectFailure(
+                await splitPdf(
+                    form([await pdfFile('scan.pdf', 2)], { mode: 'separate', pages: 'last two' })
+                )
+            ).code
+        ).toBe('invalid_settings');
+    });
+
+    it('takes one PDF at a time', async () => {
+        expect(
+            expectFailure(
+                await splitPdf(
+                    form([await pdfFile('a.pdf', 1), await pdfFile('b.pdf', 1)], {
+                        mode: 'separate',
+                        pages: '',
+                    })
+                )
+            ).code
+        ).toBe('single_pdf_only');
+    });
+
+    it('rejects an empty request', async () => {
+        expect(expectFailure(await splitPdf(form([]))).code).toBe('no_file');
     });
 });
 

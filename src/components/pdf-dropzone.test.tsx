@@ -53,7 +53,7 @@ describe('the empty dropzone', () => {
         ).toBeInTheDocument();
     });
 
-    it('always takes several files, since merging one is meaningless', () => {
+    it('takes several files when the tool folds them together', () => {
         expect(setup().input.multiple).toBe(true);
     });
 });
@@ -135,7 +135,13 @@ describe('the loaded list', () => {
         expect(screen.getByText('2 of 2 · 8 B')).toBeInTheDocument();
     });
 
-    it('always offers reordering, with the ends disabled', async () => {
+    it('leaves out the reorder controls when the tool ignores order', () => {
+        setup({ documents: [loaded('one.pdf'), loaded('two.pdf')], onMove: undefined });
+
+        expect(screen.queryByRole('button', { name: 'Move two.pdf up' })).toBeNull();
+    });
+
+    it('offers reordering when it was given a handler, with the ends disabled', async () => {
         const { onMove, user } = setup({ documents: [loaded('one.pdf'), loaded('two.pdf')] });
 
         expect(screen.getByRole('button', { name: 'Move one.pdf up' })).toBeDisabled();
@@ -166,6 +172,39 @@ describe('the loaded list', () => {
         expect(screen.getByRole('button', { name: 'Add more' })).toBeDisabled();
         expect(screen.getByRole('button', { name: 'Remove all' })).toBeDisabled();
         expect(screen.getByRole('button', { name: 'Remove a.pdf' })).toBeDisabled();
+    });
+});
+
+describe('the one-document dropzone', () => {
+    it('asks for a single PDF and states the per-file limit instead of a batch one', () => {
+        setup({ max: 1 });
+
+        expect(screen.getByText(/drag & drop a pdf/i)).toBeInTheDocument();
+        expect(screen.getByText('PDF · up to 20MB')).toBeInTheDocument();
+    });
+
+    it('takes one file at a time', () => {
+        expect(setup({ max: 1 }).input.multiple).toBe(false);
+    });
+
+    it('replaces the loaded document rather than filling up', async () => {
+        const { input, onAdd, user } = setup({ max: 1, documents: [loaded('old.pdf')] });
+
+        await user.upload(input, [pdf('new.pdf')]);
+        await waitFor(() => expect(onAdd).toHaveBeenCalled());
+
+        expect(onAdd.mock.calls[0][0].map((entry: LoadedPdf) => entry.file.name)).toEqual([
+            'new.pdf',
+        ]);
+        expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it('swaps "Add more" for a replace button and drops the batch controls', () => {
+        setup({ max: 1, documents: [loaded('a.pdf')], onMove: undefined });
+
+        expect(screen.getByRole('button', { name: 'Choose a different file' })).toBeEnabled();
+        expect(screen.queryByRole('button', { name: 'Remove all' })).toBeNull();
+        expect(screen.getByText('8 B')).toBeInTheDocument();
     });
 });
 

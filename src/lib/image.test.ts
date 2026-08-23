@@ -26,6 +26,9 @@ import {
     formatBase64Output,
     formatFileSize,
     formatFromMimeType,
+    lastPageRequested,
+    pagesInRanges,
+    parsePageRanges,
     placeholderFontSize,
     placeholderLabel,
     rotateFillsCorners,
@@ -398,6 +401,67 @@ describe('watermark placement', () => {
             left: 0,
             top: 0,
         });
+    });
+});
+
+describe('parsePageRanges', () => {
+    it('reads single pages and ranges in the order they were typed', () => {
+        expect(parsePageRanges('1-3, 5, 8-10')).toEqual([
+            { from: 1, to: 3 },
+            { from: 5, to: 5 },
+            { from: 8, to: 10 },
+        ]);
+        expect(parsePageRanges('3,1')).toEqual([
+            { from: 3, to: 3 },
+            { from: 1, to: 1 },
+        ]);
+    });
+
+    it('reads an empty field as "no selection", which every page satisfies', () => {
+        expect(parsePageRanges('')).toEqual([]);
+        expect(parsePageRanges('   ')).toEqual([]);
+        expect(pagesInRanges([], 3)).toEqual([1, 2, 3]);
+    });
+
+    it('rejects anything that is not a comma-separated range', () => {
+        for (const input of ['1..3', '-2', 'first', '1-', '1,,2', '2-3-4', '1;2']) {
+            expect(parsePageRanges(input)).toBeNull();
+        }
+    });
+
+    it('rejects a page zero and a range that runs backwards', () => {
+        expect(parsePageRanges('0')).toBeNull();
+        expect(parsePageRanges('0-3')).toBeNull();
+        expect(parsePageRanges('5-3')).toBeNull();
+    });
+
+    it('rejects a range string long enough to be an attack rather than a selection', () => {
+        expect(parsePageRanges(Array(200).fill('1').join(','))).toBeNull();
+    });
+});
+
+describe('pagesInRanges', () => {
+    it('expands ranges and drops pages named twice', () => {
+        expect(pagesInRanges([{ from: 2, to: 4 }], 10)).toEqual([2, 3, 4]);
+        expect(
+            pagesInRanges(
+                [
+                    { from: 1, to: 2 },
+                    { from: 2, to: 3 },
+                ],
+                10
+            )
+        ).toEqual([1, 2, 3]);
+    });
+
+    it('reports the last page a selection asks for, so it can be checked against the document', () => {
+        expect(
+            lastPageRequested([
+                { from: 2, to: 9 },
+                { from: 4, to: 4 },
+            ])
+        ).toBe(9);
+        expect(lastPageRequested([])).toBe(0);
     });
 });
 

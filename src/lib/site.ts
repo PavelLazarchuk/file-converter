@@ -9,6 +9,7 @@ import {
     RefreshCw,
     RotateCw,
     Scaling,
+    Scissors,
     ScanSearch,
     Stamp,
     type LucideIcon,
@@ -54,6 +55,7 @@ export type ToolKey =
     | 'metadata'
     | 'placeholder'
     | 'mergePdf'
+    | 'splitPdf'
     | 'imagesToPdf';
 
 export type Tool = {
@@ -84,6 +86,8 @@ const CONVERT_INTAKE: ToolIntake = {
 const SINGLE_RASTER_INTAKE: ToolIntake = { mimeTypes: RASTER_INTAKE.mimeTypes, max: 1 };
 
 const PDF_INTAKE: ToolIntake = { mimeTypes: [PDF_MIME_TYPE], max: MAX_BATCH_FILES };
+
+const SINGLE_PDF_INTAKE: ToolIntake = { mimeTypes: PDF_INTAKE.mimeTypes, max: 1 };
 
 export function toolTransitionName(part: 'icon' | 'title', href: string): string {
     return `tool-${part}-${href.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '')}`;
@@ -176,6 +180,14 @@ export const TOOLS: readonly Tool[] = [
         gradient: 'from-slate-500 to-slate-700',
         accent: ['#64748b', '#334155'],
         intake: PDF_INTAKE,
+    },
+    {
+        key: 'splitPdf',
+        href: '/split-pdf',
+        icon: Scissors,
+        gradient: 'from-teal-500 to-cyan-700',
+        accent: ['#14b8a6', '#0e7490'],
+        intake: SINGLE_PDF_INTAKE,
     },
     {
         key: 'imagesToPdf',

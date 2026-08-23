@@ -18,6 +18,7 @@ export async function toolMetadata(
         | 'MetadataTool'
         | 'Placeholder'
         | 'MergePdf'
+        | 'SplitPdf'
         | 'ImagesToPdf',
     path: string
 ): Promise<Metadata> {

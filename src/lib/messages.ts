@@ -5,6 +5,7 @@ import {
     MAX_BATCH_SIZE_LABEL,
     MAX_FILE_SIZE_LABEL,
     MAX_PDF_PAGES,
+    MAX_PDF_PARTS,
     formatFileSize,
     type ConvertSource,
 } from './image';
@@ -88,6 +89,10 @@ export function actionErrorText(detail: ActionErrorDetail, context: MessageConte
             return errors('unsafe_svg', { threat: detail.threat });
         case 'too_many_pages':
             return errors('too_many_pages', { pages: detail.pages, max: MAX_PDF_PAGES });
+        case 'page_out_of_range':
+            return errors('page_out_of_range', { pages: detail.pages });
+        case 'too_many_parts':
+            return errors('too_many_parts', { parts: detail.parts, max: MAX_PDF_PARTS });
         case 'rate_limited':
             return errors('rate_limited', {
                 limit: detail.limit,
