@@ -30,13 +30,16 @@ import {
     MAX_BATCH_BYTES,
     MAX_BATCH_FILES,
     MAX_BATCH_SIZE_LABEL,
+    WATERMARK_ANGLE_LIMITS,
     WATERMARK_DEFAULTS,
+    WATERMARK_LAYOUT_KEYS,
     WATERMARK_MARGIN_LIMITS,
     WATERMARK_MODE_KEYS,
     WATERMARK_OPACITY_LIMITS,
     WATERMARK_POSITION_KEYS,
     WATERMARK_SCALE_LIMITS,
     WATERMARK_TEXT_MAX_LENGTH,
+    type WatermarkLayout,
     type WatermarkPosition,
 } from '@/lib/image';
 import { watermarkSchema, type WatermarkInput, type WatermarkValues } from '@/lib/schemas';
@@ -73,14 +76,25 @@ export function WatermarkForm() {
         defaultValues,
     });
 
-    const [mode, text, color, position, opacity, scale, margin] = useWatch({
+    const [mode, text, color, position, opacity, scale, margin, layout, angle] = useWatch({
         control,
-        name: ['mode', 'text', 'color', 'position', 'opacity', 'scale', 'margin'],
+        name: [
+            'mode',
+            'text',
+            'color',
+            'position',
+            'opacity',
+            'scale',
+            'margin',
+            'layout',
+            'angle',
+        ],
     });
 
     const logo = logos.images[0] ?? null;
     const hasImages = images.length > 0;
     const usesLogo = mode === 'image';
+    const isTiled = layout === 'tile';
     const missingLogo = usesLogo && !logo;
     const first = images[0] ?? null;
     const uploadedBytes =
@@ -99,6 +113,8 @@ export function WatermarkForm() {
             opacity: values.opacity,
             scale: values.scale,
             margin: values.margin,
+            layout: values.layout,
+            angle: values.angle,
             keepMetadata: !removeMetadata,
             ...(usesLogo && logo ? { logo: logo.file } : {}),
         });
@@ -223,48 +239,86 @@ export function WatermarkForm() {
             )}
 
             <div className="space-y-2">
-                <Label>{t('position')}</Label>
+                <Label htmlFor="layout">{t('layout')}</Label>
                 <Controller
                     control={control}
-                    name="position"
+                    name="layout"
                     render={({ field }) => (
-                        <div className="grid w-fit grid-cols-3 gap-1.5">
-                            {WATERMARK_POSITION_KEYS.map(key => {
-                                const active = field.value === key;
-
-                                return (
-                                    <Button
-                                        key={key}
-                                        type="button"
-                                        size="icon"
-                                        variant={active ? 'default' : 'outline'}
-                                        aria-pressed={active}
-                                        aria-label={labels(`positions.${key}`)}
-                                        title={labels(`positions.${key}`)}
-                                        disabled={!hasImages || isPending}
-                                        onClick={() => {
-                                            clearResult();
-                                            field.onChange(key);
-                                        }}
-                                    >
-                                        <span
-                                            className={cn(
-                                                'size-2 rounded-full',
-                                                active ? 'bg-current' : 'bg-muted-foreground/50'
-                                            )}
-                                        />
-                                    </Button>
-                                );
-                            })}
-                        </div>
+                        <Select
+                            value={field.value ?? 'single'}
+                            onValueChange={value => {
+                                clearResult();
+                                field.onChange(value);
+                            }}
+                            disabled={!hasImages || isPending}
+                        >
+                            <SelectTrigger
+                                id="layout"
+                                className="w-full"
+                                aria-invalid={!!errors.layout}
+                                aria-describedby={errors.layout ? 'layout-error' : undefined}
+                            >
+                                <SelectValue placeholder={form('chooseWatermarkLayout')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {WATERMARK_LAYOUT_KEYS.map(key => (
+                                    <SelectItem key={key} value={key}>
+                                        {labels(`watermarkLayouts.${key}`)}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     )}
                 />
-                <p className="text-sm text-muted-foreground">
-                    {labels(`positions.${(position as WatermarkPosition) ?? 'bottom-right'}`)}
-                </p>
+                <FieldError id="layout-error" error={errors.layout} />
+                {isTiled && <p className="text-sm text-muted-foreground">{t('layoutHint')}</p>}
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            {!isTiled && (
+                <div className="space-y-2">
+                    <Label>{t('position')}</Label>
+                    <Controller
+                        control={control}
+                        name="position"
+                        render={({ field }) => (
+                            <div className="grid w-fit grid-cols-3 gap-1.5">
+                                {WATERMARK_POSITION_KEYS.map(key => {
+                                    const active = field.value === key;
+
+                                    return (
+                                        <Button
+                                            key={key}
+                                            type="button"
+                                            size="icon"
+                                            variant={active ? 'default' : 'outline'}
+                                            aria-pressed={active}
+                                            aria-label={labels(`positions.${key}`)}
+                                            title={labels(`positions.${key}`)}
+                                            disabled={!hasImages || isPending}
+                                            onClick={() => {
+                                                clearResult();
+                                                field.onChange(key);
+                                            }}
+                                        >
+                                            <span
+                                                className={cn(
+                                                    'size-2 rounded-full',
+                                                    active ? 'bg-current' : 'bg-muted-foreground/50'
+                                                )}
+                                            />
+                                        </Button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                        {labels(`positions.${(position as WatermarkPosition) ?? 'bottom-right'}`)}
+                    </p>
+                </div>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="space-y-2">
                     <Label htmlFor="scale">{t('scale')}</Label>
                     <IntegerInput
@@ -292,7 +346,7 @@ export function WatermarkForm() {
                     <FieldError id="opacity-error" error={errors.opacity} />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="margin">{t('margin')}</Label>
+                    <Label htmlFor="margin">{isTiled ? t('marginTile') : t('margin')}</Label>
                     <IntegerInput
                         id="margin"
                         min={WATERMARK_MARGIN_LIMITS.min}
@@ -303,6 +357,19 @@ export function WatermarkForm() {
                         {...register('margin', { onChange: clearResult })}
                     />
                     <FieldError id="margin-error" error={errors.margin} />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="angle">{t('angle')}</Label>
+                    <IntegerInput
+                        id="angle"
+                        min={WATERMARK_ANGLE_LIMITS.min}
+                        max={WATERMARK_ANGLE_LIMITS.max}
+                        disabled={!hasImages || isPending}
+                        aria-invalid={!!errors.angle}
+                        aria-describedby={errors.angle ? 'angle-error' : undefined}
+                        {...register('angle', { onChange: clearResult })}
+                    />
+                    <FieldError id="angle-error" error={errors.angle} />
                 </div>
             </div>
 
@@ -315,10 +382,12 @@ export function WatermarkForm() {
                             logo={usesLogo ? logo : null}
                             text={text ?? ''}
                             color={color ?? WATERMARK_DEFAULTS.color}
+                            layout={(layout as WatermarkLayout) ?? 'single'}
                             position={(position as WatermarkPosition) ?? 'bottom-right'}
                             opacity={numeric(opacity, 100)}
                             scale={numeric(scale, 30)}
                             margin={numeric(margin, 0)}
+                            angle={numeric(angle, 0)}
                         />
                     </div>
                     <p className="text-sm text-muted-foreground">

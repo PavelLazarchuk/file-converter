@@ -246,6 +246,8 @@ describe('watermarkSchema', () => {
         opacity: '55',
         scale: '30',
         margin: '24',
+        layout: 'single',
+        angle: '0',
     };
 
     it('accepts a text watermark', () => {

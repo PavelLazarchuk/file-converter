@@ -693,6 +693,8 @@ export async function watermarkImage(formData: FormData): Promise<ActionResult> 
             opacity: formData.get('opacity') || WATERMARK_DEFAULTS.opacity,
             scale: formData.get('scale') || WATERMARK_DEFAULTS.scale,
             margin: formData.get('margin') || WATERMARK_DEFAULTS.margin,
+            layout: formData.get('layout') || WATERMARK_DEFAULTS.layout,
+            angle: formData.get('angle') || WATERMARK_DEFAULTS.angle,
         });
 
         if (!parsed.success) throw invalid(parsed.error);

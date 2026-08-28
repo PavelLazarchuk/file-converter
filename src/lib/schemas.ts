@@ -24,6 +24,8 @@ import {
     ROTATION_KEYS,
     SATURATION_LIMITS,
     TARGET_SIZE_LIMITS,
+    WATERMARK_ANGLE_LIMITS,
+    WATERMARK_LAYOUT_KEYS,
     WATERMARK_MARGIN_LIMITS,
     WATERMARK_MODE_KEYS,
     WATERMARK_OPACITY_LIMITS,
@@ -117,6 +119,10 @@ export const watermarkSchema = z
         ),
         scale: integerInRange(WATERMARK_SCALE_LIMITS.min, WATERMARK_SCALE_LIMITS.max, 'size'),
         margin: integerInRange(WATERMARK_MARGIN_LIMITS.min, WATERMARK_MARGIN_LIMITS.max, 'margin'),
+        layout: z.enum(WATERMARK_LAYOUT_KEYS, {
+            error: fieldMessage({ k: 'chooseWatermarkLayout' }),
+        }),
+        angle: integerInRange(WATERMARK_ANGLE_LIMITS.min, WATERMARK_ANGLE_LIMITS.max, 'angle'),
     })
     .refine(values => values.mode !== 'text' || values.text.length > 0, {
         error: fieldMessage({ k: 'watermarkTextRequired' }),

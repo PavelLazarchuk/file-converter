@@ -358,6 +358,12 @@ export const WATERMARK_MODE_KEYS = ['text', 'image'] as const;
 
 export type WatermarkMode = (typeof WATERMARK_MODE_KEYS)[number];
 
+export const WATERMARK_LAYOUT_KEYS = ['single', 'tile'] as const;
+
+export type WatermarkLayout = (typeof WATERMARK_LAYOUT_KEYS)[number];
+
+export const WATERMARK_ANGLE_LIMITS = { min: 0, max: 359 } as const;
+
 export const WATERMARK_POSITION_KEYS = [
     'top-left',
     'top',
@@ -397,6 +403,8 @@ export const WATERMARK_DEFAULTS = {
     scale: '30',
     margin: '24',
     position: 'bottom-right',
+    layout: 'single',
+    angle: '0',
 } as const;
 
 export type Size = { width: number; height: number };
@@ -440,6 +448,23 @@ export function watermarkLogoLayout(image: Size, scale: number, logo: Size): Siz
         width: Math.max(1, Math.min(Math.round(logo.width * factor), image.width)),
         height: Math.max(1, Math.min(Math.round(logo.height * factor), image.height)),
     };
+}
+
+export function rotatedBounds(size: Size, angleDeg: number): Size {
+    const radians = (angleDeg * Math.PI) / 180;
+    const cos = Math.abs(Math.cos(radians));
+    const sin = Math.abs(Math.sin(radians));
+
+    return {
+        width: Math.max(1, Math.round(size.width * cos + size.height * sin)),
+        height: Math.max(1, Math.round(size.width * sin + size.height * cos)),
+    };
+}
+
+export function watermarkTileStep(cell: Size, angle: number, gap: number): Size {
+    const bounds = angle % 360 === 0 ? cell : rotatedBounds(cell, angle);
+
+    return { width: bounds.width + gap, height: bounds.height + gap };
 }
 
 export function watermarkOffset(

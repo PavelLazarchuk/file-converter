@@ -33,6 +33,7 @@ export type FieldMessage =
     | { k: 'chooseRatio' }
     | { k: 'chooseShape' }
     | { k: 'chooseWatermarkMode' }
+    | { k: 'chooseWatermarkLayout' }
     | { k: 'choosePosition' }
     | { k: 'chooseCompressMode' }
     | { k: 'chooseTargetFormat' }

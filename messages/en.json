@@ -38,7 +38,7 @@
         },
         "watermark": {
             "title": "Watermark",
-            "description": "Stamp text or a logo onto a batch — nine positions, adjustable size, margin and opacity."
+            "description": "Stamp text or a logo onto a batch — nine positions or a repeated diagonal tile, adjustable size, margin and opacity."
         },
         "filters": {
             "title": "Filters",
@@ -185,6 +185,10 @@
         "watermarkModes": {
             "text": "Text",
             "image": "Logo image"
+        },
+        "watermarkLayouts": {
+            "single": "Single stamp",
+            "tile": "Repeated tile"
         },
         "positions": {
             "top-left": "Top left",
@@ -426,7 +430,7 @@
     },
     "Watermark": {
         "metaTitle": "Add a watermark to an image",
-        "metaDescription": "Stamp text or a logo onto JPEG, PNG, WEBP or AVIF images — nine positions, adjustable size, margin and opacity, up to 20 images at once.",
+        "metaDescription": "Stamp text or a logo onto JPEG, PNG, WEBP or AVIF images — nine positions or a repeated diagonal tile, any angle, adjustable size, margin and opacity, up to 20 images at once.",
         "heading": "Watermark",
         "intro": "Stamp your name or your logo onto a batch of photos. The size follows each image's width, so the same settings look right on a thumbnail and on a full-resolution shot.",
         "watermark": "Watermark",
@@ -436,10 +440,14 @@
         "text": "Text",
         "textPlaceholder": "e.g. © Your Name",
         "color": "Color",
+        "layout": "Layout",
+        "layoutHint": "Tile repeats the stamp across the whole image, like a stock-photo watermark — position is ignored and the margin becomes the gap between repeats.",
         "position": "Position",
         "scale": "Size (% of width)",
         "opacity": "Opacity (%)",
         "margin": "Margin (px)",
+        "marginTile": "Gap (px)",
+        "angle": "Angle (° clockwise)",
         "preview": "Preview",
         "previewHint": "Approximate preview of the first image, scaled to fit — the stamp is rendered at full resolution on the download.",
         "previewBatch": "Every image in the batch gets the same settings, sized to its own width.",
@@ -670,6 +678,7 @@
         "chooseRatio": "Choose an aspect ratio",
         "chooseShape": "Choose a crop shape",
         "chooseWatermarkMode": "Choose a watermark type",
+        "chooseWatermarkLayout": "Choose a watermark layout",
         "choosePosition": "Choose a position",
         "chooseCompressMode": "Choose a compression mode",
         "chooseTargetFormat": "Choose a target format",

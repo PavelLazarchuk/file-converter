@@ -12,6 +12,8 @@ const base = {
     opacity: 100,
     scale: 30,
     margin: 10,
+    layout: 'single',
+    angle: 0,
     logo: null,
     keepMetadata: false,
 } as const;
@@ -81,5 +83,50 @@ describe('watermarkPipeline', () => {
         const meta = await describeOutput(output.data);
 
         expect([meta.width, meta.height]).toEqual([60, 40]);
+    });
+
+    it('tilts the mark: a rotated stamp differs from an unrotated one', async () => {
+        const source = await sourceImage('png', { width: 200, height: 120 });
+        const straight = await watermarkPipeline(source, { ...base, angle: 0 });
+        const tilted = await watermarkPipeline(source, { ...base, angle: 45 });
+
+        expect(Buffer.from(straight.data).equals(Buffer.from(tilted.data))).toBe(false);
+    });
+
+    it('keeps the image size unchanged after rotating a large logo, which sharp would otherwise refuse', async () => {
+        const source = await sourceImage('png', { width: 60, height: 40 });
+        const output = await watermarkPipeline(source, {
+            ...base,
+            scale: 100,
+            margin: 0,
+            angle: 45,
+            logo: await logoOf(400),
+        });
+        const meta = await describeOutput(output.data);
+
+        expect([meta.width, meta.height]).toEqual([60, 40]);
+    });
+
+    it('tiles the mark across the whole image, reaching corners a single stamp would leave untouched', async () => {
+        const source = await sourceImage('png', { width: 200, height: 120 });
+        const single = await watermarkPipeline(source, { ...base, layout: 'single' });
+        const tiled = await watermarkPipeline(source, { ...base, layout: 'tile', scale: 15 });
+
+        async function topLeftCorner(data: Buffer | Uint8Array) {
+            return sharp(Buffer.from(data))
+                .extract({ left: 0, top: 0, width: 20, height: 20 })
+                .ensureAlpha()
+                .raw()
+                .toBuffer();
+        }
+
+        const [sourceCorner, singleCorner, tiledCorner] = await Promise.all([
+            topLeftCorner(source.buffer),
+            topLeftCorner(single.data),
+            topLeftCorner(tiled.data),
+        ]);
+
+        expect(singleCorner.equals(sourceCorner)).toBe(true);
+        expect(tiledCorner.equals(sourceCorner)).toBe(false);
     });
 });
