@@ -12,6 +12,7 @@ import {
     imageToPdf,
     inspectImage,
     mergePdf,
+    organizePdf,
     resizeImage,
     rotateImage,
     splitPdf,
@@ -434,6 +435,29 @@ describe('convertImage', () => {
         const { files } = expectSuccess(await convertImage(form([source.file], { format: 'png' })));
 
         await expect(meta(files[0])).resolves.toMatchObject({ format: 'png' });
+    });
+
+    it('passes the quality the form sends down to the encoder', async () => {
+        const source = await image('png', { name: 'photo.png', width: 200, height: 200 });
+        const rough = expectSuccess(
+            await convertImage(form([source.file], { format: 'webp', quality: '10' }))
+        );
+        const fine = expectSuccess(
+            await convertImage(form([source.file], { format: 'webp', quality: '90' }))
+        );
+
+        expect(Buffer.from(rough.files[0].data).equals(Buffer.from(fine.files[0].data))).toBe(
+            false
+        );
+    });
+
+    it('rejects a quality outside the range instead of clamping it', async () => {
+        const source = await image('png', { name: 'photo.png' });
+
+        expect(
+            expectFailure(await convertImage(form([source.file], { format: 'webp', quality: '0' })))
+                .code
+        ).toBe('invalid_settings');
     });
 
     it('refuses a no-op conversion', async () => {
@@ -1322,6 +1346,64 @@ describe('splitPdf', () => {
 
     it('rejects an empty request', async () => {
         expect(expectFailure(await splitPdf(form([]))).code).toBe('no_file');
+    });
+});
+
+describe('organizePdf', () => {
+    it('deletes the pages the form names and keeps the document intact', async () => {
+        const source = await pdfFile('scan.pdf', 5, 'Quarterly report');
+        const { files } = expectSuccess(
+            await organizePdf(form([source], { mode: 'remove', pages: '2-3' }))
+        );
+        const edited = await PDFDocument.load(Buffer.from(files[0].data));
+
+        expect(files[0].filename).toBe('scan-trimmed.pdf');
+        expect(files[0].originalSize).toBe(source.size);
+        expect(edited.getPageCount()).toBe(3);
+        expect(edited.getTitle()).toBe('Quarterly report');
+    });
+
+    it('moves the named pages to the front without dropping the others', async () => {
+        const { files } = expectSuccess(
+            await organizePdf(form([await pdfFile('scan.pdf', 4)], { mode: 'reorder', pages: '3' }))
+        );
+        const edited = await PDFDocument.load(Buffer.from(files[0].data));
+
+        expect(files[0].filename).toBe('scan-reordered.pdf');
+        expect(edited.getPageCount()).toBe(4);
+    });
+
+    it('refuses a selection that would leave no pages', async () => {
+        expect(
+            expectFailure(
+                await organizePdf(
+                    form([await pdfFile('scan.pdf', 2)], { mode: 'remove', pages: '1-2' })
+                )
+            ).code
+        ).toBe('no_pages_left');
+    });
+
+    it('needs a selection — an empty one would hand the upload back', async () => {
+        expect(
+            expectFailure(
+                await organizePdf(
+                    form([await pdfFile('scan.pdf', 2)], { mode: 'remove', pages: '' })
+                )
+            ).code
+        ).toBe('invalid_settings');
+    });
+
+    it('takes one PDF at a time', async () => {
+        expect(
+            expectFailure(
+                await organizePdf(
+                    form([await pdfFile('a.pdf', 2), await pdfFile('b.pdf', 2)], {
+                        mode: 'remove',
+                        pages: '1',
+                    })
+                )
+            ).code
+        ).toBe('single_pdf_only');
     });
 });
 

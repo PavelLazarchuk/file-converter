@@ -2,6 +2,7 @@ import {
     Combine,
     Crop,
     Scale,
+    FileStack,
     FileText,
     Gauge,
     ImagePlus,
@@ -56,6 +57,7 @@ export type ToolKey =
     | 'placeholder'
     | 'mergePdf'
     | 'splitPdf'
+    | 'organizePdf'
     | 'imagesToPdf';
 
 export type Tool = {
@@ -187,6 +189,14 @@ export const TOOLS: readonly Tool[] = [
         icon: Scissors,
         gradient: 'from-teal-500 to-cyan-700',
         accent: ['#14b8a6', '#0e7490'],
+        intake: SINGLE_PDF_INTAKE,
+    },
+    {
+        key: 'organizePdf',
+        href: '/organize-pdf',
+        icon: FileStack,
+        gradient: 'from-purple-500 to-indigo-600',
+        accent: ['#a855f7', '#4f46e5'],
         intake: SINGLE_PDF_INTAKE,
     },
     {

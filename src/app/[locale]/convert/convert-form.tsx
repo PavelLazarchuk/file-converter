@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 
 import { FieldError } from '@/components/field-error';
 import { ImageDropzone, useLoadedImages } from '@/components/image-dropzone';
+import { IntegerInput } from '@/components/integer-input';
 import { MetadataSwitch } from '@/components/metadata-switch';
 import { ResultCard } from '@/components/result-card';
 import { Button } from '@/components/ui/button';
@@ -30,14 +31,17 @@ import {
     BASE64_OUTPUT_KEYS,
     CONVERT_SOURCE_KEYS,
     DEFAULT_ICO_SIZES,
+    DEFAULT_QUALITY,
     FAVICON_PACK,
     ICO_SIZE_OPTIONS,
     IMAGE_FORMATS,
     MAX_BATCH_FILES,
+    QUALITY_LIMITS,
     conversionTargets,
     convertSourceFromMimeType,
     formatBase64Output,
     stripExtension,
+    targetTakesQuality,
     type Base64Output,
     type ConvertSource,
     type ConvertTarget,
@@ -70,6 +74,7 @@ export function ConvertForm() {
 
     const {
         control,
+        register,
         handleSubmit,
         reset,
         getValues,
@@ -78,6 +83,7 @@ export function ConvertForm() {
     } = useForm<ConvertInput, unknown, ConvertValues>({
         resolver: zodResolver(convertSchema),
         mode: 'onChange',
+        defaultValues: { quality: String(DEFAULT_QUALITY) },
     });
 
     const hasImages = images.length > 0;
@@ -141,7 +147,7 @@ export function ConvertForm() {
             return;
         }
 
-        run(images, { format: values.format, keepMetadata });
+        run(images, { format: values.format, quality: values.quality, keepMetadata });
     });
 
     async function copyText(value: string) {
@@ -161,7 +167,9 @@ export function ConvertForm() {
     function keepTargetValid(next: ConvertTarget[]) {
         const current = getValues('format');
 
-        if (!current || !next.includes(current)) reset({ format: next[0] });
+        if (!current || !next.includes(current)) {
+            reset({ format: next[0], quality: getValues('quality') });
+        }
     }
 
     return (
@@ -199,7 +207,7 @@ export function ConvertForm() {
                     clearImages();
                     setDataUris(null);
                     clearResult();
-                    reset({ format: undefined });
+                    reset({ format: undefined, quality: String(DEFAULT_QUALITY) });
                 }}
             />
 
@@ -266,6 +274,25 @@ export function ConvertForm() {
                 )}
                 <FieldError id="format-error" error={errors.format} />
             </div>
+
+            {target && targetTakesQuality(target) && (
+                <div className="space-y-2">
+                    <Label htmlFor="quality">
+                        {t('quality', { min: QUALITY_LIMITS.min, max: QUALITY_LIMITS.max })}
+                    </Label>
+                    <IntegerInput
+                        id="quality"
+                        min={QUALITY_LIMITS.min}
+                        max={QUALITY_LIMITS.max}
+                        disabled={!hasImages || isPending}
+                        aria-invalid={!!errors.quality}
+                        aria-describedby={errors.quality ? 'quality-error' : undefined}
+                        {...register('quality')}
+                    />
+                    <p className="text-sm text-muted-foreground">{t('qualityHint')}</p>
+                    <FieldError id="quality-error" error={errors.quality} />
+                </div>
+            )}
 
             {target === 'ico' && (
                 <div className="space-y-4 rounded-xl border bg-card p-4">

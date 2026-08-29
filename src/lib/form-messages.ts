@@ -49,6 +49,7 @@ export type FieldMessage =
     | { k: 'icoSizesInvalid'; sizes: string }
     | { k: 'icoPackInvalid' }
     | { k: 'chooseSplitMode' }
+    | { k: 'chooseOrganizeMode' }
     | { k: 'pageRangeInvalid' }
     | { k: 'pageRangeRequired' };
 

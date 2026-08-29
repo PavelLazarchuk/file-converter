@@ -47,6 +47,7 @@ import {
 import { cropPipeline } from './pipelines/crop';
 import { filterPipeline } from './pipelines/filter';
 import { inspectPipeline, stripPipeline } from './pipelines/inspect';
+import { organizePdfPipeline } from './pipelines/organize-pdf';
 import { placeholderPipeline } from './pipelines/placeholder';
 import { resizePipeline } from './pipelines/resize';
 import { rotatePipeline } from './pipelines/rotate';
@@ -62,6 +63,7 @@ import {
     filterSchema,
     icoOptionsSchema,
     imageToPdfSchema,
+    organizePdfSchema,
     outputSizeSchema,
     placeholderSchema,
     resizeSchema,
@@ -94,6 +96,7 @@ type ToolName =
     | 'pdf'
     | 'merge-pdf'
     | 'split-pdf'
+    | 'organize-pdf'
     | 'placeholder'
     | 'rotate'
     | 'watermark'
@@ -415,7 +418,10 @@ export async function compareFormats(formData: FormData): Promise<ActionResult> 
 
 export async function convertImage(formData: FormData): Promise<ActionResult> {
     return runFiles('convert', formData, CONVERT_SOURCE_KEYS, async batch => {
-        const parsed = convertSchema.safeParse({ format: formData.get('format') });
+        const parsed = convertSchema.safeParse({
+            format: formData.get('format'),
+            quality: formData.get('quality') ?? undefined,
+        });
 
         if (!parsed.success) throw invalid(parsed.error);
 
@@ -434,6 +440,7 @@ export async function convertImage(formData: FormData): Promise<ActionResult> {
 
         const params = {
             target,
+            quality: parsed.data.quality,
             keepMetadata: keepMetadataRequested(formData),
             ico: icoOptions?.success ? icoOptions.data : null,
         };
@@ -602,6 +609,37 @@ export async function splitPdf(formData: FormData): Promise<ActionResult> {
                 produced.map(output => toActionFile({ size: originalSize }, output)),
                 failures
             );
+        },
+        uploadCount(formData)
+    );
+}
+
+export async function organizePdf(formData: FormData): Promise<ActionResult> {
+    return run(
+        'organize-pdf',
+        async () => {
+            if (uploadCount(formData) > 1) throw fail({ code: 'single_pdf_only' });
+
+            const { sources, failures } = await readPdfFiles('organize-pdf', formData);
+
+            const parsed = organizePdfSchema.safeParse({
+                mode: formData.get('mode') || 'remove',
+                pages: formData.get('pages') ?? '',
+            });
+
+            if (!parsed.success) throw invalid(parsed.error);
+
+            const [source] = sources;
+            const produced = await organizePdfPipeline(source, parsed.data);
+
+            Logger.info('pdf.organized', {
+                tool: 'organize-pdf',
+                mode: parsed.data.mode,
+                pages: source.pageCount,
+                bytes: produced.data.length,
+            });
+
+            return collect([toActionFile({ size: source.size }, produced)], failures);
         },
         uploadCount(formData)
     );

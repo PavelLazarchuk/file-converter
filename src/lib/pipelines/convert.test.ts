@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { FAVICON_PACK } from '../image';
+import { DEFAULT_QUALITY, FAVICON_PACK } from '../image';
 import { describeOutput, sourceImage } from '@/test/images';
-import { ProcessingError } from './core';
+import { applyQuality } from './compress';
+import { decode, ProcessingError } from './core';
 import { convertPipeline } from './convert';
 
-const base = { keepMetadata: false, ico: null } as const;
+const base = { keepMetadata: false, ico: null, quality: DEFAULT_QUALITY } as const;
 
 function icoSizes(ico: Buffer): number[] {
     const count = ico.readUInt16LE(4);
@@ -35,6 +36,30 @@ describe('convertPipeline', () => {
         expect((await describeOutput(output.data)).format).toBe('webp');
         expect(output.filename).toBe('photo.webp');
         expect(output.mimeType).toBe('image/webp');
+    });
+
+    it('encodes a lossy target at the quality it is given', async () => {
+        const source = await sourceImage('png', { noise: true, width: 200, height: 200 });
+        const rough = await convertPipeline(source, { ...base, target: 'webp', quality: 10 });
+        const fine = await convertPipeline(source, { ...base, target: 'webp', quality: 90 });
+
+        expect(rough.data.length).toBeLessThan(fine.data.length);
+    });
+
+    it('encodes exactly what compressing at that quality would produce', async () => {
+        const source = await sourceImage('png', { noise: true, width: 120, height: 90 });
+        const output = await convertPipeline(source, { ...base, target: 'jpeg', quality: 42 });
+        const compressed = await applyQuality(decode(source.buffer), 'jpeg', 42).toBuffer();
+
+        expect(Buffer.from(output.data).equals(compressed)).toBe(true);
+    });
+
+    it('ignores the quality on a lossless target', async () => {
+        const source = await sourceImage('jpeg', { noise: true });
+        const rough = await convertPipeline(source, { ...base, target: 'png', quality: 10 });
+        const fine = await convertPipeline(source, { ...base, target: 'png', quality: 90 });
+
+        expect(Buffer.from(rough.data).equals(Buffer.from(fine.data))).toBe(true);
     });
 
     it('refuses a conversion that would change nothing', async () => {

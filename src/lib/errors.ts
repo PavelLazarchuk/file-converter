@@ -22,6 +22,7 @@ export type ActionErrorDetail =
     | { code: 'single_pdf_only' }
     | { code: 'page_out_of_range'; pages: number }
     | { code: 'no_pages_selected' }
+    | { code: 'no_pages_left' }
     | { code: 'too_many_parts'; parts: number }
     | { code: 'rate_limited'; retryAfterSeconds: number; limit: number }
     | { code: 'invalid_settings'; field?: FieldMessage }

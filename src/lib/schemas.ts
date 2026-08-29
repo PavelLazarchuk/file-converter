@@ -8,6 +8,7 @@ import {
     CONVERT_TARGET_KEYS,
     CROP_RATIO_KEYS,
     CROP_SHAPE_KEYS,
+    DEFAULT_QUALITY,
     DIMENSION_LIMITS,
     FILTER_EFFECT_KEYS,
     FORMAT_KEYS,
@@ -15,6 +16,7 @@ import {
     HUE_LIMITS,
     ICO_SIZE_OPTIONS,
     PAGE_RANGE_MAX_LENGTH,
+    PDF_ORGANIZE_MODE_KEYS,
     PDF_PAGE_SIZE_KEYS,
     PDF_SPLIT_MODE_KEYS,
     PLACEHOLDER_TEXT_MAX_LENGTH,
@@ -141,6 +143,9 @@ export const compareSchema = z.object({
 
 export const convertSchema = z.object({
     format: z.enum(CONVERT_TARGET_KEYS, { error: fieldMessage({ k: 'chooseTargetFormat' }) }),
+    quality: integerInRange(QUALITY_LIMITS.min, QUALITY_LIMITS.max, 'quality')
+        .optional()
+        .transform(value => value ?? DEFAULT_QUALITY),
 });
 
 const icoSizes = new Set<number>(ICO_SIZE_OPTIONS);
@@ -207,6 +212,17 @@ export const splitPdfSchema = z
         path: ['pages'],
     });
 
+export const organizePdfSchema = z.object({
+    mode: z.enum(PDF_ORGANIZE_MODE_KEYS, { error: fieldMessage({ k: 'chooseOrganizeMode' }) }),
+    pages: z
+        .string({ error: fieldMessage({ k: 'pageRangeRequired' }) })
+        .trim()
+        .min(1, fieldMessage({ k: 'pageRangeRequired' }))
+        .max(PAGE_RANGE_MAX_LENGTH, fieldMessage({ k: 'maxLength', max: PAGE_RANGE_MAX_LENGTH }))
+        .refine(value => parsePageRanges(value) !== null, fieldMessage({ k: 'pageRangeInvalid' }))
+        .transform(value => parsePageRanges(value) ?? []),
+});
+
 export const imageToPdfSchema = z.object({
     pageSize: z.enum(PDF_PAGE_SIZE_KEYS, { error: fieldMessage({ k: 'choosePageSize' }) }),
 });
@@ -229,6 +245,8 @@ export type PlaceholderInput = z.input<typeof placeholderSchema>;
 export type PlaceholderValues = z.output<typeof placeholderSchema>;
 export type SplitPdfInput = z.input<typeof splitPdfSchema>;
 export type SplitPdfValues = z.output<typeof splitPdfSchema>;
+export type OrganizePdfInput = z.input<typeof organizePdfSchema>;
+export type OrganizePdfValues = z.output<typeof organizePdfSchema>;
 export type ImageToPdfInput = z.input<typeof imageToPdfSchema>;
 export type ImageToPdfValues = z.output<typeof imageToPdfSchema>;
 export type FilterInput = z.input<typeof filterSchema>;

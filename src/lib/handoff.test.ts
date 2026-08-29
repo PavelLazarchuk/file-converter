@@ -78,10 +78,11 @@ describe('choosing the tools worth offering', () => {
         expect(handoffTargets([PDF_MIME_TYPE], '/pdf').map(tool => tool.href)).toEqual([
             '/merge-pdf',
             '/split-pdf',
+            '/organize-pdf',
         ]);
     });
 
-    it('offers splitting only while the result is a single PDF', () => {
+    it('offers the single-document tools only while the result is a single PDF', () => {
         expect(
             handoffTargets([PDF_MIME_TYPE, PDF_MIME_TYPE], '/pdf').map(tool => tool.href)
         ).toEqual(['/merge-pdf']);

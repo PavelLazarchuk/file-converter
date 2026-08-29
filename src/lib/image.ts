@@ -27,6 +27,14 @@ export const CONVERT_TARGET_KEYS = [...FORMAT_KEYS, 'gif', 'tiff', 'svg', 'ico',
 
 export type ConvertTarget = (typeof CONVERT_TARGET_KEYS)[number];
 
+export const CONVERT_QUALITY_TARGET_KEYS = ['jpeg', 'webp', 'avif', 'tiff'] as const;
+
+export type ConvertQualityTarget = (typeof CONVERT_QUALITY_TARGET_KEYS)[number];
+
+export function targetTakesQuality(target: ConvertTarget): target is ConvertQualityTarget {
+    return (CONVERT_QUALITY_TARGET_KEYS as readonly string[]).includes(target);
+}
+
 export const IMAGE_FORMATS: Record<ConvertTarget, { mimeType: string; extension: string }> = {
     jpeg: { mimeType: 'image/jpeg', extension: 'jpg' },
     png: { mimeType: 'image/png', extension: 'png' },
@@ -606,6 +614,10 @@ export const MAX_PDF_PAGES = 500;
 export const PDF_SPLIT_MODE_KEYS = ['separate', 'merged'] as const;
 
 export type PdfSplitMode = (typeof PDF_SPLIT_MODE_KEYS)[number];
+
+export const PDF_ORGANIZE_MODE_KEYS = ['remove', 'reorder'] as const;
+
+export type PdfOrganizeMode = (typeof PDF_ORGANIZE_MODE_KEYS)[number];
 
 export const MAX_PDF_PARTS = MAX_BATCH_FILES;
 

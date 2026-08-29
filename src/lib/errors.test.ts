@@ -30,6 +30,7 @@ const SAMPLES: { [Code in ActionErrorCode]: Extract<ActionErrorDetail, { code: C
     single_pdf_only: { code: 'single_pdf_only' },
     page_out_of_range: { code: 'page_out_of_range', pages: 4 },
     no_pages_selected: { code: 'no_pages_selected' },
+    no_pages_left: { code: 'no_pages_left' },
     too_many_parts: { code: 'too_many_parts', parts: 84 },
     rate_limited: { code: 'rate_limited', retryAfterSeconds: 12, limit: 40 },
     invalid_settings: { code: 'invalid_settings' },

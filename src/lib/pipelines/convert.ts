@@ -1,4 +1,4 @@
-import type { Metadata } from 'sharp';
+import type { Metadata, Sharp } from 'sharp';
 
 import { encodeIco } from '../ico';
 import {
@@ -6,18 +6,29 @@ import {
     IMAGE_FORMATS,
     STRIP_QUALITY,
     ZIP_MIME_TYPE,
+    targetTakesQuality,
     type ConvertSource,
     type ConvertTarget,
 } from '../image';
 import type { IcoOptionsValues } from '../schemas';
 import { createZip, type ZipEntry } from '../zip';
+import { applyQuality } from './compress';
 import { decode, fail, hasStrippableMetadata, type PipelineOutput, type SourceImage } from './core';
 
 export type ConvertParams = {
     target: ConvertTarget;
+    quality: number;
     keepMetadata: boolean;
     ico: IcoOptionsValues | null;
 };
+
+type EncodedTarget = Exclude<ConvertTarget, 'base64' | 'svg' | 'ico'>;
+
+function encode(pipeline: Sharp, target: EncodedTarget, quality: number): Sharp {
+    if (!targetTakesQuality(target)) return pipeline.toFormat(target);
+
+    return target === 'tiff' ? pipeline.tiff({ quality }) : applyQuality(pipeline, target, quality);
+}
 
 async function base64Bytes(
     buffer: Buffer,
@@ -99,7 +110,7 @@ function faviconPackEntries(
 
 export async function convertPipeline(
     source: SourceImage<ConvertSource>,
-    { target, keepMetadata, ico }: ConvertParams
+    { target, quality, keepMetadata, ico }: ConvertParams
 ): Promise<PipelineOutput> {
     const { buffer, baseName, format: from, metadata } = source;
 
@@ -164,7 +175,7 @@ export async function convertPipeline(
 
     if (target === 'jpeg') pipeline = pipeline.flatten({ background: '#ffffff' });
 
-    pipeline = pipeline.toFormat(target);
+    pipeline = encode(pipeline, target, quality);
 
     if (keepMetadata) pipeline = pipeline.keepMetadata();
 

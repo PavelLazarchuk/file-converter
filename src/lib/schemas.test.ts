@@ -4,6 +4,7 @@ import { translator } from '@/test/messages';
 import { parseFieldMessage } from './form-messages';
 import { fieldMessageText } from './messages';
 import {
+    DEFAULT_QUALITY,
     DIMENSION_LIMITS,
     PLACEHOLDER_TEXT_MAX_LENGTH,
     QUALITY_LIMITS,
@@ -15,6 +16,7 @@ import {
     cropSchema,
     icoOptionsSchema,
     imageToPdfSchema,
+    organizePdfSchema,
     outputSizeSchema,
     placeholderSchema,
     resizeSchema,
@@ -138,6 +140,40 @@ describe('convertSchema', () => {
 
     it('rejects an unknown target', () => {
         expect(convertSchema.safeParse({ format: 'bmp' }).success).toBe(false);
+    });
+
+    it('falls back to the default quality when none is sent', () => {
+        expect(convertSchema.safeParse({ format: 'webp' }).data?.quality).toBe(DEFAULT_QUALITY);
+        expect(convertSchema.safeParse({ format: 'webp', quality: '35' }).data?.quality).toBe(35);
+    });
+
+    it('still checks a quality that is sent', () => {
+        expect(convertSchema.safeParse({ format: 'webp', quality: '101' }).success).toBe(false);
+        expect(convertSchema.safeParse({ format: 'webp', quality: 'high' }).success).toBe(false);
+    });
+});
+
+describe('organizePdfSchema', () => {
+    it('parses the mode and the range list', () => {
+        expect(organizePdfSchema.safeParse({ mode: 'remove', pages: '2-3, 7' }).data).toEqual({
+            mode: 'remove',
+            pages: [
+                { from: 2, to: 3 },
+                { from: 7, to: 7 },
+            ],
+        });
+    });
+
+    it('needs a selection in both modes', () => {
+        expect(firstError(organizePdfSchema.safeParse({ mode: 'remove', pages: '' }))).toBe(
+            'Choose the pages, like 1-3, 5'
+        );
+        expect(organizePdfSchema.safeParse({ mode: 'reorder', pages: '  ' }).success).toBe(false);
+    });
+
+    it('rejects a malformed range and an unknown mode', () => {
+        expect(organizePdfSchema.safeParse({ mode: 'remove', pages: '3-1' }).success).toBe(false);
+        expect(organizePdfSchema.safeParse({ mode: 'shuffle', pages: '1' }).success).toBe(false);
     });
 });
 
@@ -297,7 +333,7 @@ describe('splitPdfSchema', () => {
             pages: [],
         });
         expect(firstError(splitPdfSchema.safeParse({ mode: 'merged', pages: '' }))).toBe(
-            'Choose the pages to pull out, like 1-3, 5'
+            'Choose the pages, like 1-3, 5'
         );
     });
 
