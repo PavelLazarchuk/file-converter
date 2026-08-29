@@ -58,6 +58,13 @@ describe('contentSecurityPolicy', () => {
         expect(parsed.get('script-src')).toContain("'unsafe-inline'");
         expect(parsed.get('style-src')).toContain("'unsafe-inline'");
     });
+
+    it('lets the browser compile the image codecs without opening eval', () => {
+        const policy = contentSecurityPolicy(false);
+
+        expect(policy).toContain("'wasm-unsafe-eval'");
+        expect(policy).not.toContain("'unsafe-eval'");
+    });
 });
 
 describe('securityHeaders', () => {

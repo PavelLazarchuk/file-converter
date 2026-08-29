@@ -110,8 +110,15 @@ export function actionErrorText(detail: ActionErrorDetail, context: MessageConte
 export function actionWarningText(detail: ActionWarningDetail, context: MessageContext): string {
     const { warnings, locale } = context;
 
-    return warnings(detail.code, {
-        target: formatFileSize(detail.targetBytes, locale),
-        smallest: formatFileSize(detail.smallestBytes, locale),
-    });
+    switch (detail.code) {
+        case 'target_missed':
+            return warnings('target_missed', {
+                target: formatFileSize(detail.targetBytes, locale),
+                smallest: formatFileSize(detail.smallestBytes, locale),
+            });
+        case 'animation_lost':
+            return warnings('animation_lost', { frames: detail.frames });
+        default:
+            return warnings(detail.code);
+    }
 }

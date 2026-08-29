@@ -19,6 +19,7 @@ async function source(pages: number, name = 'report.pdf'): Promise<PdfSource> {
 
     return {
         document: loaded,
+        buffer,
         name,
         baseName: name.replace(/\.pdf$/, ''),
         size: buffer.length,

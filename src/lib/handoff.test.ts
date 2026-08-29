@@ -76,16 +76,18 @@ describe('choosing the tools worth offering', () => {
 
     it('keeps PDFs on the PDF path', () => {
         expect(handoffTargets([PDF_MIME_TYPE], '/pdf').map(tool => tool.href)).toEqual([
+            '/watermark-pdf',
             '/merge-pdf',
             '/split-pdf',
             '/organize-pdf',
+            '/compress-pdf',
         ]);
     });
 
     it('offers the single-document tools only while the result is a single PDF', () => {
         expect(
             handoffTargets([PDF_MIME_TYPE, PDF_MIME_TYPE], '/pdf').map(tool => tool.href)
-        ).toEqual(['/merge-pdf']);
+        ).toEqual(['/watermark-pdf', '/merge-pdf', '/compress-pdf']);
     });
 });
 

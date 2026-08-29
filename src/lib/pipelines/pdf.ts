@@ -56,11 +56,12 @@ export async function addPdfPage(
 }
 
 export function savePdf(pdfDoc: PDFDocument): Promise<Uint8Array> {
-    return pdfDoc.save();
+    return pdfDoc.save({ useObjectStreams: true });
 }
 
 export type PdfSource = {
     document: PDFDocument;
+    buffer: Buffer;
     name: string;
     baseName: string;
     size: number;

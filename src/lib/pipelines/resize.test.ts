@@ -70,4 +70,25 @@ describe('resizePipeline', () => {
         expect((await describeOutput(stripped.data)).exif).toBeUndefined();
         expect((await describeOutput(kept.data)).exif).toBeDefined();
     });
+    it('resizes every frame of an animation and names the file after one frame', async () => {
+        const source = await sourceImage('webp', { frames: 3, width: 40, height: 20, noise: true });
+        const output = await resizePipeline(source, { ...base, width: 20, height: 10 });
+        const meta = await describeOutput(output.data);
+
+        expect(meta.pages).toBe(3);
+        expect(output.filename).toBe('photo-20x10.webp');
+        expect(output.warning).toBeUndefined();
+    });
+
+    it('warns when a rotation forces the animation down to one frame', async () => {
+        const source = await sourceImage('webp', { frames: 3, width: 40, height: 20, noise: true });
+        const output = await resizePipeline(source, {
+            ...base,
+            rotate: '90',
+            width: 20,
+            height: 10,
+        });
+
+        expect(output.warning).toEqual({ code: 'animation_lost', frames: 3 });
+    });
 });

@@ -11,7 +11,7 @@ import {
     type Size,
 } from '../image';
 import type { WatermarkValues } from '../schemas';
-import { decode, sourceSize, type PipelineOutput, type SourceImage } from './core';
+import { decode, lostAnimation, sourceSize, type PipelineOutput, type SourceImage } from './core';
 
 export type WatermarkLogo = { buffer: Buffer; size: Size };
 
@@ -143,5 +143,10 @@ export async function watermarkPipeline(
     const data = await pipeline.toBuffer();
     const { extension, mimeType } = IMAGE_FORMATS[source.format];
 
-    return { data, filename: `${source.baseName}-watermarked.${extension}`, mimeType };
+    return {
+        data,
+        filename: `${source.baseName}-watermarked.${extension}`,
+        mimeType,
+        ...lostAnimation(source),
+    };
 }

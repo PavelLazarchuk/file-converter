@@ -21,6 +21,7 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { usePendingLabel, useFileAction } from '@/hooks/use-file-action';
 import { compressImage } from '@/lib/actions';
+import { LOCAL_MAX_FILE_SIZE_LABEL, compressLocally } from '@/lib/local-codec';
 import {
     DEFAULT_QUALITY,
     DEFAULT_TARGET_KB,
@@ -43,7 +44,10 @@ export function CompressForm() {
     const pendingLabel = usePendingLabel();
     const { images, addImages, removeImage, clearImages } = useLoadedImages(MAX_BATCH_FILES);
     const { isPending, outcome, isLeaving, progress, run, clearResult, downloadAll, autoDownload } =
-        useFileAction(compressImage, 'compressed-images.zip');
+        useFileAction(compressImage, 'compressed-images.zip', {
+            local: (upload, params) =>
+                compressLocally(upload, Number(params.quality), String(params.mode)),
+        });
 
     const {
         control,
@@ -195,6 +199,12 @@ export function CompressForm() {
                 <ShieldCheck className="mt-0.5 size-4 shrink-0" />
                 <p>{t('metadataNote')}</p>
             </div>
+
+            {mode === 'quality' && (
+                <p className="text-sm text-muted-foreground">
+                    {t('inBrowser', { max: LOCAL_MAX_FILE_SIZE_LABEL })}
+                </p>
+            )}
 
             {outcome && (
                 <ResultCard

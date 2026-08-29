@@ -6,6 +6,8 @@ import {
     IMAGE_FORMATS,
     STRIP_QUALITY,
     ZIP_MIME_TYPE,
+    isAnimated,
+    keepsAnimation,
     targetTakesQuality,
     type ConvertSource,
     type ConvertTarget,
@@ -13,7 +15,14 @@ import {
 import type { IcoOptionsValues } from '../schemas';
 import { createZip, type ZipEntry } from '../zip';
 import { applyQuality } from './compress';
-import { decode, fail, hasStrippableMetadata, type PipelineOutput, type SourceImage } from './core';
+import {
+    decode,
+    fail,
+    hasStrippableMetadata,
+    lostAnimation,
+    type PipelineOutput,
+    type SourceImage,
+} from './core';
 
 export type ConvertParams = {
     target: ConvertTarget;
@@ -39,7 +48,9 @@ async function base64Bytes(
     if (keepMetadata || source === 'gif' || source === 'svg') return buffer;
     if (!hasStrippableMetadata(metadata)) return buffer;
 
-    return decode(buffer).toFormat(source, { quality: STRIP_QUALITY[source] }).toBuffer();
+    return decode(buffer, { animated: isAnimated(metadata) })
+        .toFormat(source, { quality: STRIP_QUALITY[source] })
+        .toBuffer();
 }
 
 function iconPng(buffer: Buffer, size: number, background?: string): Promise<Buffer> {
@@ -116,6 +127,9 @@ export async function convertPipeline(
 
     if (target === from) throw fail({ code: 'same_format' });
 
+    const animated = isAnimated(metadata) && keepsAnimation(target);
+    const stillOnly = animated || target === 'base64' ? undefined : lostAnimation(source);
+
     if (target === 'base64') {
         const bytes = await base64Bytes(buffer, from, metadata, keepMetadata);
         const dataUri = `data:${IMAGE_FORMATS[from].mimeType};base64,${bytes.toString('base64')}`;
@@ -146,6 +160,7 @@ export async function convertPipeline(
             data: Buffer.from(svg, 'utf8'),
             filename: `${baseName}.${extension}`,
             mimeType,
+            ...stillOnly,
         };
     }
 
@@ -156,7 +171,7 @@ export async function convertPipeline(
             const icon = await buildIco(buffer, ico.sizes);
             const { extension, mimeType } = IMAGE_FORMATS.ico;
 
-            return { data: icon, filename: `${baseName}.${extension}`, mimeType };
+            return { data: icon, filename: `${baseName}.${extension}`, mimeType, ...stillOnly };
         }
 
         const [icon, assets] = await Promise.all([
@@ -168,10 +183,11 @@ export async function convertPipeline(
             data: createZip(faviconPackEntries(icon, assets)),
             filename: `${baseName}-favicons.zip`,
             mimeType: ZIP_MIME_TYPE,
+            ...stillOnly,
         };
     }
 
-    let pipeline = decode(buffer);
+    let pipeline = decode(buffer, { animated });
 
     if (target === 'jpeg') pipeline = pipeline.flatten({ background: '#ffffff' });
 
@@ -182,5 +198,5 @@ export async function convertPipeline(
     const data = await pipeline.toBuffer();
     const { extension, mimeType } = IMAGE_FORMATS[target];
 
-    return { data, filename: `${baseName}.${extension}`, mimeType };
+    return { data, filename: `${baseName}.${extension}`, mimeType, ...stillOnly };
 }

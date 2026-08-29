@@ -135,4 +135,42 @@ describe('convertPipeline', () => {
             ProcessingError
         );
     });
+    it('carries an animated GIF through to WEBP as every frame', async () => {
+        const source = await sourceImage('gif', { frames: 4, width: 20, height: 10, noise: true });
+        const output = await convertPipeline(source, { ...base, target: 'webp' });
+        const meta = await describeOutput(output.data);
+
+        expect(meta.pages).toBe(4);
+        expect(output.warning).toBeUndefined();
+    });
+
+    it('warns instead of silently flattening an animation into a still format', async () => {
+        const source = await sourceImage('gif', { frames: 4, width: 20, height: 10, noise: true });
+        const output = await convertPipeline(source, { ...base, target: 'png' });
+
+        expect(output.warning).toEqual({ code: 'animation_lost', frames: 4 });
+    });
+
+    it('says nothing about animation for a still source', async () => {
+        const source = await sourceImage('gif', { width: 20, height: 10 });
+        const output = await convertPipeline(source, { ...base, target: 'png' });
+
+        expect(output.warning).toBeUndefined();
+    });
+    it('keeps the frames when it strips metadata on the way into a data URI', async () => {
+        const source = await sourceImage('webp', {
+            frames: 4,
+            width: 20,
+            height: 10,
+            noise: true,
+            exif: true,
+        });
+        const output = await convertPipeline(source, { ...base, target: 'base64' });
+        const dataUri = Buffer.from(output.data).toString('utf8');
+        const payload = Buffer.from(dataUri.slice(dataUri.indexOf(',') + 1), 'base64');
+
+        expect(dataUri.startsWith('data:image/webp;base64,')).toBe(true);
+        expect((await describeOutput(payload)).pages).toBe(4);
+        expect(output.warning).toBeUndefined();
+    });
 });

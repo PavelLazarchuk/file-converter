@@ -34,12 +34,14 @@ import {
 } from './pipelines/pdf';
 import { comparePipeline } from './pipelines/compare';
 import { compressPipeline } from './pipelines/compress';
+import { compressPdfPipeline } from './pipelines/compress-pdf';
 import { convertPipeline } from './pipelines/convert';
 import {
     ProcessingError,
     decode,
     fail,
     invalid,
+    lostAnimation,
     sourceSize,
     type PipelineOutput,
     type SourceImage,
@@ -53,10 +55,12 @@ import { resizePipeline } from './pipelines/resize';
 import { rotatePipeline } from './pipelines/rotate';
 import { splitPdfPipeline } from './pipelines/split-pdf';
 import { watermarkPipeline, type WatermarkLogo } from './pipelines/watermark';
+import { watermarkPdfPipeline } from './pipelines/watermark-pdf';
 import { RATE_LIMIT, checkRateLimit } from './rate-limit';
 import { inspectSvg } from './svg-safety';
 import {
     compareSchema,
+    compressPdfSchema,
     compressSchema,
     convertSchema,
     cropSchema,
@@ -69,6 +73,7 @@ import {
     resizeSchema,
     rotateSchema,
     splitPdfSchema,
+    watermarkPdfSchema,
     watermarkSchema,
 } from './schemas';
 
@@ -97,6 +102,8 @@ type ToolName =
     | 'merge-pdf'
     | 'split-pdf'
     | 'organize-pdf'
+    | 'compress-pdf'
+    | 'watermark-pdf'
     | 'placeholder'
     | 'rotate'
     | 'watermark'
@@ -322,6 +329,31 @@ async function eachFile<Format extends ConvertSource>(
     return collect(produced, problems);
 }
 
+async function eachPdf(
+    tool: ToolName,
+    { sources, failures }: PdfBatch,
+    process: (source: PdfSource) => Promise<PipelineOutput>
+): Promise<ActionResult> {
+    const produced: ActionFile[] = [];
+    const problems = [...failures];
+
+    for (const source of sources) {
+        try {
+            produced.push(toActionFile(source, await process(source)));
+        } catch (error) {
+            problems.push(
+                describeFailure(source.name, error, {
+                    tool,
+                    bytes: source.size,
+                    pages: source.pageCount,
+                })
+            );
+        }
+    }
+
+    return collect(produced, problems);
+}
+
 export async function resizeImage(formData: FormData): Promise<ActionResult> {
     return runFiles('resize', formData, FORMAT_KEYS, async batch => {
         const parsed = resizeSchema.safeParse({
@@ -480,8 +512,20 @@ export async function imageToPdf(formData: FormData): Promise<ActionResult> {
                 ? `${used[0].baseName}.pdf`
                 : `${used[0].baseName}-${used.length}-pages.pdf`;
 
+        const animated = used.find(source => lostAnimation(source));
+
         return collect(
-            [toActionFile({ size: originalSize }, { data, filename, mimeType: 'application/pdf' })],
+            [
+                toActionFile(
+                    { size: originalSize },
+                    {
+                        data,
+                        filename,
+                        mimeType: PDF_MIME_TYPE,
+                        ...(animated ? lostAnimation(animated) : {}),
+                    }
+                ),
+            ],
             problems
         );
     });
@@ -517,6 +561,7 @@ async function readPdfFiles(tool: ToolName, formData: FormData): Promise<PdfBatc
 
             sources.push({
                 document,
+                buffer,
                 name: file.name,
                 baseName: stripExtension(file.name) || 'document',
                 size: file.size,
@@ -640,6 +685,49 @@ export async function organizePdf(formData: FormData): Promise<ActionResult> {
             });
 
             return collect([toActionFile({ size: source.size }, produced)], failures);
+        },
+        uploadCount(formData)
+    );
+}
+
+export async function compressPdf(formData: FormData): Promise<ActionResult> {
+    return run(
+        'compress-pdf',
+        async () => {
+            const batch = await readPdfFiles('compress-pdf', formData);
+            const parsed = compressPdfSchema.safeParse({ level: formData.get('level') });
+
+            if (!parsed.success) throw invalid(parsed.error);
+
+            return eachPdf('compress-pdf', batch, source =>
+                compressPdfPipeline(source, parsed.data)
+            );
+        },
+        uploadCount(formData)
+    );
+}
+
+export async function watermarkPdf(formData: FormData): Promise<ActionResult> {
+    return run(
+        'watermark-pdf',
+        async () => {
+            const batch = await readPdfFiles('watermark-pdf', formData);
+            const parsed = watermarkPdfSchema.safeParse({
+                text: formData.get('text') ?? '',
+                color: formData.get('color') || WATERMARK_DEFAULTS.color,
+                position: formData.get('position') || WATERMARK_DEFAULTS.position,
+                opacity: formData.get('opacity') || WATERMARK_DEFAULTS.opacity,
+                scale: formData.get('scale') || WATERMARK_DEFAULTS.scale,
+                margin: formData.get('margin') || WATERMARK_DEFAULTS.margin,
+                layout: formData.get('layout') || WATERMARK_DEFAULTS.layout,
+                angle: formData.get('angle') || WATERMARK_DEFAULTS.angle,
+            });
+
+            if (!parsed.success) throw invalid(parsed.error);
+
+            return eachPdf('watermark-pdf', batch, source =>
+                watermarkPdfPipeline(source, parsed.data)
+            );
         },
         uploadCount(formData)
     );

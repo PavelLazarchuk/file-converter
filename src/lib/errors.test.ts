@@ -38,6 +38,7 @@ const SAMPLES: { [Code in ActionErrorCode]: Extract<ActionErrorDetail, { code: C
     nothing_to_do: { code: 'nothing_to_do' },
     compress_failed: { code: 'compress_failed' },
     no_metadata: { code: 'no_metadata' },
+    unsupported_text: { code: 'unsupported_text' },
     logo_missing: { code: 'logo_missing' },
     logo_too_large: { code: 'logo_too_large' },
     transport_failed: { code: 'transport_failed' },
@@ -46,7 +47,11 @@ const SAMPLES: { [Code in ActionErrorCode]: Extract<ActionErrorDetail, { code: C
 
 const WARNINGS: { [Code in ActionWarningCode]: Extract<ActionWarningDetail, { code: Code }> } = {
     target_missed: { code: 'target_missed', targetBytes: 500_000, smallestBytes: 900_000 },
+    animation_lost: { code: 'animation_lost', frames: 24 },
+    pdf_not_smaller: { code: 'pdf_not_smaller' },
 };
+
+const warningCodes = Object.keys(WARNINGS) as ActionWarningCode[];
 
 const codes = Object.keys(SAMPLES) as ActionErrorCode[];
 
@@ -101,6 +106,18 @@ describe('the error catalog', () => {
 });
 
 describe('the warning catalog', () => {
+    it.each(warningCodes)('renders a sentence for %s', code => {
+        const message = warningText(WARNINGS[code]);
+
+        expect(message.length).toBeGreaterThan(0);
+        expect(message).toMatch(/[.!?]$/);
+        expect(message).not.toContain('undefined');
+    });
+
+    it('counts the frames it could not keep', () => {
+        expect(warningText(WARNINGS.animation_lost)).toContain('24');
+    });
+
     it('renders both sizes of a missed compression target', () => {
         const message = warningText(WARNINGS.target_missed);
 

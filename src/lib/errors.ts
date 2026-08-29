@@ -30,6 +30,7 @@ export type ActionErrorDetail =
     | { code: 'nothing_to_do' }
     | { code: 'compress_failed' }
     | { code: 'no_metadata' }
+    | { code: 'unsupported_text' }
     | { code: 'logo_missing' }
     | { code: 'logo_too_large' }
     | { code: 'transport_failed' }
@@ -37,10 +38,9 @@ export type ActionErrorDetail =
 
 export type ActionErrorCode = ActionErrorDetail['code'];
 
-export type ActionWarningDetail = {
-    code: 'target_missed';
-    targetBytes: number;
-    smallestBytes: number;
-};
+export type ActionWarningDetail =
+    | { code: 'target_missed'; targetBytes: number; smallestBytes: number }
+    | { code: 'animation_lost'; frames: number }
+    | { code: 'pdf_not_smaller' };
 
 export type ActionWarningCode = ActionWarningDetail['code'];

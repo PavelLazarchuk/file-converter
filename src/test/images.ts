@@ -10,9 +10,20 @@ export type FixtureOptions = {
     noise?: boolean;
     exif?: boolean;
     alpha?: boolean;
+    frames?: number;
 };
 
-function pixels({ width, height, noise, alpha }: Required<Omit<FixtureOptions, 'name' | 'exif'>>) {
+function pixels({
+    width,
+    height,
+    noise,
+    alpha,
+}: {
+    width: number;
+    height: number;
+    noise: boolean;
+    alpha: boolean;
+}) {
     const channels = alpha ? 4 : 3;
     const data = Buffer.alloc(width * height * channels);
 
@@ -34,9 +45,24 @@ export async function imageBuffer(
     format: 'jpeg' | 'png' | 'webp' | 'gif',
     options: FixtureOptions = {}
 ): Promise<Buffer> {
-    const { width = 40, height = 30, noise = false, alpha = false, exif = false } = options;
-    const { data, channels } = pixels({ width, height, noise, alpha });
-    let pipeline = sharp(data, { raw: { width, height, channels: channels as 3 | 4 } });
+    const {
+        width = 40,
+        height = 30,
+        noise = false,
+        alpha = false,
+        exif = false,
+        frames = 1,
+    } = options;
+    const strip = height * frames;
+    const { data, channels } = pixels({ width, height: strip, noise, alpha });
+    let pipeline = sharp(data, {
+        raw: {
+            width,
+            height: strip,
+            channels: channels as 3 | 4,
+            ...(frames > 1 ? { pageHeight: height } : {}),
+        },
+    });
 
     if (exif) pipeline = pipeline.withExif({ IFD0: { Copyright: 'test-suite' } });
 

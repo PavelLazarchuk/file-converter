@@ -10,8 +10,14 @@ export function contentSecurityPolicy(isDev: boolean): string {
         'frame-ancestors': ["'none'"],
         'form-action': ["'self'"],
         'script-src': isDev
-            ? ["'self'", "'unsafe-inline'", "'unsafe-eval'", VERCEL_DEV_SCRIPTS]
-            : ["'self'", "'unsafe-inline'"],
+            ? [
+                  "'self'",
+                  "'unsafe-inline'",
+                  "'unsafe-eval'",
+                  "'wasm-unsafe-eval'",
+                  VERCEL_DEV_SCRIPTS,
+              ]
+            : ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'"],
         'style-src': ["'self'", "'unsafe-inline'"],
         'img-src': ["'self'", 'data:', 'blob:'],
         'font-src': ["'self'", 'data:'],

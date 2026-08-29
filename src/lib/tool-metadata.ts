@@ -14,12 +14,14 @@ export async function toolMetadata(
         | 'Compress'
         | 'Convert'
         | 'Watermark'
+        | 'WatermarkPdf'
         | 'Filters'
         | 'MetadataTool'
         | 'Placeholder'
         | 'MergePdf'
         | 'SplitPdf'
         | 'OrganizePdf'
+        | 'CompressPdf'
         | 'ImagesToPdf',
     path: string
 ): Promise<Metadata> {

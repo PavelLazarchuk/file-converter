@@ -50,6 +50,7 @@ export type FieldMessage =
     | { k: 'icoPackInvalid' }
     | { k: 'chooseSplitMode' }
     | { k: 'chooseOrganizeMode' }
+    | { k: 'choosePdfLevel' }
     | { k: 'pageRangeInvalid' }
     | { k: 'pageRangeRequired' };
 

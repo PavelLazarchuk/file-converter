@@ -246,6 +246,62 @@ describe('batching', () => {
     });
 });
 
+describe('processing in the browser', () => {
+    it('never reaches the server when every file is handled locally', async () => {
+        const action = actionReturning({ success: true, files: [resultFile()] });
+        const local = vi.fn(async () => resultFile({ filename: 'photo-compressed.png' }));
+        const { result } = renderHook(() => useFileAction(action, 'images.zip', { local }));
+
+        act(() => result.current.run([upload('a.png'), upload('b.png')], { quality: '80' }));
+        await waitFor(() => expect(result.current.outcome).not.toBeNull());
+
+        expect(action).not.toHaveBeenCalled();
+        expect(local).toHaveBeenCalledTimes(2);
+        expect(result.current.outcome?.files).toHaveLength(2);
+    });
+
+    it('renames a locally produced batch so a zip cannot carry two of the same entry', async () => {
+        const action = actionReturning({ success: true, files: [resultFile()] });
+        const local = vi.fn(async () => resultFile({ filename: 'photo.png' }));
+        const { result } = renderHook(() => useFileAction(action, 'images.zip', { local }));
+
+        act(() => result.current.run([upload('a.png'), upload('b.png')], {}));
+        await waitFor(() => expect(result.current.outcome).not.toBeNull());
+
+        expect(result.current.outcome?.files.map(entry => entry.file.filename)).toEqual([
+            'photo.png',
+            'photo-2.png',
+        ]);
+    });
+
+    it('falls back to the server for the whole batch when one file is not eligible', async () => {
+        const action = actionReturning({ success: true, files: [resultFile()] });
+        const local = vi
+            .fn<(upload: { file: File }) => Promise<ActionFile | null>>()
+            .mockResolvedValueOnce(resultFile())
+            .mockResolvedValueOnce(null);
+        const { result } = renderHook(() => useFileAction(action, 'images.zip', { local }));
+
+        act(() => result.current.run([upload('a.png'), upload('b.png')], {}));
+        await waitFor(() => expect(action).toHaveBeenCalled());
+
+        expect(action.mock.calls[0][0].getAll('file')).toHaveLength(2);
+    });
+
+    it('falls back to the server when the browser codec throws', async () => {
+        const action = actionReturning({ success: true, files: [resultFile()] });
+        const local = vi.fn(async () => {
+            throw new Error('wasm unavailable');
+        });
+        const { result } = renderHook(() => useFileAction(action, 'images.zip', { local }));
+
+        act(() => result.current.run([upload('a.png')], {}));
+        await waitFor(() => expect(action).toHaveBeenCalled());
+
+        expect(result.current.outcome?.files).toHaveLength(1);
+    });
+});
+
 describe('automatic downloads', () => {
     it('stays off by default', async () => {
         const action = actionReturning({ success: true, files: [resultFile()] });

@@ -1,6 +1,6 @@
-import { IMAGE_FORMATS, fitPads, type ImageFormat } from '../image';
+import { IMAGE_FORMATS, fitPads, isAnimated, type ImageFormat } from '../image';
 import type { ResizeValues } from '../schemas';
-import { decode, type PipelineOutput, type SourceImage } from './core';
+import { decode, lostAnimation, type PipelineOutput, type SourceImage } from './core';
 
 export type ResizeParams = ResizeValues & {
     withoutEnlargement: boolean;
@@ -13,7 +13,8 @@ export async function resizePipeline(
 ): Promise<PipelineOutput> {
     const background =
         source.format === 'jpeg' ? { r: 255, g: 255, b: 255 } : { r: 0, g: 0, b: 0, alpha: 0 };
-    let pipeline = decode(source.buffer);
+    const animated = isAnimated(source.metadata) && rotate === '0';
+    let pipeline = decode(source.buffer, { animated });
 
     if (rotate !== '0') pipeline = pipeline.rotate(Number(rotate));
 
@@ -32,7 +33,8 @@ export async function resizePipeline(
 
     return {
         data,
-        filename: `${source.baseName}-${info.width}x${info.height}.${extension}`,
+        filename: `${source.baseName}-${info.width}x${info.pageHeight ?? info.height}.${extension}`,
         mimeType,
+        ...(animated ? undefined : lostAnimation(source)),
     };
 }

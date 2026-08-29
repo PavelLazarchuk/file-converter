@@ -5,7 +5,9 @@
     "private": true,
     "sideEffects": false,
     "scripts": {
+        "predev": "node scripts/copy-codecs.mjs",
         "dev": "next dev",
+        "prebuild": "node scripts/copy-codecs.mjs",
         "build": "next build",
         "start": "next start",
         "lint": "eslint .",
@@ -16,7 +18,9 @@
         "typecheck": "next typegen && tsc --noEmit",
         "prepare": "husky",
         "test": "vitest run",
-        "test:watch": "vitest"
+        "test:watch": "vitest",
+        "codecs": "node scripts/copy-codecs.mjs",
+        "codecs:check": "node scripts/copy-codecs.mjs --check"
     },
     "homepage": "https://file-converter-mu-seven.vercel.app",
     "repository": {
@@ -33,6 +37,9 @@
     ],
     "dependencies": {
         "@hookform/resolvers": "^5.7.1",
+        "@jsquash/jpeg": "^1.6.0",
+        "@jsquash/png": "^3.1.1",
+        "@jsquash/webp": "^1.5.0",
         "@vercel/analytics": "^2.0.1",
         "@vercel/speed-insights": "^2.0.0",
         "class-variance-authority": "^0.7.1",

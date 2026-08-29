@@ -84,6 +84,7 @@ describe('mergePdfs', () => {
         const sources = await Promise.all(
             [2, 3].map(async (pages, index) => ({
                 document: await loadPdf(await pdfWith(pages, `source-${index}`)),
+                buffer: Buffer.alloc(0),
                 name: `file-${index}.pdf`,
                 baseName: `file-${index}`,
                 size: 0,
@@ -98,7 +99,16 @@ describe('mergePdfs', () => {
     it('drops the sources’ title, because each page is rebuilt in a fresh document', async () => {
         const document = await loadPdf(await pdfWith(1, 'secret internal draft'));
         const merged = await PDFDocument.load(
-            await mergePdfs([{ document, name: 'a.pdf', baseName: 'a', size: 0, pageCount: 1 }])
+            await mergePdfs([
+                {
+                    document,
+                    buffer: Buffer.alloc(0),
+                    name: 'a.pdf',
+                    baseName: 'a',
+                    size: 0,
+                    pageCount: 1,
+                },
+            ])
         );
 
         expect(merged.getTitle()).toBeUndefined();

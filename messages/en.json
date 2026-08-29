@@ -40,6 +40,10 @@
             "title": "Watermark",
             "description": "Stamp text or a logo onto a batch — nine positions or a repeated diagonal tile, adjustable size, margin and opacity."
         },
+        "watermarkPdf": {
+            "title": "Watermark PDF",
+            "description": "Stamp text across every page of a PDF — nine positions or a repeated tile, any angle, without rebuilding the document."
+        },
         "filters": {
             "title": "Filters",
             "description": "Turn a batch black & white or sepia, invert it, or dial brightness, saturation, hue and blur by hand."
@@ -63,6 +67,10 @@
         "organizePdf": {
             "title": "Organize PDF",
             "description": "Delete pages from a PDF or move them into a different order — the document keeps its title and author."
+        },
+        "compressPdf": {
+            "title": "Compress PDF",
+            "description": "Shrink a PDF by re-encoding the photos inside it — scans and image-heavy documents lose the most weight."
         },
         "imagesToPdf": {
             "title": "Images to PDF",
@@ -237,6 +245,14 @@
             "vivid": "Vivid",
             "cool": "Cool",
             "soft": "Soft focus"
+        },
+        "pdfCompressLevels": {
+            "light": "Light",
+            "lightHint": "Re-encodes the photos at high quality and keeps every pixel. Safest for print.",
+            "balanced": "Balanced",
+            "balancedHint": "Re-encodes at a visible-but-clean quality and caps photos at {width}px wide.",
+            "strong": "Strong",
+            "strongHint": "Squeezes hardest and caps photos at {width}px wide. Best for screen reading."
         }
     },
     "Uploads": {
@@ -316,7 +332,8 @@
         "metadataNote": "All metadata (EXIF, GPS location, ICC profile, XMP) is stripped from the output.",
         "pending": "Compressing…",
         "submit": "Compress",
-        "submitDownload": "Compress & download"
+        "submitDownload": "Compress & download",
+        "inBrowser": "JPEG and WEBP files under {max} are compressed right here in your browser — they never reach the server."
     },
     "Resize": {
         "metaTitle": "Resize an image",
@@ -438,7 +455,8 @@
         "buildPackDownload": "Build favicon pack & download",
         "pending": "Converting…",
         "submit": "Convert",
-        "submitDownload": "Convert & download"
+        "submitDownload": "Convert & download",
+        "inBrowser": "Conversions between JPEG, PNG and WEBP run right here in your browser for files under {max} — they never reach the server."
     },
     "Watermark": {
         "metaTitle": "Add a watermark to an image",
@@ -690,10 +708,13 @@
         "logo_missing": "Upload the image to use as the watermark.",
         "logo_too_large": "The images and the watermark image add up to more than {max}. Use a smaller watermark, or fewer images.",
         "transport_failed": "The request could not be sent. Check your connection and try again.",
-        "unknown": "Something went wrong while processing the image."
+        "unknown": "Something went wrong while processing the image.",
+        "unsupported_text": "The watermark uses characters the built-in PDF fonts can't draw. Latin letters, digits and punctuation work."
     },
     "Warnings": {
-        "target_missed": "Couldn't reach {target} at these dimensions — the smallest this image compresses to is {smallest}. Resize it first for anything smaller."
+        "target_missed": "Couldn't reach {target} at these dimensions — the smallest this image compresses to is {smallest}. Resize it first for anything smaller.",
+        "animation_lost": "Only the first of {frames} frames came through — the result is a still image.",
+        "pdf_not_smaller": "This PDF was already as small as it gets, so the original came back untouched."
     },
     "Form": {
         "required": "{label} is required",
@@ -714,6 +735,7 @@
         "choosePageSize": "Choose a page size",
         "chooseSplitMode": "Choose what to produce",
         "chooseOrganizeMode": "Choose what to do with the pages.",
+        "choosePdfLevel": "Choose how hard to compress",
         "pageRangeInvalid": "Pages must look like 1-3, 5, 8-10",
         "pageRangeRequired": "Choose the pages, like 1-3, 5",
         "watermarkTextRequired": "Watermark text is required",
@@ -757,5 +779,37 @@
         "blue": "Blue accent",
         "green": "Green accent",
         "rose": "Rose accent"
+    },
+    "WatermarkPdf": {
+        "metaTitle": "Add a watermark to a PDF",
+        "metaDescription": "Stamp text across every page of a PDF — nine positions or a repeated diagonal tile, any angle, adjustable size, margin and opacity. The document keeps its title, author and outline.",
+        "heading": "Watermark PDF",
+        "intro": "Stamp DRAFT, CONFIDENTIAL or your own line across every page. The stamp is drawn into the pages you uploaded, so the document keeps its title, author and outline.",
+        "text": "Text",
+        "textPlaceholder": "e.g. CONFIDENTIAL",
+        "color": "Color",
+        "layout": "Layout",
+        "layoutHint": "Tile repeats the stamp across the whole page — position is ignored and the margin becomes the gap between repeats.",
+        "position": "Position",
+        "scale": "Size (% of page width)",
+        "opacity": "Opacity (%)",
+        "margin": "Margin (pt)",
+        "marginTile": "Gap (pt)",
+        "angle": "Angle (° clockwise)",
+        "note": "The stamp is drawn on top of every page, in the standard Helvetica the PDF viewer already has — nothing is embedded and nothing is rasterized.",
+        "pending": "Stamping…",
+        "submit": "Add watermark",
+        "submitDownload": "Add watermark & download"
+    },
+    "CompressPdf": {
+        "metaTitle": "Compress a PDF",
+        "metaDescription": "Shrink a PDF by re-encoding the JPEG images inside it — pick how hard to squeeze, and the pages, text and outline stay exactly as they were.",
+        "heading": "Compress PDF",
+        "intro": "Scans and photo-heavy documents carry their weight in images. This re-encodes those images and leaves the text, fonts and page structure untouched.",
+        "level": "How hard to squeeze",
+        "note": "Only the JPEG photos inside the document are re-encoded — text, vector art and fonts come through byte for byte. A PDF that is all text has nothing to shed and comes back as it was.",
+        "pending": "Compressing…",
+        "submit": "Compress PDF",
+        "submitDownload": "Compress & download"
     }
 }

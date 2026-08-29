@@ -25,6 +25,7 @@ import { Switch } from '@/components/ui/switch';
 import { usePendingLabel, useFileAction } from '@/hooks/use-file-action';
 import { useFileSize } from '@/hooks/use-messages';
 import { convertImage } from '@/lib/actions';
+import { LOCAL_MAX_FILE_SIZE_LABEL, convertLocally, isLocalCodec } from '@/lib/local-codec';
 import { downloadFile } from '@/lib/download';
 import {
     BASE64_OUTPUTS,
@@ -70,7 +71,15 @@ export function ConvertForm() {
     const [icoSizes, setIcoSizes] = useState<number[]>([...DEFAULT_ICO_SIZES]);
     const [icoPack, setIcoPack] = useState(false);
     const { isPending, outcome, isLeaving, progress, run, clearResult, downloadAll, autoDownload } =
-        useFileAction(convertImage, 'converted-images.zip');
+        useFileAction(convertImage, 'converted-images.zip', {
+            local: (upload, params) =>
+                convertLocally(
+                    upload,
+                    params.format as ConvertTarget,
+                    Number(params.quality ?? DEFAULT_QUALITY),
+                    params.keepMetadata === true
+                ),
+        });
 
     const {
         control,
@@ -425,6 +434,12 @@ export function ConvertForm() {
                         </div>
                     ))}
                 </div>
+            )}
+
+            {removeMetadata && target && isLocalCodec(target) && (
+                <p className="text-sm text-muted-foreground">
+                    {t('inBrowser', { max: LOCAL_MAX_FILE_SIZE_LABEL })}
+                </p>
             )}
 
             {outcome && (

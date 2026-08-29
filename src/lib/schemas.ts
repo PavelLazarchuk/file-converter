@@ -16,6 +16,7 @@ import {
     HUE_LIMITS,
     ICO_SIZE_OPTIONS,
     PAGE_RANGE_MAX_LENGTH,
+    PDF_COMPRESS_LEVEL_KEYS,
     PDF_ORGANIZE_MODE_KEYS,
     PDF_PAGE_SIZE_KEYS,
     PDF_SPLIT_MODE_KEYS,
@@ -102,34 +103,43 @@ export const filterSchema = z.object({
     blur: integerInRange(BLUR_LIMITS.min, BLUR_LIMITS.max, 'blur'),
 });
 
+const watermarkText = z
+    .string()
+    .trim()
+    .max(
+        WATERMARK_TEXT_MAX_LENGTH,
+        fieldMessage({ k: 'maxLength', max: WATERMARK_TEXT_MAX_LENGTH })
+    );
+
+const watermarkStamp = {
+    text: watermarkText,
+    color: hexColor('textColor'),
+    position: z.enum(WATERMARK_POSITION_KEYS, { error: fieldMessage({ k: 'choosePosition' }) }),
+    opacity: integerInRange(WATERMARK_OPACITY_LIMITS.min, WATERMARK_OPACITY_LIMITS.max, 'opacity'),
+    scale: integerInRange(WATERMARK_SCALE_LIMITS.min, WATERMARK_SCALE_LIMITS.max, 'size'),
+    margin: integerInRange(WATERMARK_MARGIN_LIMITS.min, WATERMARK_MARGIN_LIMITS.max, 'margin'),
+    layout: z.enum(WATERMARK_LAYOUT_KEYS, { error: fieldMessage({ k: 'chooseWatermarkLayout' }) }),
+    angle: integerInRange(WATERMARK_ANGLE_LIMITS.min, WATERMARK_ANGLE_LIMITS.max, 'angle'),
+};
+
 export const watermarkSchema = z
     .object({
         mode: z.enum(WATERMARK_MODE_KEYS, { error: fieldMessage({ k: 'chooseWatermarkMode' }) }),
-        text: z
-            .string()
-            .trim()
-            .max(
-                WATERMARK_TEXT_MAX_LENGTH,
-                fieldMessage({ k: 'maxLength', max: WATERMARK_TEXT_MAX_LENGTH })
-            ),
-        color: hexColor('textColor'),
-        position: z.enum(WATERMARK_POSITION_KEYS, { error: fieldMessage({ k: 'choosePosition' }) }),
-        opacity: integerInRange(
-            WATERMARK_OPACITY_LIMITS.min,
-            WATERMARK_OPACITY_LIMITS.max,
-            'opacity'
-        ),
-        scale: integerInRange(WATERMARK_SCALE_LIMITS.min, WATERMARK_SCALE_LIMITS.max, 'size'),
-        margin: integerInRange(WATERMARK_MARGIN_LIMITS.min, WATERMARK_MARGIN_LIMITS.max, 'margin'),
-        layout: z.enum(WATERMARK_LAYOUT_KEYS, {
-            error: fieldMessage({ k: 'chooseWatermarkLayout' }),
-        }),
-        angle: integerInRange(WATERMARK_ANGLE_LIMITS.min, WATERMARK_ANGLE_LIMITS.max, 'angle'),
+        ...watermarkStamp,
     })
     .refine(values => values.mode !== 'text' || values.text.length > 0, {
         error: fieldMessage({ k: 'watermarkTextRequired' }),
         path: ['text'],
     });
+
+export const watermarkPdfSchema = z.object({
+    ...watermarkStamp,
+    text: watermarkText.min(1, fieldMessage({ k: 'watermarkTextRequired' })),
+});
+
+export const compressPdfSchema = z.object({
+    level: z.enum(PDF_COMPRESS_LEVEL_KEYS, { error: fieldMessage({ k: 'choosePdfLevel' }) }),
+});
 
 export const compressSchema = z.object({
     mode: z.enum(COMPRESS_MODES, { error: fieldMessage({ k: 'chooseCompressMode' }) }),
@@ -255,3 +265,7 @@ export type RotateInput = z.input<typeof rotateSchema>;
 export type RotateValues = z.output<typeof rotateSchema>;
 export type WatermarkInput = z.input<typeof watermarkSchema>;
 export type WatermarkValues = z.output<typeof watermarkSchema>;
+export type WatermarkPdfInput = z.input<typeof watermarkPdfSchema>;
+export type WatermarkPdfValues = z.output<typeof watermarkPdfSchema>;
+export type CompressPdfInput = z.input<typeof compressPdfSchema>;
+export type CompressPdfValues = z.output<typeof compressPdfSchema>;

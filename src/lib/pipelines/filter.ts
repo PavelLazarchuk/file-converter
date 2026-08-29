@@ -1,7 +1,7 @@
 import type { Matrix3x3 } from 'sharp';
 
 import { IMAGE_FORMATS, filterSuffix, type FilterOptions, type ImageFormat } from '../image';
-import { decode, type PipelineOutput, type SourceImage } from './core';
+import { decode, lostAnimation, type PipelineOutput, type SourceImage } from './core';
 
 export type FilterParams = FilterOptions & { keepMetadata: boolean };
 
@@ -40,5 +40,10 @@ export async function filterPipeline(
     const { extension, mimeType } = IMAGE_FORMATS[source.format];
     const suffix = filterSuffix({ effect, brightness, saturation, hue, blur, sharpen });
 
-    return { data, filename: `${source.baseName}-${suffix}.${extension}`, mimeType };
+    return {
+        data,
+        filename: `${source.baseName}-${suffix}.${extension}`,
+        mimeType,
+        ...lostAnimation(source),
+    };
 }

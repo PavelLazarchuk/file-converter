@@ -35,6 +35,22 @@ export function targetTakesQuality(target: ConvertTarget): target is ConvertQual
     return (CONVERT_QUALITY_TARGET_KEYS as readonly string[]).includes(target);
 }
 
+export const ANIMATED_TARGET_KEYS = ['gif', 'webp'] as const;
+
+export function keepsAnimation(target: ConvertTarget): boolean {
+    return (ANIMATED_TARGET_KEYS as readonly string[]).includes(target);
+}
+
+export type FrameSource = { pages?: number };
+
+export function frameCount(metadata: FrameSource): number {
+    return Math.max(1, metadata.pages ?? 1);
+}
+
+export function isAnimated(metadata: FrameSource): boolean {
+    return frameCount(metadata) > 1;
+}
+
 export const IMAGE_FORMATS: Record<ConvertTarget, { mimeType: string; extension: string }> = {
     jpeg: { mimeType: 'image/jpeg', extension: 'jpg' },
     png: { mimeType: 'image/png', extension: 'png' },
@@ -576,6 +592,14 @@ export function conversionTargets(sourceMimeTypes: readonly string[]): ConvertTa
 
 export const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
+export type Rgb = { r: number; g: number; b: number };
+
+export function hexToRgb(hex: string): Rgb {
+    const value = Number.parseInt(hex.slice(1), 16);
+
+    return { r: (value >> 16) & 255, g: (value >> 8) & 255, b: value & 255 };
+}
+
 export const PLACEHOLDER_TEXT_MAX_LENGTH = 60;
 
 export const PLACEHOLDER_DEFAULTS = {
@@ -620,6 +644,23 @@ export const PDF_ORGANIZE_MODE_KEYS = ['remove', 'reorder'] as const;
 export type PdfOrganizeMode = (typeof PDF_ORGANIZE_MODE_KEYS)[number];
 
 export const MAX_PDF_PARTS = MAX_BATCH_FILES;
+
+export const PDF_COMPRESS_LEVEL_KEYS = ['light', 'balanced', 'strong'] as const;
+
+export type PdfCompressLevel = (typeof PDF_COMPRESS_LEVEL_KEYS)[number];
+
+export const PDF_COMPRESS_LEVELS: Record<
+    PdfCompressLevel,
+    { quality: number; maxWidth: number | null }
+> = {
+    light: { quality: 82, maxWidth: null },
+    balanced: { quality: 65, maxWidth: 2000 },
+    strong: { quality: 45, maxWidth: 1200 },
+};
+
+export const MIN_RECOMPRESSED_IMAGE_BYTES = 4096;
+
+export const MAX_PDF_WATERMARK_TILES = 400;
 
 export const PAGE_RANGE_MAX_LENGTH = 200;
 

@@ -2,6 +2,7 @@ import {
     Combine,
     Crop,
     Scale,
+    FileSignature,
     FileStack,
     FileText,
     Gauge,
@@ -12,6 +13,7 @@ import {
     Scaling,
     Scissors,
     ScanSearch,
+    Shrink,
     Stamp,
     type LucideIcon,
 } from 'lucide-react';
@@ -52,12 +54,14 @@ export type ToolKey =
     | 'compress'
     | 'convert'
     | 'watermark'
+    | 'watermarkPdf'
     | 'filters'
     | 'metadata'
     | 'placeholder'
     | 'mergePdf'
     | 'splitPdf'
     | 'organizePdf'
+    | 'compressPdf'
     | 'imagesToPdf';
 
 export type Tool = {
@@ -153,6 +157,14 @@ export const TOOLS: readonly Tool[] = [
         intake: RASTER_INTAKE,
     },
     {
+        key: 'watermarkPdf',
+        href: '/watermark-pdf',
+        icon: FileSignature,
+        gradient: 'from-cyan-500 to-blue-700',
+        accent: ['#06b6d4', '#1d4ed8'],
+        intake: PDF_INTAKE,
+    },
+    {
         key: 'filters',
         href: '/filters',
         icon: Palette,
@@ -198,6 +210,14 @@ export const TOOLS: readonly Tool[] = [
         gradient: 'from-purple-500 to-indigo-600',
         accent: ['#a855f7', '#4f46e5'],
         intake: SINGLE_PDF_INTAKE,
+    },
+    {
+        key: 'compressPdf',
+        href: '/compress-pdf',
+        icon: Shrink,
+        gradient: 'from-orange-500 to-red-600',
+        accent: ['#f97316', '#dc2626'],
+        intake: PDF_INTAKE,
     },
     {
         key: 'imagesToPdf',

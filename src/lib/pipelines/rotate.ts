@@ -1,6 +1,6 @@
 import { IMAGE_FORMATS, rotateSuffix, type ImageFormat } from '../image';
 import type { RotateValues } from '../schemas';
-import { decode, type PipelineOutput, type SourceImage } from './core';
+import { decode, lostAnimation, type PipelineOutput, type SourceImage } from './core';
 
 export type RotateParams = RotateValues & {
     flipHorizontal: boolean;
@@ -33,5 +33,10 @@ export async function rotatePipeline(
     const { extension, mimeType } = IMAGE_FORMATS[source.format];
     const suffix = rotateSuffix({ angle, flipHorizontal, flipVertical });
 
-    return { data, filename: `${source.baseName}-${suffix}.${extension}`, mimeType };
+    return {
+        data,
+        filename: `${source.baseName}-${suffix}.${extension}`,
+        mimeType,
+        ...lostAnimation(source),
+    };
 }

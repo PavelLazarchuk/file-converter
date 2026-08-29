@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
     compareFormats,
     compressImage,
+    compressPdf,
     convertImage,
     cropImage,
     filterImage,
@@ -18,6 +19,7 @@ import {
     splitPdf,
     stripImageMetadata,
     watermarkImage,
+    watermarkPdf,
     type ActionFile,
     type ActionResult,
 } from './actions';
@@ -1195,6 +1197,95 @@ describe('upload limits', () => {
                 error: 'File is too large. The maximum size is 20MB.',
             },
         ]);
+    });
+});
+
+describe('watermarkPdf', () => {
+    const settings = {
+        text: 'CONFIDENTIAL',
+        color: '#ff0000',
+        position: 'center',
+        opacity: '25',
+        scale: '40',
+        margin: '24',
+        layout: 'single',
+        angle: '45',
+    };
+
+    it('stamps a batch and keeps each document’s own name and title', async () => {
+        const { files } = expectSuccess(
+            await watermarkPdf(
+                form(
+                    [
+                        await pdfFile('report.pdf', 2, 'Quarterly report'),
+                        await pdfFile('appendix.pdf', 1),
+                    ],
+                    settings
+                )
+            )
+        );
+
+        expect(files.map(file => file.filename)).toEqual([
+            'report-watermarked.pdf',
+            'appendix-watermarked.pdf',
+        ]);
+        expect(await PDFDocument.load(files[0].data).then(pdf => pdf.getTitle())).toBe(
+            'Quarterly report'
+        );
+    });
+
+    it('refuses text the standard PDF fonts cannot draw', async () => {
+        expect(
+            expectFailure(
+                await watermarkPdf(
+                    form([await pdfFile('report.pdf', 1)], { ...settings, text: 'Секретно' })
+                )
+            ).code
+        ).toBe('unsupported_text');
+    });
+
+    it('rejects an empty stamp instead of writing a blank one', async () => {
+        expect(
+            expectFailure(
+                await watermarkPdf(
+                    form([await pdfFile('report.pdf', 1)], { ...settings, text: '' })
+                )
+            ).code
+        ).toBe('invalid_settings');
+    });
+});
+
+describe('compressPdf', () => {
+    it('rejects a level it does not know', async () => {
+        expect(
+            expectFailure(
+                await compressPdf(form([await pdfFile('scan.pdf', 1)], { level: 'brutal' }))
+            ).code
+        ).toBe('invalid_settings');
+    });
+
+    it('hands a text-only PDF back untouched, with a warning', async () => {
+        const source = await pdfFile('memo.pdf', 1);
+        const { files } = expectSuccess(await compressPdf(form([source], { level: 'strong' })));
+
+        expect(files[0].filename).toBe('memo-compressed.pdf');
+        expect(files[0].warning).toEqual({ code: 'pdf_not_smaller' });
+        expect(warningText(files[0].warning!)).toContain('already');
+    });
+
+    it('collects the unreadable file and still compresses the rest', async () => {
+        const broken = new File([new Uint8Array([1, 2, 3, 4])], 'broken.pdf', {
+            type: 'application/pdf',
+        });
+        const result = expectSuccess(
+            await compressPdf(form([broken, await pdfFile('scan.pdf', 1)], { level: 'light' }))
+        );
+
+        expect(result.files).toHaveLength(1);
+        expect(result.failures?.[0]).toEqual({
+            filename: 'broken.pdf',
+            detail: { code: 'unreadable_pdf' },
+        });
     });
 });
 

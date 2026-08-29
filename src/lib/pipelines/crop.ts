@@ -6,7 +6,7 @@ import {
     type Size,
 } from '../image';
 import type { CropValues } from '../schemas';
-import { decode, sourceSize, type PipelineOutput, type SourceImage } from './core';
+import { decode, lostAnimation, sourceSize, type PipelineOutput, type SourceImage } from './core';
 
 export type CropParams = CropValues & {
     target: Size | null;
@@ -52,5 +52,6 @@ export async function cropPipeline(
         data,
         filename: `${source.baseName}-${ratioLabel}${shapeLabel}.${extension}`,
         mimeType,
+        ...lostAnimation(source),
     };
 }

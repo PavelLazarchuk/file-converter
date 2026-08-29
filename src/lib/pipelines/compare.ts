@@ -1,6 +1,6 @@
 import { IMAGE_FORMATS, type ImageFormat } from '../image';
 import { applyQuality, createDecoder } from './compress';
-import type { PipelineOutput, SourceImage } from './core';
+import { lostAnimation, type PipelineOutput, type SourceImage } from './core';
 
 export type CompareParams = { quality: number };
 
@@ -10,13 +10,19 @@ export async function comparePipeline(
     { quality }: CompareParams
 ): Promise<PipelineOutput[]> {
     const nextPipeline = await createDecoder(source.buffer, source.metadata);
+    const stillOnly = lostAnimation(source);
     const outputs: PipelineOutput[] = [];
 
     for (const format of formats) {
         const { extension, mimeType } = IMAGE_FORMATS[format];
         const data = await applyQuality(nextPipeline(), format, quality).toBuffer();
 
-        outputs.push({ data, filename: `${source.baseName}.${extension}`, mimeType });
+        outputs.push({
+            data,
+            filename: `${source.baseName}.${extension}`,
+            mimeType,
+            ...stillOnly,
+        });
     }
 
     return outputs;

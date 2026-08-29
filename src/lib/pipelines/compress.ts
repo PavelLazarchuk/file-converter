@@ -4,7 +4,7 @@ import sharp from 'sharp';
 import { IMAGE_FORMATS, QUALITY_LIMITS, type ImageFormat } from '../image';
 import { Logger } from '../logger';
 import type { CompressValues } from '../schemas';
-import { decode, fail, type PipelineOutput, type SourceImage } from './core';
+import { decode, fail, lostAnimation, type PipelineOutput, type SourceImage } from './core';
 
 const RAW_REUSE_MAX_PIXELS = 24_000_000;
 const MAX_QUALITY_STEPS = 7;
@@ -72,7 +72,7 @@ async function compressToTarget(
         }
     }
 
-    if (best) return { data: best, filename, mimeType };
+    if (best) return { data: best, filename, mimeType, ...lostAnimation(source) };
 
     if (!smallest) throw fail({ code: 'compress_failed' });
 
@@ -109,5 +109,5 @@ export async function compressPipeline(
 
     const data = await applyQuality(decode(source.buffer), source.format, quality).toBuffer();
 
-    return { data, filename, mimeType };
+    return { data, filename, mimeType, ...lostAnimation(source) };
 }

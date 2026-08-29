@@ -1,7 +1,14 @@
 import { describeMetadata } from '../exif';
 import { IMAGE_FORMATS, STRIP_QUALITY, type ImageFormat } from '../image';
 import { METADATA_MIME_TYPE } from '../metadata';
-import { decode, fail, hasStrippableMetadata, type PipelineOutput, type SourceImage } from './core';
+import {
+    decode,
+    fail,
+    hasStrippableMetadata,
+    lostAnimation,
+    type PipelineOutput,
+    type SourceImage,
+} from './core';
 
 export async function inspectPipeline(source: SourceImage<ImageFormat>): Promise<PipelineOutput> {
     const report = describeMetadata(
@@ -28,5 +35,10 @@ export async function stripPipeline(source: SourceImage<ImageFormat>): Promise<P
         .toBuffer();
     const { extension, mimeType } = IMAGE_FORMATS[source.format];
 
-    return { data, filename: `${source.baseName}-clean.${extension}`, mimeType };
+    return {
+        data,
+        filename: `${source.baseName}-clean.${extension}`,
+        mimeType,
+        ...lostAnimation(source),
+    };
 }

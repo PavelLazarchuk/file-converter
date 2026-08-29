@@ -2,7 +2,7 @@ import sharp, { type Metadata } from 'sharp';
 
 import type { ActionErrorCode, ActionErrorDetail, ActionWarningDetail } from '../errors';
 import { parseFieldMessage } from '../form-messages';
-import { MAX_INPUT_PIXELS, type ConvertSource, type Size } from '../image';
+import { MAX_INPUT_PIXELS, frameCount, isAnimated, type ConvertSource, type Size } from '../image';
 
 export class ProcessingError extends Error {
     constructor(readonly detail: ActionErrorDetail) {
@@ -43,8 +43,17 @@ export type PipelineOutput = {
     warning?: ActionWarningDetail;
 };
 
-export function decode(buffer: Buffer) {
-    return sharp(buffer, { limitInputPixels: MAX_INPUT_PIXELS }).autoOrient();
+export function decode(buffer: Buffer, { animated = false } = {}) {
+    return sharp(buffer, {
+        limitInputPixels: MAX_INPUT_PIXELS,
+        ...(animated ? { animated: true } : {}),
+    }).autoOrient();
+}
+
+export function lostAnimation(source: SourceImage): { warning: ActionWarningDetail } | undefined {
+    if (!isAnimated(source.metadata)) return undefined;
+
+    return { warning: { code: 'animation_lost', frames: frameCount(source.metadata) } };
 }
 
 export function sourceSize(metadata: Metadata): Size {

@@ -9,12 +9,12 @@ import { useActionMessage } from '@/hooks/use-messages';
 import type { ActionFailure, ActionFile, ActionResult } from '@/lib/actions';
 import { downloadFile } from '@/lib/download';
 import { renameAll } from '@/lib/filename-template';
-import { BATCH_CHUNK_SIZE, ZIP_MIME_TYPE } from '@/lib/image';
+import { BATCH_CHUNK_SIZE, ZIP_MIME_TYPE, uniqueFilenames } from '@/lib/image';
 import { Logger } from '@/lib/logger';
 import { useFilenameTemplate } from '@/hooks/use-filename-template';
 import { createZip } from '@/lib/zip';
 
-export type Uploaded = { file: File };
+export type Uploaded = { file: File; width?: number; height?: number };
 
 export type OutcomeFile = {
     file: ActionFile;
@@ -114,7 +114,9 @@ export type RunParams = Record<string, string | number | boolean | File>;
 
 export type BatchProgress = { done: number; total: number };
 
-export type FileActionOptions = { chunkSize?: number | null };
+export type LocalRun = (upload: Uploaded, params: RunParams) => Promise<ActionFile | null>;
+
+export type FileActionOptions = { chunkSize?: number | null; local?: LocalRun };
 
 export function chunk<Item>(items: Item[], size: number): Item[][] {
     const groups: Item[][] = [];
@@ -148,7 +150,7 @@ function prefersReducedMotion(): boolean {
 export function useFileAction(
     action: (formData: FormData) => Promise<ActionResult>,
     zipName = 'images.zip',
-    { chunkSize = BATCH_CHUNK_SIZE }: FileActionOptions = {}
+    { chunkSize = BATCH_CHUNK_SIZE, local }: FileActionOptions = {}
 ) {
     const [isPending, startTransition] = useTransition();
     const [outcome, setOutcomeState] = useState<ActionOutcome | null>(null);
@@ -247,11 +249,81 @@ export function useFileAction(
         });
     }
 
+    async function runLocally(images: Uploaded[], params: RunParams): Promise<ActionFile[] | null> {
+        if (!local || !images.length) return null;
+
+        const files: ActionFile[] = [];
+
+        reportProgress(images.length > 1 ? { done: 0, total: images.length } : null);
+
+        for (const [index, image] of images.entries()) {
+            const produced = await local(image, params).catch((error: unknown) => {
+                Logger.warn('action.local_failed', { name: image.file.name, error });
+
+                return null;
+            });
+
+            if (!produced) return null;
+
+            files.push(produced);
+
+            if (images.length > 1) reportProgress({ done: index + 1, total: images.length });
+        }
+
+        const names = uniqueFilenames(files.map(file => file.filename));
+
+        return files.map((file, index) => ({ ...file, filename: names[index] }));
+    }
+
+    async function finish(
+        files: ActionFile[],
+        failures: ActionFailure[],
+        options?: RunOptions
+    ): Promise<void> {
+        reportProgress(null);
+
+        const [first] = failures;
+
+        if (first) {
+            const error = message(first.detail);
+
+            toast.error(
+                failures.length === 1
+                    ? result('failedToast', { name: first.filename, error })
+                    : result('failedToastMany', {
+                          files: common('files', { count: failures.length }),
+                          name: first.filename,
+                          error,
+                      })
+            );
+        }
+
+        if (options?.onResult?.(files) === 'handled') return;
+
+        const described = await Promise.all(files.map(describe));
+
+        setOutcome({ files: described, failures });
+
+        const settled = failures.length === 0 && files.every(file => !file.warning);
+
+        if (autoDownload && settled) {
+            downloadResults(described, zipName, template, copyRef.current);
+        }
+    }
+
     function run(images: Uploaded[], params: RunParams, options?: RunOptions) {
         cancelExit();
 
         startTransition(async () => {
             setOutcome(null);
+
+            const inBrowser = await runLocally(images, params);
+
+            if (inBrowser) {
+                await finish(inBrowser, [], options);
+
+                return;
+            }
 
             const groups = chunkSize && images.length ? chunk(images, chunkSize) : [images];
             const files: ActionFile[] = [];
@@ -285,35 +357,7 @@ export function useFileAction(
                 if (groups.length > 1) reportProgress({ done, total: images.length });
             }
 
-            reportProgress(null);
-
-            const [first] = failures;
-
-            if (first) {
-                const error = message(first.detail);
-
-                toast.error(
-                    failures.length === 1
-                        ? result('failedToast', { name: first.filename, error })
-                        : result('failedToastMany', {
-                              files: common('files', { count: failures.length }),
-                              name: first.filename,
-                              error,
-                          })
-                );
-            }
-
-            if (options?.onResult?.(files) === 'handled') return;
-
-            const described = await Promise.all(files.map(describe));
-
-            setOutcome({ files: described, failures });
-
-            const settled = failures.length === 0 && files.every(file => !file.warning);
-
-            if (autoDownload && settled) {
-                downloadResults(described, zipName, template, copyRef.current);
-            }
+            await finish(files, failures, options);
         });
     }
 
