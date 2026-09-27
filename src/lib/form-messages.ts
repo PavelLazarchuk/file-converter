@@ -51,6 +51,7 @@ export type FieldMessage =
     | { k: 'chooseSplitMode' }
     | { k: 'chooseOrganizeMode' }
     | { k: 'choosePdfLevel' }
+    | { k: 'chooseDpi' }
     | { k: 'pageRangeInvalid' }
     | { k: 'pageRangeRequired' };
 

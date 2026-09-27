@@ -7,7 +7,9 @@ import { toast } from 'sonner';
 import { useAutoDownload } from '@/hooks/use-auto-download';
 import { useActionMessage } from '@/hooks/use-messages';
 import type { ActionFailure, ActionFile, ActionResult } from '@/lib/actions';
+import { yieldToBrowser, type BrowserTool } from '@/lib/browser-tool';
 import { downloadFile } from '@/lib/download';
+import { ProcessingError, type ActionErrorDetail } from '@/lib/errors';
 import { renameAll } from '@/lib/filename-template';
 import { BATCH_CHUNK_SIZE, ZIP_MIME_TYPE, uniqueFilenames } from '@/lib/image';
 import { Logger } from '@/lib/logger';
@@ -118,6 +120,16 @@ export type LocalRun = (upload: Uploaded, params: RunParams) => Promise<ActionFi
 
 export type FileActionOptions = { chunkSize?: number | null; local?: LocalRun };
 
+export type ServerAction = (formData: FormData) => Promise<ActionResult>;
+
+function browserFailure(filename: string, error: unknown): ActionFailure {
+    if (error instanceof ProcessingError) return { filename, detail: error.detail };
+
+    Logger.error('action.browser_failed', { name: filename, error });
+
+    return { filename, detail: { code: 'unknown' } };
+}
+
 export function chunk<Item>(items: Item[], size: number): Item[][] {
     const groups: Item[][] = [];
 
@@ -148,7 +160,7 @@ function prefersReducedMotion(): boolean {
 }
 
 export function useFileAction(
-    action: (formData: FormData) => Promise<ActionResult>,
+    action: ServerAction | BrowserTool,
     zipName = 'images.zip',
     { chunkSize = BATCH_CHUNK_SIZE, local }: FileActionOptions = {}
 ) {
@@ -233,7 +245,11 @@ export function useFileAction(
         if (mountedRef.current) setProgress(next);
     }, []);
 
-    function send(group: Uploaded[], params: RunParams): Promise<ActionResult> {
+    function send(
+        serverAction: ServerAction,
+        group: Uploaded[],
+        params: RunParams
+    ): Promise<ActionResult> {
         const formData = new FormData();
 
         for (const upload of group) formData.append('file', upload.file);
@@ -242,7 +258,7 @@ export function useFileAction(
             formData.append(key, value instanceof File ? value : String(value));
         }
 
-        return action(formData).catch((error: unknown): ActionResult => {
+        return serverAction(formData).catch((error: unknown): ActionResult => {
             Logger.error('action.transport_failed', { files: group.length, error });
 
             return { success: false, detail: { code: 'transport_failed' } };
@@ -311,11 +327,63 @@ export function useFileAction(
         }
     }
 
+    async function runInBrowser(
+        tool: BrowserTool,
+        images: Uploaded[],
+        params: RunParams,
+        options?: RunOptions
+    ): Promise<void> {
+        const files: ActionFile[] = [];
+        const failures: ActionFailure[] = [];
+        const single = images.length === 1;
+
+        reportProgress(single ? null : { done: 0, total: images.length });
+
+        for (const [index, image] of images.entries()) {
+            await yieldToBrowser();
+
+            try {
+                const produced = await tool.inBrowser(image, params, (done, total) => {
+                    if (single && total > 1) reportProgress({ done, total });
+                });
+
+                files.push(...produced);
+            } catch (error) {
+                failures.push(browserFailure(image.file.name, error));
+            }
+
+            if (!single) reportProgress({ done: index + 1, total: images.length });
+        }
+
+        if (!files.length) {
+            const detail: ActionErrorDetail = failures[0]?.detail ?? { code: 'no_file' };
+
+            reportProgress(null);
+            toast.error(message(detail));
+
+            return;
+        }
+
+        const names = uniqueFilenames(files.map(file => file.filename));
+
+        await finish(
+            files.map((file, index) => ({ ...file, filename: names[index] })),
+            failures,
+            options
+        );
+    }
+
     function run(images: Uploaded[], params: RunParams, options?: RunOptions) {
         cancelExit();
 
         startTransition(async () => {
             setOutcome(null);
+
+            if (typeof action !== 'function') {
+                await runInBrowser(action, images, params, options);
+
+                return;
+            }
 
             const inBrowser = await runLocally(images, params);
 
@@ -333,7 +401,7 @@ export function useFileAction(
             reportProgress(groups.length > 1 ? { done, total: images.length } : null);
 
             for (const [index, group] of groups.entries()) {
-                const outcome = await send(group, params);
+                const outcome = await send(action, group, params);
 
                 if (!outcome.success) {
                     if (!files.length) {

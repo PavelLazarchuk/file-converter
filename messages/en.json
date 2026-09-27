@@ -1,7 +1,7 @@
 {
     "Site": {
         "tagline": "Resize, Crop, Compress & Convert",
-        "description": "Free browser tools for images, in batches of up to 20: resize with locked aspect ratio or a social preset, crop to preset ratios or a circle, rotate and flip, compress by quality or target size, convert between JPEG, PNG, WEBP, AVIF, GIF, TIFF, SVG and ICO favicons, stamp a text or logo watermark, inspect EXIF and GPS metadata, combine images into a multi-page PDF, and merge several PDFs into one.",
+        "description": "Free browser tools for images, in batches of up to 20: resize with locked aspect ratio or a social preset, crop to preset ratios or a circle, rotate and flip, compress by quality or target size, convert between JPEG, PNG, WEBP, AVIF, GIF, TIFF, SVG and ICO favicons, stamp a text or logo watermark, inspect EXIF and GPS metadata, combine images into a multi-page PDF, merge several PDFs into one, and turn PDF pages into images.",
         "toolList": "Image Toolbox tools",
         "footerBlurb": "Focused tools for everyday image work — no account, no queue, no watermarks. Uploads are processed in memory and never stored.",
         "footerTools": "Tools",
@@ -75,6 +75,10 @@
         "imagesToPdf": {
             "title": "Images to PDF",
             "description": "Combine JPEG, PNG, WEBP, AVIF, GIF or SVG images into one PDF, a page each, fit to the image or a standard A4/Letter page."
+        },
+        "pdfToImages": {
+            "title": "PDF to JPG",
+            "description": "Turn every page of a PDF, or just the ones you pick, into a JPEG, PNG or WEBP image at 72, 150 or 300 DPI — rendered in your browser."
         }
     },
     "Landing": {
@@ -102,7 +106,8 @@
         "processing": {
             "title": "Where your images are processed",
             "p1": "Processing happens on the server, not in your browser. When you press the button, the file is sent over HTTPS to a Server Action, decoded in memory by sharp, and the result comes straight back in the response.",
-            "p2": "Nothing is written to disk, no database, no object storage, no queue. Once the request finishes, the memory holding your image is released. There is no copy left to download, index or share, and no URL that points at your file."
+            "p2": "Nothing is written to disk, no database, no object storage, no queue. Once the request finishes, the memory holding your image is released. There is no copy left to download, index or share, and no URL that points at your file.",
+            "p3": "PDF to JPG is the exception, and the stricter one: it runs entirely in your browser, so those files are never uploaded at all. The same goes for small JPEG, PNG and WEBP files in Compress and Convert."
         },
         "notCollected": {
             "title": "What is not collected",
@@ -253,6 +258,14 @@
             "balancedHint": "Re-encodes at a visible-but-clean quality and caps photos at {width}px wide.",
             "strong": "Strong",
             "strongHint": "Squeezes hardest and caps photos at {width}px wide. Best for screen reading."
+        },
+        "pdfDpi": {
+            "72": "72 DPI — screen",
+            "150": "150 DPI — documents",
+            "300": "300 DPI — print",
+            "72Hint": "Small files for a quick look or a web page. Text gets soft when you zoom in.",
+            "150Hint": "Sharp enough to read and share, at a fraction of the print size. A good default.",
+            "300Hint": "Print quality. An A4 page comes out around 2480 × 3508 px, so the files are large."
         }
     },
     "Uploads": {
@@ -303,6 +316,10 @@
         "downloadOne": "Download {name}",
         "downloading": "Downloading {name}",
         "downloadingZip": "Downloading {files} as {name}",
+        "share": "Share",
+        "shareAll": "Share all",
+        "shareOne": "Share {name}",
+        "shareFailed": "Could not share the file — download it instead.",
         "discard": "Discard",
         "failed": "{files} could not be processed",
         "failedToast": "{name}: {error}",
@@ -698,7 +715,7 @@
         "page_out_of_range": "This PDF only has {pages, plural, one {# page} other {# pages}} — the range asks for more.",
         "no_pages_selected": "Choose the pages to pull out — a range like 1-3, 5.",
         "no_pages_left": "That would delete every page. Leave at least one behind.",
-        "too_many_parts": "That would make {parts} files. Split up to {max} pages at a time.",
+        "too_many_parts": "That would make {parts} files. Pick up to {max} pages at a time.",
         "rate_limited": "Too many requests — this tool allows {limit} images per minute. Try again in {seconds}s.",
         "invalid_settings": "Invalid settings.",
         "same_format": "Target format must differ from the source format.",
@@ -707,6 +724,7 @@
         "no_metadata": "This file carries no metadata to remove.",
         "logo_missing": "Upload the image to use as the watermark.",
         "logo_too_large": "The images and the watermark image add up to more than {max}. Use a smaller watermark, or fewer images.",
+        "engine_failed": "The converter could not start in this browser. Reload the page and try again, or use an up-to-date browser.",
         "transport_failed": "The request could not be sent. Check your connection and try again.",
         "unknown": "Something went wrong while processing the image.",
         "unsupported_text": "The watermark uses characters the built-in PDF fonts can't draw. Latin letters, digits and punctuation work."
@@ -714,7 +732,8 @@
     "Warnings": {
         "target_missed": "Couldn't reach {target} at these dimensions — the smallest this image compresses to is {smallest}. Resize it first for anything smaller.",
         "animation_lost": "Only the first of {frames} frames came through — the result is a still image.",
-        "pdf_not_smaller": "This PDF was already as small as it gets, so the original came back untouched."
+        "pdf_not_smaller": "This PDF was already as small as it gets, so the original came back untouched.",
+        "page_downscaled": "This page is too large to render at {requested} DPI in a browser, so it came out at {dpi} DPI."
     },
     "Form": {
         "required": "{label} is required",
@@ -767,7 +786,8 @@
             "hue": "Hue rotation",
             "blur": "Blur"
         },
-        "chooseEffect": "Choose an effect"
+        "chooseEffect": "Choose an effect",
+        "chooseDpi": "Choose a resolution"
     },
     "Theme": {
         "group": "Theme",
@@ -811,5 +831,23 @@
         "pending": "Compressing…",
         "submit": "Compress PDF",
         "submitDownload": "Compress & download"
+    },
+    "PdfToImages": {
+        "metaTitle": "PDF to JPG — convert PDF pages to images",
+        "metaDescription": "Convert PDF pages to JPG, PNG or WEBP images at 72, 150 or 300 DPI. Pick the pages you need — the PDF is rendered in your browser and never uploaded.",
+        "heading": "PDF to JPG",
+        "intro": "Turn the pages of a PDF into images — every page, or only the ones you type. The document is rendered right here in your browser.",
+        "format": "Image format",
+        "dpi": "Resolution",
+        "quality": "Quality ({min}–{max})",
+        "qualityHint": "Lower means a smaller file. 80 keeps text crisp; go lower for photo-heavy pages.",
+        "pngNote": "PNG is lossless — the sharpest text, and the largest files.",
+        "pages": "Pages",
+        "pagesPlaceholder": "e.g. 1-3, 5, 8-10",
+        "pagesHint": "Leave empty for every page — up to {max} at a time. Ranges and single pages, separated by commas.",
+        "note": "The PDF never leaves your device: pdf.js draws each page in this tab and the image is encoded here too.",
+        "pending": "Rendering…",
+        "submit": "Convert to images",
+        "submitDownload": "Convert & download"
     }
 }

@@ -41,6 +41,7 @@ const SAMPLES: { [Code in ActionErrorCode]: Extract<ActionErrorDetail, { code: C
     unsupported_text: { code: 'unsupported_text' },
     logo_missing: { code: 'logo_missing' },
     logo_too_large: { code: 'logo_too_large' },
+    engine_failed: { code: 'engine_failed' },
     transport_failed: { code: 'transport_failed' },
     unknown: { code: 'unknown' },
 };
@@ -49,6 +50,7 @@ const WARNINGS: { [Code in ActionWarningCode]: Extract<ActionWarningDetail, { co
     target_missed: { code: 'target_missed', targetBytes: 500_000, smallestBytes: 900_000 },
     animation_lost: { code: 'animation_lost', frames: 24 },
     pdf_not_smaller: { code: 'pdf_not_smaller' },
+    page_downscaled: { code: 'page_downscaled', requested: 300, dpi: 212 },
 };
 
 const warningCodes = Object.keys(WARNINGS) as ActionWarningCode[];
@@ -116,6 +118,13 @@ describe('the warning catalog', () => {
 
     it('counts the frames it could not keep', () => {
         expect(warningText(WARNINGS.animation_lost)).toContain('24');
+    });
+
+    it('names both resolutions of a downscaled page', () => {
+        const message = warningText(WARNINGS.page_downscaled);
+
+        expect(message).toContain('300');
+        expect(message).toContain('212');
     });
 
     it('renders both sizes of a missed compression target', () => {

@@ -22,7 +22,8 @@ export async function toolMetadata(
         | 'SplitPdf'
         | 'OrganizePdf'
         | 'CompressPdf'
-        | 'ImagesToPdf',
+        | 'ImagesToPdf'
+        | 'PdfToImages',
     path: string
 ): Promise<Metadata> {
     const t = await getTranslations({ locale, namespace });

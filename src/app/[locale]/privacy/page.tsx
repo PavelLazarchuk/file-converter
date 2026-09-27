@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: PageProps<'/[locale]/privacy'
 }
 
 const SECTIONS = [
-    { title: 'processing.title', body: ['processing.p1', 'processing.p2'] },
+    { title: 'processing.title', body: ['processing.p1', 'processing.p2', 'processing.p3'] },
     { title: 'notCollected.title', body: ['notCollected.p1', 'notCollected.p2'] },
     { title: 'analytics.title', body: ['analytics.p1', 'analytics.p2'] },
     { title: 'metadata.title', body: ['metadata.p1', 'metadata.p2', 'metadata.p3'] },

@@ -13,6 +13,7 @@ import {
 import {
     compressSchema,
     convertSchema,
+    pdfToImagesSchema,
     cropSchema,
     icoOptionsSchema,
     imageToPdfSchema,
@@ -343,5 +344,35 @@ describe('splitPdfSchema', () => {
         );
         expect(splitPdfSchema.safeParse({ mode: 'separate', pages: '5-3' }).success).toBe(false);
         expect(splitPdfSchema.safeParse({ mode: 'every-other', pages: '1' }).success).toBe(false);
+    });
+});
+
+describe('pdfToImagesSchema', () => {
+    const valid = { format: 'jpeg', dpi: '150', quality: '80', pages: '' };
+
+    it('turns the DPI into a number and an empty range into every page', () => {
+        expect(pdfToImagesSchema.safeParse(valid).data).toEqual({
+            format: 'jpeg',
+            dpi: 150,
+            quality: 80,
+            pages: [],
+        });
+    });
+
+    it('only renders the resolutions and formats it offers', () => {
+        expect(firstError(pdfToImagesSchema.safeParse({ ...valid, dpi: '600' }))).toBe(
+            'Choose a resolution'
+        );
+        expect(pdfToImagesSchema.safeParse({ ...valid, format: 'avif' }).success).toBe(false);
+    });
+
+    it('shares the page-range rules with the split tool', () => {
+        expect(firstError(pdfToImagesSchema.safeParse({ ...valid, pages: '1..3' }))).toBe(
+            'Pages must look like 1-3, 5, 8-10'
+        );
+        expect(pdfToImagesSchema.safeParse({ ...valid, pages: '2, 4-5' }).data?.pages).toEqual([
+            { from: 2, to: 2 },
+            { from: 4, to: 5 },
+        ]);
     });
 });

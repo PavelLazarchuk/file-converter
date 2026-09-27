@@ -41,3 +41,4 @@ yarn-error.log*
 
 # generated codecs
 /public/wasm
+/public/pdfjs

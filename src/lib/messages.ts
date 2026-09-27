@@ -118,6 +118,8 @@ export function actionWarningText(detail: ActionWarningDetail, context: MessageC
             });
         case 'animation_lost':
             return warnings('animation_lost', { frames: detail.frames });
+        case 'page_downscaled':
+            return warnings('page_downscaled', { requested: detail.requested, dpi: detail.dpi });
         default:
             return warnings(detail.code);
     }

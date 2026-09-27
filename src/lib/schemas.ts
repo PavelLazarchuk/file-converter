@@ -4,6 +4,7 @@ import { fieldMessage, type FieldLabel } from './form-messages';
 import {
     BLUR_LIMITS,
     BRIGHTNESS_LIMITS,
+    BROWSER_OUTPUT_KEYS,
     COMPRESS_MODES,
     CONVERT_TARGET_KEYS,
     CROP_RATIO_KEYS,
@@ -19,6 +20,7 @@ import {
     PDF_COMPRESS_LEVEL_KEYS,
     PDF_ORGANIZE_MODE_KEYS,
     PDF_PAGE_SIZE_KEYS,
+    PDF_RENDER_DPI_KEYS,
     PDF_SPLIT_MODE_KEYS,
     PLACEHOLDER_TEXT_MAX_LENGTH,
     QUALITY_LIMITS,
@@ -201,21 +203,17 @@ export const placeholderSchema = z.object({
     format: z.enum(FORMAT_KEYS, { error: fieldMessage({ k: 'chooseOutputFormat' }) }),
 });
 
+const optionalPageRanges = z
+    .string()
+    .trim()
+    .max(PAGE_RANGE_MAX_LENGTH, fieldMessage({ k: 'maxLength', max: PAGE_RANGE_MAX_LENGTH }))
+    .refine(value => parsePageRanges(value) !== null, fieldMessage({ k: 'pageRangeInvalid' }))
+    .transform(value => parsePageRanges(value) ?? []);
+
 export const splitPdfSchema = z
     .object({
         mode: z.enum(PDF_SPLIT_MODE_KEYS, { error: fieldMessage({ k: 'chooseSplitMode' }) }),
-        pages: z
-            .string()
-            .trim()
-            .max(
-                PAGE_RANGE_MAX_LENGTH,
-                fieldMessage({ k: 'maxLength', max: PAGE_RANGE_MAX_LENGTH })
-            )
-            .refine(
-                value => parsePageRanges(value) !== null,
-                fieldMessage({ k: 'pageRangeInvalid' })
-            )
-            .transform(value => parsePageRanges(value) ?? []),
+        pages: optionalPageRanges,
     })
     .refine(values => values.mode !== 'merged' || values.pages.length > 0, {
         error: fieldMessage({ k: 'pageRangeRequired' }),
@@ -231,6 +229,17 @@ export const organizePdfSchema = z.object({
         .max(PAGE_RANGE_MAX_LENGTH, fieldMessage({ k: 'maxLength', max: PAGE_RANGE_MAX_LENGTH }))
         .refine(value => parsePageRanges(value) !== null, fieldMessage({ k: 'pageRangeInvalid' }))
         .transform(value => parsePageRanges(value) ?? []),
+});
+
+const browserOutput = z.enum(BROWSER_OUTPUT_KEYS, {
+    error: fieldMessage({ k: 'chooseOutputFormat' }),
+});
+
+export const pdfToImagesSchema = z.object({
+    format: browserOutput,
+    dpi: z.enum(PDF_RENDER_DPI_KEYS, { error: fieldMessage({ k: 'chooseDpi' }) }).transform(Number),
+    quality: integerInRange(QUALITY_LIMITS.min, QUALITY_LIMITS.max, 'quality'),
+    pages: optionalPageRanges,
 });
 
 export const imageToPdfSchema = z.object({
@@ -257,6 +266,8 @@ export type SplitPdfInput = z.input<typeof splitPdfSchema>;
 export type SplitPdfValues = z.output<typeof splitPdfSchema>;
 export type OrganizePdfInput = z.input<typeof organizePdfSchema>;
 export type OrganizePdfValues = z.output<typeof organizePdfSchema>;
+export type PdfToImagesInput = z.input<typeof pdfToImagesSchema>;
+export type PdfToImagesValues = z.output<typeof pdfToImagesSchema>;
 export type ImageToPdfInput = z.input<typeof imageToPdfSchema>;
 export type ImageToPdfValues = z.output<typeof imageToPdfSchema>;
 export type FilterInput = z.input<typeof filterSchema>;

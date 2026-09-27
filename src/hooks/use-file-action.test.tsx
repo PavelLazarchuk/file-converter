@@ -6,7 +6,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LoadedImage } from '@/components/image-dropzone';
 import { useFileAction } from '@/hooks/use-file-action';
 import type { ActionFile, ActionResult } from '@/lib/actions';
+import type { BrowserTool } from '@/lib/browser-tool';
 import { downloadFile } from '@/lib/download';
+import { fail } from '@/lib/errors';
 import { AUTO_DOWNLOAD_STORAGE_KEY } from '@/lib/preferences';
 
 vi.mock('@/lib/download', () => ({ downloadFile: vi.fn() }));
@@ -299,6 +301,104 @@ describe('processing in the browser', () => {
         await waitFor(() => expect(action).toHaveBeenCalled());
 
         expect(result.current.outcome?.files).toHaveLength(1);
+    });
+});
+
+describe('a tool that only runs in the browser', () => {
+    function tool(inBrowser: BrowserTool['inBrowser']): BrowserTool {
+        return { inBrowser: vi.fn(inBrowser) };
+    }
+
+    it('hands every upload and the raw parameters to the browser, one at a time', async () => {
+        const browser = tool(async ({ file }) => [resultFile({ filename: file.name })]);
+        const { result } = renderHook(() => useFileAction(browser));
+
+        act(() => result.current.run([upload('a.png'), upload('b.png')], { quality: 70 }));
+        await waitFor(() => expect(result.current.outcome?.files).toHaveLength(2));
+
+        expect(vi.mocked(browser.inBrowser).mock.calls.map(([entry]) => entry.file.name)).toEqual([
+            'a.png',
+            'b.png',
+        ]);
+        expect(vi.mocked(browser.inBrowser).mock.calls[0][1]).toEqual({ quality: 70 });
+    });
+
+    it('turns a failing file into a failure on the card and keeps the rest', async () => {
+        const browser = tool(async ({ file }) => {
+            if (file.name === 'broken.pdf') throw fail({ code: 'unreadable_pdf' });
+
+            return [resultFile({ filename: file.name })];
+        });
+        const { result } = renderHook(() => useFileAction(browser));
+
+        act(() => result.current.run([upload('broken.pdf'), upload('fine.pdf')], {}));
+        await waitFor(() => expect(result.current.outcome).not.toBeNull());
+
+        expect(result.current.outcome?.files.map(entry => entry.file.filename)).toEqual([
+            'fine.pdf',
+        ]);
+        expect(result.current.outcome?.failures).toEqual([
+            { filename: 'broken.pdf', detail: { code: 'unreadable_pdf' } },
+        ]);
+    });
+
+    it('toasts and shows no card when nothing came through, like a failed request', async () => {
+        const browser = tool(async () => {
+            throw fail({ code: 'encrypted_pdf' });
+        });
+        const { result } = renderHook(() => useFileAction(browser));
+
+        act(() => result.current.run([upload('locked.pdf')], {}));
+        await waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith(errorText({ code: 'encrypted_pdf' }))
+        );
+
+        expect(result.current.outcome).toBeNull();
+        expect(result.current.isPending).toBe(false);
+    });
+
+    it('reports an unexpected exception as unknown rather than leaking its message', async () => {
+        const browser = tool(async () => {
+            throw new TypeError('canvas exploded');
+        });
+        const { result } = renderHook(() => useFileAction(browser));
+
+        act(() => result.current.run([upload()], {}));
+        await waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith(errorText({ code: 'unknown' }))
+        );
+    });
+
+    it('shows the progress a single file reports, such as the pages of one PDF', async () => {
+        let release: () => void = () => {};
+        const gate = new Promise<void>(resolve => (release = resolve));
+        const browser = tool(async (_upload, _params, progress) => {
+            progress(2, 5);
+            await gate;
+
+            return [resultFile()];
+        });
+        const { result } = renderHook(() => useFileAction(browser));
+
+        act(() => result.current.run([upload('doc.pdf')], {}));
+        await waitFor(() => expect(result.current.progress).toEqual({ done: 2, total: 5 }));
+
+        await act(async () => release());
+        await waitFor(() => expect(result.current.outcome).not.toBeNull());
+
+        expect(result.current.progress).toBeNull();
+    });
+
+    it('renames a batch whose outputs collide', async () => {
+        const browser = tool(async () => [resultFile({ filename: 'IMG_0001.jpg' })]);
+        const { result } = renderHook(() => useFileAction(browser));
+
+        act(() => result.current.run([upload('a.pdf'), upload('b.pdf')], {}));
+        await waitFor(() => expect(result.current.outcome?.files).toHaveLength(2));
+
+        const names = result.current.outcome?.files.map(entry => entry.file.filename);
+
+        expect(new Set(names).size).toBe(2);
     });
 });
 

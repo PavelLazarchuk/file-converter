@@ -27,6 +27,8 @@ import {
     formatFileSize,
     formatFromMimeType,
     lastPageRequested,
+    pageImageName,
+    pageRenderSize,
     pagesInRanges,
     parsePageRanges,
     placeholderFontSize,
@@ -473,5 +475,36 @@ describe('limits', () => {
 
     it('accepts the four editable formats everywhere', () => {
         expect(FORMAT_KEYS.every(key => CONVERT_SOURCE_KEYS.includes(key))).toBe(true);
+    });
+});
+
+describe('rendering PDF pages', () => {
+    const A4 = { width: 595.28, height: 841.89 };
+
+    it('scales points to pixels at the requested DPI', () => {
+        expect(pageRenderSize(A4, 72)).toEqual({ scale: 1, width: 595, height: 841, dpi: 72 });
+        expect(pageRenderSize(A4, 300)).toMatchObject({ width: 2480, height: 3507, dpi: 300 });
+    });
+
+    it('shrinks a page that would not fit a browser canvas, and says by how much', () => {
+        const poster = { width: 2384, height: 3370 };
+        const render = pageRenderSize(poster, 300);
+
+        expect(render.width * render.height).toBeLessThanOrEqual(16_000_000);
+        expect(render.dpi).toBeLessThan(300);
+        expect(render.dpi).toBeGreaterThan(100);
+    });
+
+    it('keeps a long strip under the per-side limit even when its area is small', () => {
+        const strip = { width: 14400, height: 72 };
+        const render = pageRenderSize(strip, 150, { pixels: 16_000_000, side: 16_384 });
+
+        expect(render.width).toBeLessThanOrEqual(16_384);
+        expect(render.height).toBeGreaterThanOrEqual(1);
+    });
+
+    it('names each image after its page number', () => {
+        expect(pageImageName('report', 3, 'jpeg')).toBe('report-page-3.jpg');
+        expect(pageImageName('report', 12, 'webp')).toBe('report-page-12.webp');
     });
 });

@@ -1,31 +1,9 @@
 import sharp, { type Metadata } from 'sharp';
 
-import type { ActionErrorCode, ActionErrorDetail, ActionWarningDetail } from '../errors';
-import { parseFieldMessage } from '../form-messages';
+import { fail, type ActionWarningDetail } from '../errors';
 import { MAX_INPUT_PIXELS, frameCount, isAnimated, type ConvertSource, type Size } from '../image';
 
-export class ProcessingError extends Error {
-    constructor(readonly detail: ActionErrorDetail) {
-        super(detail.code);
-        this.name = 'ProcessingError';
-    }
-
-    get code(): ActionErrorCode {
-        return this.detail.code;
-    }
-}
-
-export function fail(detail: ActionErrorDetail): ProcessingError {
-    return new ProcessingError(detail);
-}
-
-type IssueList = { issues: readonly { message: string }[] };
-
-export function invalid(error: IssueList): ProcessingError {
-    const field = parseFieldMessage(error.issues[0]?.message);
-
-    return fail({ code: 'invalid_settings', ...(field ? { field } : {}) });
-}
+export { ProcessingError, fail, invalid } from '../errors';
 
 export type SourceImage<Format extends ConvertSource = ConvertSource> = {
     buffer: Buffer;

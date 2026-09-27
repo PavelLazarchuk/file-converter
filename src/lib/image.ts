@@ -51,6 +51,14 @@ export function isAnimated(metadata: FrameSource): boolean {
     return frameCount(metadata) > 1;
 }
 
+export const BROWSER_OUTPUT_KEYS = ['jpeg', 'png', 'webp'] as const;
+
+export type BrowserOutput = (typeof BROWSER_OUTPUT_KEYS)[number];
+
+export function browserOutputTakesQuality(format: BrowserOutput): boolean {
+    return format !== 'png';
+}
+
 export const IMAGE_FORMATS: Record<ConvertTarget, { mimeType: string; extension: string }> = {
     jpeg: { mimeType: 'image/jpeg', extension: 'jpg' },
     png: { mimeType: 'image/png', extension: 'png' },
@@ -661,6 +669,42 @@ export const PDF_COMPRESS_LEVELS: Record<
 export const MIN_RECOMPRESSED_IMAGE_BYTES = 4096;
 
 export const MAX_PDF_WATERMARK_TILES = 400;
+
+export const PDF_RENDER_DPI_KEYS = ['72', '150', '300'] as const;
+
+export type PdfRenderDpi = (typeof PDF_RENDER_DPI_KEYS)[number];
+
+export const PDF_POINTS_PER_INCH = 72;
+
+export const PDF_RENDER_LIMITS = { pixels: 16_000_000, side: 16_384 } as const;
+
+export type PageRender = { scale: number; width: number; height: number; dpi: number };
+
+export function pageRenderSize(
+    page: Size,
+    dpi: number,
+    limits: { pixels: number; side: number } = PDF_RENDER_LIMITS
+): PageRender {
+    const requested = dpi / PDF_POINTS_PER_INCH;
+    const fit = Math.min(
+        1,
+        Math.sqrt(limits.pixels / (page.width * requested * page.height * requested)),
+        limits.side / (page.width * requested),
+        limits.side / (page.height * requested)
+    );
+    const scale = requested * fit;
+
+    return {
+        scale,
+        width: Math.max(1, Math.floor(page.width * scale)),
+        height: Math.max(1, Math.floor(page.height * scale)),
+        dpi: fit < 1 ? Math.floor(dpi * fit) : dpi,
+    };
+}
+
+export function pageImageName(baseName: string, page: number, format: BrowserOutput): string {
+    return `${baseName}-page-${page}.${IMAGE_FORMATS[format].extension}`;
+}
 
 export const PAGE_RANGE_MAX_LENGTH = 200;
 

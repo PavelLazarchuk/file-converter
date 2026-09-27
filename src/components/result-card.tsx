@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Image from 'next/image';
-import { Download, FileCheck2, TriangleAlert, X } from 'lucide-react';
+import { Download, FileCheck2, Share2, TriangleAlert, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +24,7 @@ import { useActionMessage, useFileSize, useWarningMessage } from '@/hooks/use-me
 import { FILENAME_TEMPLATE_MAX_LENGTH, FILENAME_TOKENS } from '@/lib/filename-template';
 import { handoffTargets } from '@/lib/handoff';
 import { sizeChange } from '@/lib/image';
+import { shareFiles, shareSupport, type Shareable } from '@/lib/share';
 import { toolByHref } from '@/lib/site';
 import { cn } from '@/lib/utils';
 
@@ -185,7 +187,23 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
     const warningMessage = useWarningMessage();
     const { files, failures } = outcome;
     const single = files.length === 1 ? files[0] : null;
-    const names = outcomeNames(files, template);
+    const names = useMemo(() => outcomeNames(files, template), [files, template]);
+    const shareable = useMemo(
+        () =>
+            files.map((entry, index) => ({
+                data: entry.file.data,
+                name: names[index],
+                mimeType: entry.file.mimeType,
+            })),
+        [files, names]
+    );
+    const canShare = useMemo(() => shareSupport(shareable), [shareable]);
+
+    function share(entries: Shareable[]) {
+        void shareFiles(entries).then(result => {
+            if (result === 'failed') toast.error(t('shareFailed'));
+        });
+    }
 
     return (
         <div
@@ -253,6 +271,17 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
                             >
                                 <Download />
                             </Button>
+                            {canShare.each[index] && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label={t('shareOne', { name: names[index] })}
+                                    onClick={() => share([shareable[index]])}
+                                >
+                                    <Share2 />
+                                </Button>
+                            )}
                         </li>
                     ))}
                 </ul>
@@ -285,6 +314,12 @@ export function ResultCard({ outcome, leaving, onDismiss, onDownloadAll }: Resul
                             : t('download')
                         : t('downloadAll')}
                 </Button>
+                {canShare.all && (
+                    <Button type="button" variant="outline" onClick={() => share(shareable)}>
+                        <Share2 />
+                        {single ? t('share') : t('shareAll')}
+                    </Button>
+                )}
                 <Button type="button" variant="outline" onClick={onDismiss}>
                     <X />
                     {t('discard')}

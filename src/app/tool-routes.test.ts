@@ -10,10 +10,17 @@ function read(href: string, file: string): string {
 }
 
 describe('every tool route', () => {
-    it.each(TOOLS.map(tool => tool.href))(
+    it.each(TOOLS.filter(tool => !tool.inBrowser).map(tool => tool.href))(
         '%s raises the Server Action timeout above the platform default',
         href => {
             expect(read(href, 'page.tsx')).toMatch(/export const maxDuration = \d+;/);
+        }
+    );
+
+    it.each(TOOLS.filter(tool => tool.inBrowser).map(tool => tool.href))(
+        '%s hosts no Server Action, so it sets no timeout',
+        href => {
+            expect(read(href, 'page.tsx')).not.toContain('maxDuration');
         }
     );
 

@@ -1,12 +1,18 @@
 import type { ActionFile } from './actions';
-import { IMAGE_FORMATS, MAX_INPUT_PIXELS, type ConvertTarget } from './image';
+import {
+    BROWSER_OUTPUT_KEYS,
+    IMAGE_FORMATS,
+    MAX_INPUT_PIXELS,
+    type BrowserOutput,
+    type ConvertTarget,
+} from './image';
 
 export const LOCAL_MAX_FILE_SIZE = 2 * 1024 * 1024;
 export const LOCAL_MAX_FILE_SIZE_LABEL = '2MB';
 
-export const LOCAL_CODEC_KEYS = ['jpeg', 'png', 'webp'] as const;
+export const LOCAL_CODEC_KEYS = BROWSER_OUTPUT_KEYS;
 
-export type LocalCodec = (typeof LOCAL_CODEC_KEYS)[number];
+export type LocalCodec = BrowserOutput;
 
 const WASM_PATH = '/wasm';
 
@@ -42,7 +48,7 @@ export function fitsLocalBudget({ file, width, height }: LocalSource): boolean {
 
 const started = new Map<string, Promise<unknown>>();
 
-function once(key: string, start: () => Promise<unknown>): Promise<unknown> {
+export function once<Value>(key: string, start: () => Promise<Value>): Promise<Value> {
     const running =
         started.get(key) ??
         start().catch((error: unknown) => {
@@ -53,7 +59,7 @@ function once(key: string, start: () => Promise<unknown>): Promise<unknown> {
 
     started.set(key, running);
 
-    return running;
+    return running as Promise<Value>;
 }
 
 const emscripten = { locateFile: (path: string) => `${WASM_PATH}/${path}` };
@@ -116,8 +122,17 @@ async function reencode(
     if (!source) throw new Error('unrecognised codec');
 
     const decode = await decoder(source);
-    const encode = await encoder(target);
     const image = await decode(bytes.buffer as ArrayBuffer);
+
+    return encodeImage(image, target, quality);
+}
+
+export async function encodeImage(
+    image: ImageData,
+    codec: LocalCodec,
+    quality: number
+): Promise<Uint8Array> {
+    const encode = await encoder(codec);
 
     return new Uint8Array(await encode(image, quality));
 }

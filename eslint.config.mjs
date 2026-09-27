@@ -7,7 +7,14 @@ const eslintConfig = defineConfig([
     ...nextVitals,
     ...nextTs,
     prettier,
-    globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts']),
+    globalIgnores([
+        '.next/**',
+        'out/**',
+        'build/**',
+        'next-env.d.ts',
+        'public/wasm/**',
+        'public/pdfjs/**',
+    ]),
 ]);
 
 export default eslintConfig;

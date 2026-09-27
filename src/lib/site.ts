@@ -2,6 +2,7 @@ import {
     Combine,
     Crop,
     Scale,
+    FileImage,
     FileSignature,
     FileStack,
     FileText,
@@ -62,7 +63,8 @@ export type ToolKey =
     | 'splitPdf'
     | 'organizePdf'
     | 'compressPdf'
-    | 'imagesToPdf';
+    | 'imagesToPdf'
+    | 'pdfToImages';
 
 export type Tool = {
     key: ToolKey;
@@ -71,6 +73,7 @@ export type Tool = {
     gradient: string;
     accent: readonly [string, string];
     intake?: ToolIntake;
+    inBrowser?: true;
 };
 
 export type ToolCopy = { title: string; description: string };
@@ -226,6 +229,15 @@ export const TOOLS: readonly Tool[] = [
         gradient: 'from-red-500 to-rose-600',
         accent: ['#ef4444', '#e11d48'],
         intake: CONVERT_INTAKE,
+    },
+    {
+        key: 'pdfToImages',
+        href: '/pdf-to-jpg',
+        icon: FileImage,
+        gradient: 'from-rose-500 to-orange-600',
+        accent: ['#f43f5e', '#ea580c'],
+        intake: SINGLE_PDF_INTAKE,
+        inBrowser: true,
     },
 ] as const;
 

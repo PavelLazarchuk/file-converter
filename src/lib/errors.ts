@@ -1,4 +1,4 @@
-import type { FieldMessage } from './form-messages';
+import { parseFieldMessage, type FieldMessage } from './form-messages';
 import type { ConvertSource } from './image';
 
 export type ActionErrorDetail =
@@ -33,6 +33,7 @@ export type ActionErrorDetail =
     | { code: 'unsupported_text' }
     | { code: 'logo_missing' }
     | { code: 'logo_too_large' }
+    | { code: 'engine_failed' }
     | { code: 'transport_failed' }
     | { code: 'unknown' };
 
@@ -41,6 +42,30 @@ export type ActionErrorCode = ActionErrorDetail['code'];
 export type ActionWarningDetail =
     | { code: 'target_missed'; targetBytes: number; smallestBytes: number }
     | { code: 'animation_lost'; frames: number }
-    | { code: 'pdf_not_smaller' };
+    | { code: 'pdf_not_smaller' }
+    | { code: 'page_downscaled'; requested: number; dpi: number };
 
 export type ActionWarningCode = ActionWarningDetail['code'];
+
+export class ProcessingError extends Error {
+    constructor(readonly detail: ActionErrorDetail) {
+        super(detail.code);
+        this.name = 'ProcessingError';
+    }
+
+    get code(): ActionErrorCode {
+        return this.detail.code;
+    }
+}
+
+export function fail(detail: ActionErrorDetail): ProcessingError {
+    return new ProcessingError(detail);
+}
+
+type IssueList = { issues: readonly { message: string }[] };
+
+export function invalid(error: IssueList): ProcessingError {
+    const field = parseFieldMessage(error.issues[0]?.message);
+
+    return fail({ code: 'invalid_settings', ...(field ? { field } : {}) });
+}

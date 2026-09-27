@@ -2,12 +2,13 @@ import { screen } from '@testing-library/react';
 
 import { render } from '@/test/intl';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ResultCard } from '@/components/result-card';
 import type { ActionFile } from '@/lib/actions';
 import { downloadFile } from '@/lib/download';
 import { clearHandoff, peekHandoff } from '@/lib/handoff';
+import { FILENAME_TEMPLATE_STORAGE_KEY } from '@/lib/preferences';
 import type { ActionOutcome, OutcomeFile } from '@/hooks/use-file-action';
 
 const push = vi.fn();
@@ -258,5 +259,74 @@ describe('the auto-download preference', () => {
 
         expect(toggle).toBeChecked();
         expect(localStorage.getItem('auto-download')).toBe('true');
+    });
+});
+
+describe('sharing', () => {
+    const share = vi.fn<(data: ShareData) => Promise<void>>(() => Promise.resolve());
+
+    function allowShare(canShare: (data: ShareData) => boolean = () => true) {
+        Object.defineProperty(navigator, 'canShare', { value: canShare, configurable: true });
+        Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+    }
+
+    beforeEach(() => share.mockClear());
+
+    afterEach(() => {
+        Reflect.deleteProperty(navigator, 'canShare');
+        Reflect.deleteProperty(navigator, 'share');
+    });
+
+    it('offers no share button where the browser cannot share', () => {
+        setup(outcome([entry()]));
+
+        expect(screen.queryByRole('button', { name: /share/i })).toBeNull();
+    });
+
+    it('shares the single result under the name the card shows', async () => {
+        allowShare();
+        localStorage.setItem(FILENAME_TEMPLATE_STORAGE_KEY, '{name}-small');
+
+        const { user } = setup(outcome([entry()]));
+
+        await user.click(screen.getByRole('button', { name: 'Share' }));
+
+        const files = share.mock.calls[0][0].files ?? [];
+
+        expect(screen.getByText('photo-small.png')).toBeInTheDocument();
+        expect(files.map(file => [file.name, file.type])).toEqual([
+            ['photo-small.png', 'image/png'],
+        ]);
+    });
+
+    it('shares the whole batch at once, and each file from its row', async () => {
+        allowShare();
+
+        const { user } = setup(
+            outcome([entry({ filename: 'a.png' }), entry({ filename: 'b.png' })])
+        );
+
+        await user.click(screen.getByRole('button', { name: 'Share all' }));
+        await user.click(screen.getByRole('button', { name: 'Share b.png' }));
+
+        expect(share.mock.calls.map(([data]) => data.files?.map(file => file.name))).toEqual([
+            ['a.png', 'b.png'],
+            ['b.png'],
+        ]);
+    });
+
+    it('hides only the buttons whose files the share sheet refuses', () => {
+        allowShare(({ files = [] }) => files.every(file => file.type === 'image/png'));
+
+        setup(
+            outcome([
+                entry({ filename: 'a.png' }),
+                entry({ filename: 'icons.zip', mimeType: 'application/zip' }, false),
+            ])
+        );
+
+        expect(screen.queryByRole('button', { name: 'Share all' })).toBeNull();
+        expect(screen.getByRole('button', { name: 'Share a.png' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Share icons.zip' })).toBeNull();
     });
 });

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { clearHandoff, handoffTargets, peekHandoff, setHandoff, takeHandoff } from './handoff';
-import { IMAGE_FORMATS, PDF_MIME_TYPE } from './image';
+import { IMAGE_FORMATS, MAX_PDF_PARTS, PDF_MIME_TYPE } from './image';
 import { TOOLS } from './site';
 
 const PNG = IMAGE_FORMATS.png.mimeType;
@@ -81,7 +81,17 @@ describe('choosing the tools worth offering', () => {
             '/split-pdf',
             '/organize-pdf',
             '/compress-pdf',
+            '/pdf-to-jpg',
         ]);
+    });
+
+    it('sends the rendered pages of a PDF on to the image tools', () => {
+        const pages = Array.from({ length: MAX_PDF_PARTS }, () => 'image/jpeg');
+        const targets = handoffTargets(pages, '/pdf-to-jpg').map(tool => tool.href);
+
+        expect(targets).toContain('/compress');
+        expect(targets).toContain('/convert');
+        expect(targets).not.toContain('/crop');
     });
 
     it('offers the single-document tools only while the result is a single PDF', () => {
